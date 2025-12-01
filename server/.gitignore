@@ -1,0 +1,16 @@
+# Python virtual environment
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Downloaded videos
+temp/
+*.mp4
+*.webm
+*.mkv
+
+# ffmpeg binary
+bin/
