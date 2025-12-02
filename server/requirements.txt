@@ -3,3 +3,5 @@ yt-dlp
 uvicorn
 python-multipart
 ffmpeg-python
+google-api-python-client
+python-dotenv
