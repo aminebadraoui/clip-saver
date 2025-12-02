@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 import yt_dlp
 import os
@@ -10,6 +10,9 @@ import shutil
 from googleapiclient.discovery import build
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+import threading
+import time
+import json
 
 # Load environment variables
 load_dotenv()
@@ -40,63 +43,136 @@ app.mount("/temp", StaticFiles(directory=str(TEMP_DIR)), name="temp")
 # else:
 #     print("WARNING: YOUTUBE_API_KEY not found in environment variables. Viral tracker will not work.")
 
+# Global progress storage
+download_progress = {}
+
 class DownloadRequest(BaseModel):
     videoId: str
 
 class CleanupRequest(BaseModel):
     filename: str
 
-@app.post("/api/download")
-async def download_video(request: DownloadRequest):
-    # ... (keep existing download_video code)
-    video_id = request.videoId
-    
-    if not video_id:
-        raise HTTPException(status_code=400, detail="Missing videoId")
-    
-    # Check if file already exists
-    existing_files = [f for f in os.listdir(TEMP_DIR) if video_id in f]
-    if existing_files:
-        return JSONResponse({
-            "url": f"/temp/{existing_files[0]}",
-            "filename": existing_files[0]
-        })
-    
+def progress_hook(d, task_id):
+    if d['status'] == 'downloading':
+        progress = 0
+        try:
+            if 'total_bytes' in d and d['total_bytes'] > 0:
+                progress = (d['downloaded_bytes'] / d['total_bytes']) * 100
+            elif 'total_bytes_estimate' in d and d['total_bytes_estimate'] > 0:
+                progress = (d['downloaded_bytes'] / d['total_bytes_estimate']) * 100
+            elif '_percent_str' in d:
+                p = d.get('_percent_str', '0%').replace('%', '')
+                progress = float(p)
+            
+            # Debug log for progress
+            print(f"DEBUG: Task {task_id} - Progress: {progress}% - Keys: {list(d.keys())}")
+        except Exception as e:
+            print(f"Error calculating progress: {e}")
+            progress = 0
+        
+        download_progress[task_id] = {
+            "status": "downloading",
+            "progress": progress,
+            "speed": d.get('_speed_str', 'N/A'),
+            "eta": d.get('_eta_str', 'N/A')
+        }
+    elif d['status'] == 'finished':
+        print(f"DEBUG: Task {task_id} - Finished")
+        download_progress[task_id] = {
+            "status": "processing",
+            "progress": 100,
+            "message": "Processing video..."
+        }
+
+def run_download(video_id, task_id, output_template):
     video_url = f"https://www.youtube.com/watch?v={video_id}"
-    output_template = str(TEMP_DIR / "%(title)s-%(id)s.%(ext)s")
     
-    print(f"Downloading video: {video_id}")
-    
+    # Optimized options
     ydl_opts = {
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-        'outtmpl': output_template,
+        'format': 'bestvideo[height>=720][ext=mp4]+bestaudio[ext=m4a]/best[height>=720][ext=mp4]/best[ext=mp4]/best',
+        'outtmpl': str(TEMP_DIR / "%(title).100s-%(id)s.%(ext)s"), # Limit title length
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
+        'restrictfilenames': True, # Ensure ASCII filenames
+        # 'concurrent_fragment_downloads': 4, # Removed as it might cause throttling
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}, # Use android client for better speed
+        'progress_hooks': [lambda d: progress_hook(d, task_id)],
     }
     
     try:
-        # Run blocking yt-dlp in a thread pool
-        # Note: yt-dlp is blocking, so we should ideally run it in a thread pool too, 
-        # but for now we focus on the viral endpoint fix.
-        # Actually, let's keep download_video as is for now if it was working, 
-        # but technically it should also be 'def' or run_in_executor.
-        # However, the user issue is specifically about the viral endpoint.
-        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=True)
             filename = ydl.prepare_filename(info)
             basename = os.path.basename(filename)
             
-            print(f"Download complete: {basename}")
+            print(f"DEBUG: Generated filename: {filename}")
+            print(f"DEBUG: Basename: {basename}")
             
-            return JSONResponse({
+            download_progress[task_id] = {
+                "status": "completed",
+                "progress": 100,
                 "url": f"/temp/{basename}",
                 "filename": basename
-            })
+            }
     except Exception as e:
         print(f"Download failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
+        download_progress[task_id] = {
+            "status": "error",
+            "error": str(e)
+        }
+
+@app.post("/api/download")
+async def start_download(request: DownloadRequest):
+    video_id = request.videoId
+    if not video_id:
+        raise HTTPException(status_code=400, detail="Missing videoId")
+    
+    # Check if file already exists
+    existing_files = [f for f in os.listdir(TEMP_DIR) if video_id in f and not f.endswith('.part')]
+    print(f"DEBUG: Checking for existing files with ID {video_id}. Found: {existing_files}")
+    
+    if existing_files:
+        return JSONResponse({
+            "status": "exists",
+            "url": f"/temp/{existing_files[0]}",
+            "filename": existing_files[0]
+        })
+    
+    task_id = f"{video_id}_{int(time.time())}"
+    output_template = str(TEMP_DIR / "%(title)s-%(id)s.%(ext)s")
+    
+    # Initialize progress
+    download_progress[task_id] = {"status": "starting", "progress": 0}
+    
+    # Start background thread
+    thread = threading.Thread(
+        target=run_download,
+        args=(video_id, task_id, output_template)
+    )
+    thread.start()
+    
+    return JSONResponse({"taskId": task_id})
+
+import asyncio
+
+@app.get("/api/download/progress/{task_id}")
+async def get_download_progress(task_id: str):
+    async def event_generator():
+        while True:
+            if task_id in download_progress:
+                data = download_progress[task_id]
+                yield f"data: {json.dumps(data)}\n\n"
+                
+                if data["status"] in ["completed", "error"]:
+                    break
+            else:
+                yield f"data: {json.dumps({'status': 'error', 'error': 'Task not found'})}\n\n"
+                break
+            
+            await asyncio.sleep(0.1)
+            
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @app.get("/api/youtube/viral")
 def get_viral_videos(timeFilter: str = "today", maxResults: int = 50, q: str = None):
@@ -205,6 +281,125 @@ def get_viral_videos(timeFilter: str = "today", maxResults: int = 50, q: str = N
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"YouTube API error: {str(e)}")
+
+class CaptureRequest(BaseModel):
+    videoId: str
+    timestamp: float
+
+@app.post("/api/capture-thumbnail")
+async def capture_thumbnail(request: CaptureRequest):
+    print(f"DEBUG: Received capture request for video {request.videoId} at {request.timestamp}")
+    video_id = request.videoId
+    timestamp = request.timestamp
+    
+    if not video_id:
+        print("DEBUG: Missing videoId")
+        raise HTTPException(status_code=400, detail="Missing videoId")
+
+    # Create a unique filename for this capture
+    base_filename = f"{video_id}_{int(timestamp)}"
+    temp_video_path = TEMP_DIR / f"{base_filename}.mp4"
+    output_image_path = TEMP_DIR / f"{base_filename}.jpg"
+    
+    print(f"DEBUG: Output path: {output_image_path}")
+
+    # Return existing if available
+    if output_image_path.exists():
+         print("DEBUG: Returning existing thumbnail")
+         return JSONResponse({"url": f"/temp/{output_image_path.name}"})
+
+    try:
+        print("DEBUG: Starting capture process...")
+        # 1. Get the streaming URL using yt-dlp
+        # We use -g to get the URL, and we select a format that is video-only or combined, 
+        # preferably 720p or best available to ensure good thumbnail quality but fast response.
+        cmd_get_url = [
+            "yt-dlp",
+            "-g",
+            "-f", "bestvideo[height<=720]/best[height<=720]",
+            f"https://www.youtube.com/watch?v={video_id}"
+        ]
+        
+        process = await asyncio.create_subprocess_exec(
+            *cmd_get_url,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate()
+        
+        if process.returncode != 0:
+            print(f"yt-dlp error: {stderr.decode()}")
+            raise Exception("Failed to get video URL")
+            
+        stream_url = stdout.decode().strip().split('\n')[0] # Take the first URL (video)
+
+        # 2. Use ffmpeg to extract the frame directly from the stream
+        # -ss seeks to the timestamp
+        # -i input url
+        # -frames:v 1 captures one frame
+        # -q:v 2 sets high quality jpeg
+        cmd_ffmpeg = [
+            "ffmpeg",
+            "-ss", str(timestamp),
+            "-i", stream_url,
+            "-frames:v", "1",
+            "-q:v", "2",
+            "-y", # Overwrite
+            str(output_image_path)
+        ]
+        
+        process_ffmpeg = await asyncio.create_subprocess_exec(
+            *cmd_ffmpeg,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        await process_ffmpeg.communicate()
+        
+        if process_ffmpeg.returncode != 0 or not output_image_path.exists():
+             # Fallback: Try downloading a small section if streaming fails (slower but more robust)
+             print("Direct stream capture failed, trying download section...")
+             
+             ydl_opts = {
+                'format': 'bestvideo[height<=720]/best[height<=720]',
+                'outtmpl': str(temp_video_path),
+                'download_ranges': lambda info, ydl: [{'start_time': timestamp, 'end_time': timestamp + 1}],
+                'quiet': True,
+                'force_keyframes_at_cuts': True,
+             }
+             
+             # Run blocking yt-dlp in thread
+             loop = asyncio.get_event_loop()
+             await loop.run_in_executor(None, lambda: yt_dlp.YoutubeDL(ydl_opts).download([f"https://www.youtube.com/watch?v={video_id}"]))
+             
+             # Now extract frame from local file
+             cmd_ffmpeg_local = [
+                "ffmpeg",
+                "-i", str(temp_video_path),
+                "-frames:v", "1",
+                "-q:v", "2",
+                "-y",
+                str(output_image_path)
+             ]
+             
+             process_local = await asyncio.create_subprocess_exec(
+                *cmd_ffmpeg_local,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+             )
+             await process_local.communicate()
+             
+             # Cleanup temp video
+             if temp_video_path.exists():
+                 os.remove(temp_video_path)
+
+        if output_image_path.exists():
+            return JSONResponse({"url": f"/temp/{output_image_path.name}"})
+        else:
+            raise Exception("Failed to generate thumbnail image")
+
+    except Exception as e:
+        print(f"Thumbnail capture error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/cleanup")
 async def cleanup_video(request: CleanupRequest):

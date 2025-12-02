@@ -1,5 +1,7 @@
+import { useNavigate } from "react-router-dom";
 import type { ViralVideo } from "@/types/youtube";
-import { ExternalLink, Eye, Users, TrendingUp } from "lucide-react";
+import { ExternalLink, Eye, Users, TrendingUp, Scissors } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface ViralVideoCardProps {
     video: ViralVideo;
@@ -37,17 +39,24 @@ function formatDate(dateString: string): string {
 }
 
 export function ViralVideoCard({ video }: ViralVideoCardProps) {
+    const navigate = useNavigate();
     const viralRatioColor = getViralRatioColor(video.viralRatio);
 
+    const handleCreateClip = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        navigate(`/create?url=${encodeURIComponent(video.url)}`);
+    };
+
     return (
-        <a
-            href={video.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group block bg-card rounded-xl overflow-hidden border border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:scale-[1.02]"
-        >
+        <div className="group block bg-card rounded-xl overflow-hidden border border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:scale-[1.02]">
             {/* Thumbnail */}
-            <div className="relative aspect-video overflow-hidden bg-muted">
+            <a
+                href={video.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="relative aspect-video overflow-hidden bg-muted block"
+            >
                 <img
                     src={video.thumbnail}
                     alt={video.title}
@@ -65,14 +74,19 @@ export function ViralVideoCard({ video }: ViralVideoCardProps) {
                 <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <ExternalLink className="w-5 h-5 text-white drop-shadow-lg" />
                 </div>
-            </div>
+            </a>
 
             {/* Content */}
             <div className="p-4 space-y-3">
                 {/* Title */}
-                <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+                <a
+                    href={video.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors"
+                >
                     {video.title}
-                </h3>
+                </a>
 
                 {/* Channel Name */}
                 <p className="text-sm text-muted-foreground">{video.channelName}</p>
@@ -90,7 +104,17 @@ export function ViralVideoCard({ video }: ViralVideoCardProps) {
                     <span>•</span>
                     <span>{formatDate(video.publishedAt)}</span>
                 </div>
+
+                {/* Actions */}
+                <Button
+                    onClick={handleCreateClip}
+                    className="w-full mt-2 gap-2"
+                    variant="secondary"
+                >
+                    <Scissors className="w-4 h-4" />
+                    Create Clip
+                </Button>
             </div>
-        </a>
+        </div>
     );
 }

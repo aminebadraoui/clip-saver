@@ -1,5 +1,6 @@
-import { useState, useEffect, type RefObject } from "react";
+import { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
+import YouTube, { type YouTubeEvent, type YouTubePlayer } from "react-youtube";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { formatTime } from "@/utils/formatTime";
-import { Trash2, Plus, Save, Play, Camera } from "lucide-react";
+import { Trash2, Plus, Save, Play, Pause, Loader2 } from "lucide-react";
 import type { Clip } from "@/types/clip";
 
 interface Segment {
@@ -15,42 +16,36 @@ interface Segment {
     start: string;
     end: string;
     thumbnail?: string | null;
+    isGeneratingThumbnail?: boolean;
 }
 
 interface SegmentBuilderProps {
     videoId: string;
     videoTitle: string;
     thumbnail: string;
-    videoRef: RefObject<HTMLVideoElement | null>;
     onSave: (clips: Clip[]) => void;
 }
 
-export function SegmentBuilder({ videoId, videoTitle, thumbnail, videoRef, onSave }: SegmentBuilderProps) {
+export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave }: SegmentBuilderProps) {
     const [segments, setSegments] = useState<Segment[]>([]);
     const [start, setStart] = useState("");
     const [end, setEnd] = useState("");
     const [error, setError] = useState<string | null>(null);
-    const [capturedThumbnail, setCapturedThumbnail] = useState<string | null>(null);
-    const [isCapturing, setIsCapturing] = useState(false);
     const [sliderValue, setSliderValue] = useState([0, 0]);
     const [duration, setDuration] = useState<number>(0);
+    const [isPlaying, setIsPlaying] = useState(false);
 
-    // Get duration from video element
-    useEffect(() => {
-        const video = videoRef.current;
-        if (video) {
-            const updateDuration = () => {
-                setDuration(video.duration || 0);
-            };
+    const playerRef = useRef<YouTubePlayer | null>(null);
+    const previewIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-            if (video.duration) {
-                updateDuration();
-            }
+    const onPlayerReady = (event: YouTubeEvent) => {
+        playerRef.current = event.target;
+        setDuration(event.target.getDuration());
+    };
 
-            video.addEventListener('loadedmetadata', updateDuration);
-            return () => video.removeEventListener('loadedmetadata', updateDuration);
-        }
-    }, [videoRef]);
+    const onStateChange = (event: YouTubeEvent) => {
+        setIsPlaying(event.data === 1); // 1 is playing
+    };
 
     // Sync slider with inputs
     useEffect(() => {
@@ -63,84 +58,67 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, videoRef, onSav
         const prevStart = sliderValue[0];
         const prevEnd = sliderValue[1];
 
-        console.log('Slider changed:', { prevStart, prevEnd, newStart: value[0], newEnd: value[1] });
-        console.log('Video element:', videoRef.current);
-
         setSliderValue(value);
         setStart(value[0].toString());
         setEnd(value[1].toString());
 
-        const video = videoRef.current;
-        if (video) {
+        if (playerRef.current) {
             // Determine which thumb was moved and seek accordingly
             if (value[0] !== prevStart) {
-                // Start thumb was moved
-                console.log('Seeking to start:', value[0]);
-                video.currentTime = value[0];
+                playerRef.current.seekTo(value[0], true);
             } else if (value[1] !== prevEnd) {
-                // End thumb was moved
-                console.log('Seeking to end:', value[1]);
-                video.currentTime = value[1];
+                playerRef.current.seekTo(value[1], true);
             }
-        } else {
-            console.log('Video element is null!');
-        }
-    };
-
-    const handleCapture = () => {
-        const video = videoRef.current;
-        if (!video) {
-            setError("Video not loaded");
-            return;
-        }
-
-        try {
-            setIsCapturing(true);
-            const canvas = document.createElement("canvas");
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-
-            const ctx = canvas.getContext("2d");
-            if (ctx) {
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                setCapturedThumbnail(canvas.toDataURL("image/jpeg"));
-            }
-        } catch (err) {
-            console.error("Capture failed", err);
-            setError("Failed to capture frame. Please try again.");
-        } finally {
-            setIsCapturing(false);
         }
     };
 
     const previewSegment = () => {
-        const video = videoRef.current;
-        if (!video) return;
+        if (!playerRef.current) return;
+
         const s = parseInt(start);
         const e = parseInt(end);
+
         if (!isNaN(s) && !isNaN(e) && s < e) {
-            video.currentTime = s;
-            video.play();
+            playerRef.current.seekTo(s, true);
+            playerRef.current.playVideo();
+
+            // Clear existing interval
+            if (previewIntervalRef.current) {
+                clearInterval(previewIntervalRef.current);
+            }
 
             // Stop at end time
-            const checkTime = setInterval(() => {
-                if (video.currentTime >= e) {
-                    video.pause();
-                    clearInterval(checkTime);
+            previewIntervalRef.current = setInterval(async () => {
+                if (!playerRef.current) return;
+                const currentTime = await playerRef.current.getCurrentTime();
+
+                if (currentTime >= e) {
+                    playerRef.current.pauseVideo();
+                    if (previewIntervalRef.current) {
+                        clearInterval(previewIntervalRef.current);
+                    }
                 }
             }, 100);
-
-            // Clear interval after duration
-            setTimeout(() => clearInterval(checkTime), (e - s + 1) * 1000);
         }
     };
 
+    // Cleanup interval on unmount
+    useEffect(() => {
+        return () => {
+            if (previewIntervalRef.current) {
+                clearInterval(previewIntervalRef.current);
+            }
+        };
+    }, []);
+
     const addSegment = () => {
+        console.log("DEBUG: addSegment called", { start, end });
         setError(null);
         const startNum = parseInt(start);
         const endNum = parseInt(end);
 
         if (isNaN(startNum) || isNaN(endNum)) {
+            console.log("DEBUG: Invalid numbers");
             setError("Start and end times must be valid numbers (seconds).");
             return;
         }
@@ -167,61 +145,65 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, videoRef, onSav
             return;
         }
 
-        // Auto-capture thumbnail at start time
-        const video = videoRef.current;
-        let autoThumbnail: string | null = null;
-
-        if (video) {
-            try {
-                // Seek to start time
-                video.currentTime = startNum;
-
-                // Wait a brief moment for the frame to load, then capture
-                setTimeout(() => {
-                    const canvas = document.createElement("canvas");
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-
-                    const ctx = canvas.getContext("2d");
-                    if (ctx) {
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        autoThumbnail = canvas.toDataURL("image/jpeg");
-
-                        // Create segment with auto-captured thumbnail
-                        const newSegment: Segment = {
-                            id: uuidv4(),
-                            start: start,
-                            end: end,
-                            thumbnail: capturedThumbnail || autoThumbnail, // Use manual capture if available, otherwise auto
-                        };
-
-                        setSegments([...segments, newSegment]);
-                        setStart("");
-                        setEnd("");
-                        setSliderValue([0, 0]);
-                        setCapturedThumbnail(null);
-                    }
-                }, 100); // Small delay to ensure frame is loaded
-
-                return; // Exit early since we're handling async
-            } catch (err) {
-                console.error("Auto-capture failed:", err);
-            }
-        }
-
-        // Fallback if video not available or capture failed
+        console.log("DEBUG: Validation passed, creating segment...");
+        // Optimistic update
+        const tempId = uuidv4();
         const newSegment: Segment = {
-            id: uuidv4(),
+            id: tempId,
             start: start,
             end: end,
-            thumbnail: capturedThumbnail,
+            thumbnail: null, // Will be updated
         };
 
         setSegments([...segments, newSegment]);
         setStart("");
         setEnd("");
         setSliderValue([0, 0]);
-        setCapturedThumbnail(null);
+
+        // Trigger server-side capture
+        console.log("DEBUG: Sending capture request...", { videoId, timestamp: startNum });
+        fetch('/api/capture-thumbnail', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                videoId,
+                timestamp: startNum
+            })
+        })
+            .then(async res => {
+                console.log("DEBUG: Capture response status:", res.status);
+                if (!res.ok) {
+                    const text = await res.text();
+                    throw new Error(`Server error: ${res.status} ${text}`);
+                }
+                return res.json();
+            })
+            .then(data => {
+                console.log("DEBUG: Capture success:", data);
+                if (data.url) {
+                    setSegments(prev => prev.map(s =>
+                        s.id === tempId
+                            ? { ...s, thumbnail: data.url }
+                            : s
+                    ));
+                } else {
+                    // Fallback to smart thumbnail if capture fails
+                    setSegments(prev => prev.map(s =>
+                        s.id === tempId
+                            ? { ...s, thumbnail: getSmartThumbnail(startNum) }
+                            : s
+                    ));
+                }
+            })
+            .catch(err => {
+                console.error("DEBUG: Thumbnail capture failed:", err);
+                // Fallback
+                setSegments(prev => prev.map(s =>
+                    s.id === tempId
+                        ? { ...s, thumbnail: getSmartThumbnail(startNum) }
+                        : s
+                ));
+            });
     };
 
     const removeSegment = (id: string) => {
@@ -229,20 +211,24 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, videoRef, onSav
     };
 
     const getSmartThumbnail = (start: number) => {
-        if (!duration) return thumbnail; // Fallback to main thumbnail if duration unknown
+        // Use standard YouTube thumbnails
+        // 0 = default (480x360), 1, 2, 3 = generated thumbnails
+        // hqdefault = 480x360
+        // mqdefault = 320x180
+        // default = 120x90
 
-        const ratio = start / duration;
-        let thumbIndex = "1"; // Default to ~25% mark
+        // We can try to pick one of the 3 generated thumbnails based on start time relative to duration
+        // But since we don't know exact duration until player loads, and we want this to be simple
+        // Let's just use the high quality default for now, or maybe try to map to 1/2/3 if we have duration
 
-        if (ratio < 0.375) {
-            thumbIndex = "1";
-        } else if (ratio < 0.625) {
-            thumbIndex = "2";
-        } else {
-            thumbIndex = "3";
+        if (duration > 0) {
+            const ratio = start / duration;
+            if (ratio < 0.33) return `https://img.youtube.com/vi/${videoId}/1.jpg`;
+            if (ratio < 0.66) return `https://img.youtube.com/vi/${videoId}/2.jpg`;
+            return `https://img.youtube.com/vi/${videoId}/3.jpg`;
         }
 
-        return `https://img.youtube.com/vi/${videoId}/${thumbIndex}.jpg`;
+        return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
     };
 
     const handleSave = () => {
@@ -250,14 +236,11 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, videoRef, onSav
 
         const clips: Clip[] = segments.map((seg) => {
             const startSeconds = parseInt(seg.start);
-            // Use captured thumbnail if available for this segment, otherwise smart thumbnail
-            const finalThumbnail = seg.thumbnail || getSmartThumbnail(startSeconds);
-
             return {
                 id: uuidv4(),
                 videoId,
                 title: videoTitle,
-                thumbnail: finalThumbnail,
+                thumbnail: seg.thumbnail || thumbnail,
                 start: startSeconds,
                 end: parseInt(seg.end),
                 createdAt: Date.now(),
@@ -269,6 +252,27 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, videoRef, onSav
 
     return (
         <div className="space-y-6">
+            {/* YouTube Player */}
+            <Card className="overflow-hidden bg-black">
+                <div className="aspect-video w-full flex items-center justify-center">
+                    <YouTube
+                        videoId={videoId}
+                        className="w-full h-full"
+                        iframeClassName="w-full h-full"
+                        onReady={onPlayerReady}
+                        onStateChange={onStateChange}
+                        opts={{
+                            playerVars: {
+                                autoplay: 1,
+                                controls: 1,
+                                rel: 0,
+                                showinfo: 0,
+                            },
+                        }}
+                    />
+                </div>
+            </Card>
+
             <div className="space-y-4">
                 <div className="flex justify-between text-sm text-muted-foreground">
                     <span>00:00</span>
@@ -312,26 +316,10 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, videoRef, onSav
 
             {error && <p className="text-sm text-destructive">{error}</p>}
 
-            {capturedThumbnail && (
-                <div className="relative w-32 aspect-video rounded-md overflow-hidden border border-border">
-                    <img src={capturedThumbnail} alt="Captured" className="w-full h-full object-cover" />
-                    <Button
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-1 right-1 h-6 w-6"
-                        onClick={() => setCapturedThumbnail(null)}
-                    >
-                        <Trash2 className="w-3 h-3" />
-                    </Button>
-                </div>
-            )}
-
             <div className="flex gap-2">
                 <Button onClick={previewSegment} variant="outline" className="flex-1" disabled={!start || !end}>
-                    <Play className="w-4 h-4 mr-2" /> Preview
-                </Button>
-                <Button onClick={handleCapture} variant="outline" className="flex-1" disabled={isCapturing}>
-                    <Camera className="w-4 h-4 mr-2" /> {isCapturing ? "Capturing..." : "Snapshot"}
+                    {isPlaying ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
+                    Preview Segment
                 </Button>
                 <Button onClick={addSegment} className="flex-1" variant="secondary">
                     <Plus className="w-4 h-4 mr-2" /> Add Segment
@@ -341,36 +329,46 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, videoRef, onSav
             {segments.length > 0 && (
                 <div className="space-y-4">
                     <Separator />
-                    <h3 className="font-medium text-sm text-muted-foreground">Segments to Save</h3>
-                    <div className="space-y-2">
+                    <h3 className="font-medium text-lg text-muted-foreground">Segments to Save</h3>
+                    <div className="space-y-3">
                         {segments.map((seg) => (
-                            <Card key={seg.id} className="p-3 flex items-center gap-3 bg-muted/50">
-                                {seg.thumbnail && (
-                                    <div className="relative w-24 aspect-video rounded overflow-hidden flex-shrink-0 border border-border">
+                            <Card key={seg.id} className="p-4 flex items-center gap-4 bg-muted/50">
+                                <div className="relative w-40 aspect-video rounded-md overflow-hidden flex-shrink-0 border border-border bg-black/10 flex items-center justify-center">
+                                    {seg.thumbnail ? (
                                         <img
                                             src={seg.thumbnail}
                                             alt="Segment thumbnail"
                                             className="w-full h-full object-cover"
                                         />
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center text-muted-foreground">
+                                            <Loader2 className="w-6 h-6 animate-spin mb-1" />
+                                            <span className="text-xs">Generating...</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    <div className="font-medium text-lg">
+                                        {formatTime(parseInt(seg.start))} - {formatTime(parseInt(seg.end))}
                                     </div>
-                                )}
-                                <div className="flex-1 text-sm font-medium">
-                                    {formatTime(parseInt(seg.start))} - {formatTime(parseInt(seg.end))}
+                                    <div className="text-sm text-muted-foreground">
+                                        Duration: {formatTime(parseInt(seg.end) - parseInt(seg.start))}
+                                    </div>
                                 </div>
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
+                                    className="h-10 w-10 text-muted-foreground hover:text-destructive flex-shrink-0"
                                     onClick={() => removeSegment(seg.id)}
                                 >
-                                    <Trash2 className="w-4 h-4" />
+                                    <Trash2 className="w-5 h-5" />
                                 </Button>
                             </Card>
                         ))}
                     </div>
 
-                    <Button onClick={handleSave} className="w-full" size="lg">
-                        <Save className="w-4 h-4 mr-2" /> Save All Segments
+                    <Button onClick={handleSave} className="w-full h-12 text-lg" size="lg">
+                        <Save className="w-5 h-5 mr-2" /> Save All Segments
                     </Button>
                 </div>
             )}
