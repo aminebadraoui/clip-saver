@@ -25,3 +25,20 @@ export async function fetchViralVideos(
         throw error;
     }
 }
+
+export async function fetchTrendingKeywords(): Promise<string[]> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/youtube/trending-keywords`);
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || "Failed to fetch trending keywords");
+        }
+
+        const data = await response.json();
+        return data.keywords;
+    } catch (error) {
+        console.error("Error fetching trending keywords:", error);
+        return [];
+    }
+}

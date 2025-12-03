@@ -183,7 +183,6 @@ def get_viral_videos(timeFilter: str = "today", maxResults: int = 50, q: str = N
     
     try:
         # Build service inside the request
-        # cache_discovery=True is default and helps performance
         youtube = build("youtube", "v3", developerKey=api_key)
         
         # Calculate publishedAfter timestamp based on timeFilter
@@ -201,58 +200,100 @@ def get_viral_videos(timeFilter: str = "today", maxResults: int = 50, q: str = N
         
         published_after = time_filters[timeFilter].isoformat("T") + "Z"
         
-        # Step 1: Search for recent videos
-        search_params = {
-            "part": "id,snippet",
-            "type": "video",
-            "publishedAfter": published_after,
-            "order": "viewCount",
-            "maxResults": min(maxResults, 50),
-            "relevanceLanguage": "en",
-            "safeSearch": "moderate"
-        }
+        # Step 1: Search for recent videos (handling pagination for > 50 results)
+        video_ids = []
+        next_page_token = None
+        # Fetch more videos initially to allow for filtering
+        initial_fetch_target = 200
         
-        if q:
-            search_params["q"] = q
+        while len(video_ids) < initial_fetch_target:
+            # Calculate how many more we need, capped at 50 per request
+            remaining = initial_fetch_target - len(video_ids)
+            current_limit = min(remaining, 50)
             
-        search_response = youtube.search().list(**search_params).execute()
+            search_params = {
+                "part": "id,snippet",
+                "type": "video",
+                "publishedAfter": published_after,
+                "order": "viewCount",
+                "maxResults": current_limit,
+                "relevanceLanguage": "en",
+                "regionCode": "US",
+                "safeSearch": "moderate"
+            }
+            
+            if q:
+                search_params["q"] = q
+            
+            if next_page_token:
+                search_params["pageToken"] = next_page_token
+                
+            search_response = youtube.search().list(**search_params).execute()
+            
+            if not search_response.get("items"):
+                break
+                
+            # Extract video IDs
+            new_ids = [item["id"]["videoId"] for item in search_response["items"]]
+            video_ids.extend(new_ids)
+            
+            next_page_token = search_response.get("nextPageToken")
+            if not next_page_token:
+                break
         
-        if not search_response.get("items"):
+        if not video_ids:
             return JSONResponse({"videos": []})
         
-        # Extract video IDs
-        video_ids = [item["id"]["videoId"] for item in search_response["items"]]
-        
-        # Step 2: Get video statistics
-        videos_response = youtube.videos().list(
-            part="statistics,snippet",
-            id=",".join(video_ids)
-        ).execute()
+        # Step 2: Get video statistics (batching in chunks of 50)
+        all_videos_items = []
+        for i in range(0, len(video_ids), 50):
+            batch_ids = video_ids[i:i+50]
+            videos_response = youtube.videos().list(
+                part="statistics,snippet",
+                id=",".join(batch_ids)
+            ).execute()
+            all_videos_items.extend(videos_response.get("items", []))
         
         # Extract channel IDs
-        channel_ids = list(set([video["snippet"]["channelId"] for video in videos_response["items"]]))
+        channel_ids = list(set([video["snippet"]["channelId"] for video in all_videos_items]))
         
-        # Step 3: Get channel statistics
-        channels_response = youtube.channels().list(
-            part="statistics,snippet",
-            id=",".join(channel_ids)
-        ).execute()
-        
-        # Create channel lookup
-        channels = {
-            channel["id"]: {
-                "subscriberCount": int(channel["statistics"].get("subscriberCount", 1)),
-                "channelTitle": channel["snippet"]["title"]
-            }
-            for channel in channels_response["items"]
-        }
-        
-        # Step 4: Calculate viral ratio and build response
-        viral_videos = []
-        for video in videos_response["items"]:
-            channel_id = video["snippet"]["channelId"]
-            channel_info = channels.get(channel_id, {"subscriberCount": 1, "channelTitle": "Unknown"})
+        # Step 3: Get channel statistics (batching in chunks of 50)
+        channels = {}
+        for i in range(0, len(channel_ids), 50):
+            batch_channel_ids = channel_ids[i:i+50]
+            channels_response = youtube.channels().list(
+                part="statistics,snippet",
+                id=",".join(batch_channel_ids)
+            ).execute()
             
+            for channel in channels_response.get("items", []):
+                channels[channel["id"]] = {
+                    "subscriberCount": int(channel["statistics"].get("subscriberCount", 1)),
+                    "channelTitle": channel["snippet"]["title"],
+                    "country": channel["snippet"].get("country", "")
+                }
+        
+        # Step 4: Filter, Calculate viral ratio and build response
+        viral_videos = []
+        target_countries = ["US", "GB", "CA", "AU", "NZ", "IE"]
+        
+        for video in all_videos_items:
+            channel_id = video["snippet"]["channelId"]
+            channel_info = channels.get(channel_id, {"subscriberCount": 1, "channelTitle": "Unknown", "country": ""})
+            
+            # Strict Filtering Logic
+            video_lang = video["snippet"].get("defaultAudioLanguage", "") or video["snippet"].get("defaultLanguage", "")
+            channel_country = channel_info["country"]
+            
+            is_english = video_lang.startswith("en")
+            is_target_country = channel_country in target_countries
+            
+            # If we can't determine language, rely on country. If country is missing, be lenient if language is missing? 
+            # Or strict? User said "from US or at least in english".
+            # Let's be strict: Must be target country OR English language.
+            if not (is_target_country or is_english):
+                 continue
+
             view_count = int(video["statistics"].get("viewCount", 0))
             subscriber_count = max(channel_info["subscriberCount"], 1)  # Avoid division by zero
             viral_ratio = view_count / subscriber_count
@@ -270,7 +311,15 @@ def get_viral_videos(timeFilter: str = "today", maxResults: int = 50, q: str = N
                 "url": f"https://www.youtube.com/watch?v={video['id']}"
             })
         
-        # Sort by viral ratio (highest first)
+        # Take top 100 from the filtered list (they are already roughly sorted by view count from search, 
+        # but search results aren't perfectly strictly ordered by view count across pages, though close enough for this purpose.
+        # However, to be precise with "100 highest views videos", we should sort by viewCount first, take top 100, then sort by ratio.
+        
+        # Sort by view count descending to get the true "top 100 views" from our filtered pool
+        viral_videos.sort(key=lambda x: x["viewCount"], reverse=True)
+        viral_videos = viral_videos[:100]
+        
+        # Now sort these 100 by viral ratio
         viral_videos.sort(key=lambda x: x["viralRatio"], reverse=True)
         
         return JSONResponse({"videos": viral_videos})
@@ -281,6 +330,137 @@ def get_viral_videos(timeFilter: str = "today", maxResults: int = 50, q: str = N
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"YouTube API error: {str(e)}")
+
+# Cache for trending keywords
+trending_cache = {
+    "timestamp": 0,
+    "keywords": []
+}
+
+@app.get("/api/youtube/trending-keywords")
+def get_trending_keywords():
+    # Check cache (1 hour)
+    if time.time() - trending_cache["timestamp"] < 3600 and trending_cache["keywords"]:
+        return JSONResponse({"keywords": trending_cache["keywords"]})
+
+    try:
+        # Scrape YouTube Trending (Gaming & Music) to get a mix
+        # Gaming: 4gIcGhpnYW1pbmdfY29ycHVzX21vc3RfcG9wdWxhcg%3D%3D
+        # Music:  4gIcGhptdXNpY19jb3JwdXNfbW9zdF9wb3B1bGFy
+        urls = [
+            "https://www.youtube.com/feed/trending?bp=4gIcGhpnYW1pbmdfY29ycHVzX21vc3RfcG9wdWxhcg%3D%3D", # Gaming
+            "https://www.youtube.com/feed/trending?bp=4gIcGhptdXNpY19jb3JwdXNfbW9zdF9wb3B1bGFy" # Music
+        ]
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9"
+        }
+        
+        import urllib.request
+        import re
+        from collections import Counter
+        
+        all_titles = []
+        
+        for url in urls:
+            try:
+                req = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    html = response.read().decode("utf-8")
+                    
+                match = re.search(r'var ytInitialData = ({.*?});', html)
+                if match:
+                    data = json.loads(match.group(1))
+                    
+                    def extract_titles(obj):
+                        if isinstance(obj, dict):
+                            if "videoRenderer" in obj:
+                                video = obj["videoRenderer"]
+                                if "title" in video and "runs" in video["title"]:
+                                    all_titles.append(video["title"]["runs"][0]["text"])
+                                elif "title" in video and "simpleText" in video["title"]:
+                                    all_titles.append(video["title"]["simpleText"])
+                            
+                            if "gridVideoRenderer" in obj:
+                                video = obj["gridVideoRenderer"]
+                                if "title" in video and "runs" in video["title"]:
+                                    all_titles.append(video["title"]["runs"][0]["text"])
+                                elif "title" in video and "simpleText" in video["title"]:
+                                    all_titles.append(video["title"]["simpleText"])
+
+                            for key, value in obj.items():
+                                extract_titles(value)
+                        elif isinstance(obj, list):
+                            for item in obj:
+                                extract_titles(item)
+                                
+                    extract_titles(data)
+            except Exception as e:
+                print(f"Error scraping {url}: {e}")
+                continue
+
+        if not all_titles:
+            # Fallback if scraping fails entirely
+            return JSONResponse({"keywords": ["Minecraft", "Fortnite", "Roblox", "GTA 6", "Taylor Swift", "MrBeast", "Elden Ring", "SpaceX", "AI", "ChatGPT"]})
+
+        # Extract keywords logic
+        stop_words = set([
+            "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", 
+            "is", "are", "was", "were", "be", "been", "this", "that", "it", "i", "you", "he", "she", 
+            "we", "they", "my", "your", "his", "her", "our", "their", "what", "which", "who", "whom", 
+            "whose", "how", "where", "when", "why", "video", "youtube", "channel", "subscribe", "like", 
+            "comment", "share", "official", "music", "video", "lyric", "lyrics", "full", "hd", "hq", 
+            "4k", "1080p", "2024", "2025", "new", "vs", "feat", "ft", "live", "stream", "trailer", 
+            "episode", "season", "part", "gameplay", "walkthrough", "review", "reaction", "highlights",
+            "moment", "moments", "best", "top", "funny", "compilation", "clip", "clips", "shorts"
+        ])
+        
+        phrases = []
+        for title in all_titles:
+            title_lower = title.lower()
+            clean_title = re.sub(r'[^\w\s]', ' ', title_lower)
+            words = clean_title.split()
+            
+            # 3-grams
+            for i in range(len(words) - 2):
+                if any(w in stop_words for w in [words[i], words[i+1], words[i+2]]):
+                    if words[i] in stop_words or words[i+2] in stop_words:
+                        continue
+                phrases.append(f"{words[i]} {words[i+1]} {words[i+2]}")
+
+            # 4-grams
+            for i in range(len(words) - 3):
+                if words[i] in stop_words or words[i+3] in stop_words:
+                    continue
+                phrases.append(f"{words[i]} {words[i+1]} {words[i+2]} {words[i+3]}")
+                
+        # Get top 20 most common phrases
+        counts = Counter(phrases)
+        common = counts.most_common(30)
+        
+        keywords = []
+        seen = set()
+        for item in common:
+            phrase = item[0]
+            if phrase not in seen:
+                keywords.append(phrase)
+                seen.add(phrase)
+        
+        result = keywords[:20]
+        
+        # Update cache
+        trending_cache["timestamp"] = time.time()
+        trending_cache["keywords"] = result
+        
+        return JSONResponse({"keywords": result})
+
+    except Exception as e:
+        print(f"Error fetching trending keywords: {str(e)}")
+        # Return cache if available even if expired, or fallback
+        if trending_cache["keywords"]:
+             return JSONResponse({"keywords": trending_cache["keywords"]})
+        return JSONResponse({"keywords": []})
 
 class CaptureRequest(BaseModel):
     videoId: str
@@ -325,7 +505,12 @@ async def capture_thumbnail(request: CaptureRequest):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await process.communicate()
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10.0)
+        except asyncio.TimeoutError:
+            process.kill()
+            print("DEBUG: yt-dlp -g timed out")
+            raise Exception("yt-dlp timed out")
         
         if process.returncode != 0:
             print(f"yt-dlp error: {stderr.decode()}")

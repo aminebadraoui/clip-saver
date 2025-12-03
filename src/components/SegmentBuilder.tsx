@@ -36,7 +36,7 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave }: Segme
     const [isPlaying, setIsPlaying] = useState(false);
 
     const playerRef = useRef<YouTubePlayer | null>(null);
-    const previewIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const previewIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const onPlayerReady = (event: YouTubeEvent) => {
         playerRef.current = event.target;

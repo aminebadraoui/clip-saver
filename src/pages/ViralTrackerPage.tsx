@@ -6,6 +6,8 @@ import { ViralVideoCard } from "@/components/ViralVideoCard";
 import { Loader2, TrendingUp, AlertCircle, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
+import { TrendingKeywords } from "@/components/TrendingKeywords";
+
 export function ViralTrackerPage() {
     const [videos, setVideos] = useState<ViralVideo[]>([]);
     const [loading, setLoading] = useState(false);
@@ -65,6 +67,8 @@ export function ViralTrackerPage() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
+
+                <TrendingKeywords onKeywordClick={setSearchQuery} />
 
                 <TimeFilterBar
                     selectedFilter={selectedFilter}

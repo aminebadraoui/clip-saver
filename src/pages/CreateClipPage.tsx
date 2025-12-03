@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getYouTubeId } from "@/utils/getYouTubeId";
 import { saveClip } from "@/utils/storage";
