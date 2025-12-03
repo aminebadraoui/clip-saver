@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import type { ViralVideo } from "@/types/youtube";
-import { ExternalLink, Eye, Users, TrendingUp, Scissors } from "lucide-react";
+import { ExternalLink, Eye, Users, TrendingUp, Scissors, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ViralVideoCardProps {
@@ -46,6 +46,18 @@ export function ViralVideoCard({ video }: ViralVideoCardProps) {
         e.preventDefault();
         e.stopPropagation();
         navigate(`/create?url=${encodeURIComponent(video.url)}`);
+    };
+
+    const handleAddToLibrary = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        navigate("/save-asset", {
+            state: {
+                videoId: video.videoId,
+                title: video.title,
+                thumbnail: video.thumbnail
+            }
+        });
     };
 
     return (
@@ -113,6 +125,14 @@ export function ViralVideoCard({ video }: ViralVideoCardProps) {
                 >
                     <Scissors className="w-4 h-4" />
                     Create Clip
+                </Button>
+                <Button
+                    onClick={handleAddToLibrary}
+                    className="w-full gap-2"
+                    variant="outline"
+                >
+                    <Plus className="w-4 h-4" />
+                    Add to Library
                 </Button>
             </div>
         </div>

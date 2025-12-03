@@ -104,6 +104,8 @@ export function deleteFolder(id: string) {
 
 // --- Tags ---
 
+import { v4 as uuidv4 } from "uuid";
+
 export function getTags(): Tag[] {
     try {
         const json = localStorage.getItem(TAGS_KEY);
@@ -140,3 +142,38 @@ export function deleteTag(id: string) {
         localStorage.setItem(CLIPS_KEY, JSON.stringify(updatedClips));
     }
 }
+
+export function initializeFolders() {
+    const initialized = localStorage.getItem("yt_initialized");
+    if (initialized) return;
+
+    const folders = getFolders();
+    if (folders.length > 0) {
+        localStorage.setItem("yt_initialized", "true");
+        return;
+    }
+
+    const predefinedFolders = [
+        // Video Category
+        { name: "Inspirations", category: "video" },
+        { name: "Viral", category: "video" },
+        { name: "Great Animations", category: "video" },
+        { name: "AI Generated", category: "video" },
+        // Image Category
+        { name: "Inspirations", category: "image" },
+        { name: "Ads", category: "image" },
+        { name: "AI Generated", category: "image" },
+    ];
+
+    const newFolders: Folder[] = predefinedFolders.map(f => ({
+        id: uuidv4(),
+        name: f.name,
+        category: f.category as "video" | "image",
+        parentId: null,
+        createdAt: Date.now(),
+    }));
+
+    localStorage.setItem(FOLDERS_KEY, JSON.stringify(newFolders));
+    localStorage.setItem("yt_initialized", "true");
+}
+

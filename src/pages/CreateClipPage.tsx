@@ -1,13 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getYouTubeId } from "@/utils/getYouTubeId";
-import { saveClip } from "@/utils/storage";
 import { SegmentBuilder } from "@/components/SegmentBuilder";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Loader2 } from "lucide-react";
+import { SaveClipModal } from "@/components/SaveClipModal";
+import { getFolders, getTags, getClips, saveClips } from "@/utils/storage";
 import type { Clip } from "@/types/clip";
+import type { Folder } from "@/types/folder";
+import type { Tag } from "@/types/tag";
 
 export function CreateClipPage() {
     const navigate = useNavigate();
@@ -21,10 +24,35 @@ export function CreateClipPage() {
         thumbnail: string;
     } | null>(null);
 
-    // Auto-fetch if URL is provided in query params
+    const [folders, setFolders] = useState<Folder[]>([]);
+    const [tags, setTags] = useState<Tag[]>([]);
+    const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+    const [clipsToSave, setClipsToSave] = useState<Clip[]>([]);
+
+    useEffect(() => {
+        setFolders(getFolders());
+        setTags(getTags());
+    }, []);
+
+    // Auto-fetch if URL is provided in query params or source ID
     useEffect(() => {
         const queryUrl = searchParams.get("url");
-        if (queryUrl && !videoData && !loading) {
+        const sourceId = searchParams.get("source");
+
+        if (sourceId) {
+            const allClips = getClips();
+            const sourceClip = allClips.find(c => c.id === sourceId);
+            if (sourceClip) {
+                setVideoData({
+                    id: sourceClip.videoId,
+                    title: sourceClip.title,
+                    thumbnail: sourceClip.thumbnail,
+                });
+                // If it's a clip, maybe we should pre-fill start/end? 
+                // But SegmentBuilder expects videoId.
+                // If source is a video, we just load it.
+            }
+        } else if (queryUrl && !videoData && !loading) {
             handleFetch(queryUrl);
         }
     }, []); // Run once on mount
@@ -64,8 +92,21 @@ export function CreateClipPage() {
         }
     };
 
-    const handleSave = async (clips: Clip[]) => {
-        clips.forEach((clip) => saveClip(clip));
+    const handleSave = (clips: Clip[]) => {
+        setClipsToSave(clips);
+        setIsSaveModalOpen(true);
+    };
+
+    const handleModalSave = (metadata: any) => {
+        const clipsWithMetadata = clipsToSave.map(clip => ({
+            ...clip,
+            ...metadata,
+            type: 'clip' as const, // Ensure type is clip
+            sourceVideoId: searchParams.get("source") || undefined,
+            originalVideoUrl: url || undefined,
+        }));
+
+        saveClips(clipsWithMetadata);
         navigate("/");
     };
 
@@ -113,8 +154,16 @@ export function CreateClipPage() {
                     </CardContent>
                 </Card>
 
+                {/* Debug Info */}
+                <div className="p-4 bg-muted rounded text-xs font-mono">
+                    <p>URL: {url}</p>
+                    <p>Loading: {loading.toString()}</p>
+                    <p>Error: {error}</p>
+                    <p>VideoData: {JSON.stringify(videoData)}</p>
+                </div>
+
                 {videoData && (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="space-y-6">
                         <SegmentBuilder
                             videoId={videoData.id}
                             videoTitle={videoData.title}
@@ -124,6 +173,15 @@ export function CreateClipPage() {
                     </div>
                 )}
             </div>
+
+            <SaveClipModal
+                isOpen={isSaveModalOpen}
+                onClose={() => setIsSaveModalOpen(false)}
+                onSave={handleModalSave}
+                folders={folders}
+                tags={tags}
+                clips={clipsToSave}
+            />
         </div>
     );
 }

@@ -252,24 +252,17 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave }: Segme
 
     return (
         <div className="space-y-6">
-            {/* YouTube Player */}
             <Card className="overflow-hidden bg-black">
-                <div className="aspect-video w-full flex items-center justify-center">
-                    <YouTube
-                        videoId={videoId}
-                        className="w-full h-full"
-                        iframeClassName="w-full h-full"
-                        onReady={onPlayerReady}
-                        onStateChange={onStateChange}
-                        opts={{
-                            playerVars: {
-                                autoplay: 1,
-                                controls: 1,
-                                rel: 0,
-                                showinfo: 0,
-                            },
-                        }}
-                    />
+                <div className="w-full h-[400px] flex items-center justify-center">
+                    <iframe
+                        width="100%"
+                        height="100%"
+                        src={`https://www.youtube.com/embed/${videoId}`}
+                        title="YouTube video player"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                    ></iframe>
                 </div>
             </Card>
 

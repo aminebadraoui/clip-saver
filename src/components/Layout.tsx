@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Scissors, Plus, TrendingUp } from "lucide-react";
+import { Scissors, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LayoutProps {
@@ -8,7 +8,6 @@ interface LayoutProps {
 
 const tabs = [
     { path: "/", label: "Your Clips", icon: Scissors },
-    { path: "/create", label: "Create Clip", icon: Plus },
     { path: "/viral-tracker", label: "Viral Tracker", icon: TrendingUp },
 ];
 

@@ -4,7 +4,7 @@ import type { Tag } from "@/types/tag";
 import { formatTime } from "@/utils/formatTime";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Trash2, MoreVertical, FolderInput, Tag as TagIcon } from "lucide-react";
+import { Play, Trash2, MoreVertical, FolderInput, Tag as TagIcon, Scissors } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
     DropdownMenu,
@@ -54,9 +54,11 @@ export function ClipCard({ clip, folders = [], tags = [], onDelete, onUpdate }: 
                     className="object-cover w-full h-full"
                     loading="lazy"
                 />
-                <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                    {formatTime(clip.start)} - {formatTime(clip.end)}
-                </div>
+                {clip.type === 'clip' && typeof clip.start === 'number' && typeof clip.end === 'number' && (
+                    <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                        {formatTime(clip.start)} - {formatTime(clip.end)}
+                    </div>
+                )}
 
                 {/* Overlay actions */}
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -138,13 +140,21 @@ export function ClipCard({ clip, folders = [], tags = [], onDelete, onUpdate }: 
                 )}
             </CardContent>
 
-            <CardFooter className="p-4 pt-0">
-                <Button asChild variant="default" size="sm" className="w-full">
+            <CardFooter className="p-4 pt-0 gap-2">
+                <Button asChild variant="default" size="sm" className="flex-1">
                     <Link to={`/clip/${clip.id}`}>
                         <Play className="w-4 h-4 mr-2" />
-                        Play
+                        {clip.type === 'video' ? 'Watch' : 'Play'}
                     </Link>
                 </Button>
+                {clip.type === 'video' && (
+                    <Button asChild variant="secondary" size="sm" className="flex-1">
+                        <Link to={`/create?source=${clip.id}`}>
+                            <Scissors className="w-4 h-4 mr-2" />
+                            Clip
+                        </Link>
+                    </Button>
+                )}
             </CardFooter>
         </Card>
     );

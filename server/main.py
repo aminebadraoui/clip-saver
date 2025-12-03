@@ -122,6 +122,36 @@ def run_download(video_id, task_id, output_template):
             "error": str(e)
         }
 
+@app.get("/api/info")
+async def get_video_info(videoId: str):
+    if not videoId:
+        raise HTTPException(status_code=400, detail="Missing videoId")
+    
+    video_url = f"https://www.youtube.com/watch?v={videoId}"
+    
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'skip_download': True,
+    }
+    
+    try:
+        # Run in executor to avoid blocking the event loop
+        loop = asyncio.get_event_loop()
+        info = await loop.run_in_executor(None, lambda: yt_dlp.YoutubeDL(ydl_opts).extract_info(video_url, download=False))
+        
+        return JSONResponse({
+            "title": info.get('title'),
+            "thumbnail": info.get('thumbnail'),
+            "duration": info.get('duration'),
+            "uploadDate": info.get('upload_date'),
+            "uploader": info.get('uploader'),
+            "viewCount": info.get('view_count')
+        })
+    except Exception as e:
+        print(f"Error fetching video info: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch video info")
+
 @app.post("/api/download")
 async def start_download(request: DownloadRequest):
     video_id = request.videoId

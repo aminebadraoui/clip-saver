@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+
 import { v4 as uuidv4 } from "uuid";
 import {
     getClips,
@@ -11,15 +11,20 @@ import {
     getTags,
     saveTag,
     deleteTag,
-    updateClip
+    updateClip,
+    initializeFolders,
+    saveClip
 } from "@/utils/storage";
 import type { Clip } from "@/types/clip";
 import type { Folder } from "@/types/folder";
 import type { Tag } from "@/types/tag";
 import { ClipCard } from "@/components/ClipCard";
 import { Sidebar } from "@/components/Sidebar";
+import { AddVideoSheet } from "@/components/AddVideoSheet";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Plus } from "lucide-react";
+
 
 export function ClipsPage() {
     const [clips, setClips] = useState<Clip[]>([]);
@@ -28,8 +33,12 @@ export function ClipsPage() {
 
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
     const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
+    const [filterType, setFilterType] = useState<'all' | 'video' | 'clip'>('all');
+    const [isAddVideoModalOpen, setIsAddVideoModalOpen] = useState(false);
+    const [quickAddUrl, setQuickAddUrl] = useState("");
 
     useEffect(() => {
+        initializeFolders();
         refreshData();
     }, []);
 
@@ -50,11 +59,12 @@ export function ClipsPage() {
     };
 
     // Folder handlers
-    const handleCreateFolder = (name: string, parentId: string | null) => {
+    const handleCreateFolder = (name: string, parentId: string | null, category: 'video' | 'image' = 'video') => {
         const newFolder: Folder = {
             id: uuidv4(),
             name,
             parentId,
+            category,
             createdAt: Date.now(),
         };
         saveFolder(newFolder);
@@ -97,6 +107,26 @@ export function ClipsPage() {
         }
     };
 
+    // Video/Clip handlers
+    const handleSaveVideo = (videoData: any) => {
+        const newVideo: Clip = {
+            id: uuidv4(),
+            type: 'video',
+            createdAt: Date.now(),
+            ...videoData
+        };
+        saveClip(newVideo);
+        // Update local state immediately to avoid refresh requirement
+        setClips(prev => [newVideo, ...prev]);
+        setQuickAddUrl(""); // Clear input
+    };
+
+    const handleQuickAdd = () => {
+        if (quickAddUrl.trim()) {
+            setIsAddVideoModalOpen(true);
+        }
+    };
+
     // Selection handlers
     const handleSelectFolder = (id: string | null) => {
         setSelectedFolderId(id);
@@ -117,6 +147,23 @@ export function ClipsPage() {
             return clip.tagIds?.includes(selectedTagId);
         }
         return true;
+    }).filter(clip => {
+        if (filterType === 'all') return true;
+
+        // Improved legacy handling:
+        // If type is explicitly set, use it.
+        // If not, check if it has start/end times. If so, it's a clip.
+        // Otherwise, treat as video.
+        let type = clip.type;
+        if (!type) {
+            if (typeof clip.start === 'number' && typeof clip.end === 'number') {
+                type = 'clip';
+            } else {
+                type = 'video';
+            }
+        }
+
+        return type === filterType;
     });
 
     return (
@@ -143,28 +190,55 @@ export function ClipsPage() {
                                 ? folders.find(f => f.id === selectedFolderId)?.name
                                 : selectedTagId
                                     ? `Tag: ${tags.find(t => t.id === selectedTagId)?.name}`
-                                    : "All Clips"}
+                                    : "All Videos"}
                         </h1>
-                        <Button asChild size="lg">
-                            <Link to="/create">
-                                <Plus className="w-5 h-5 mr-2" /> Create New Clip
-                            </Link>
-                        </Button>
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
+                                <Button
+                                    variant={filterType === 'all' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setFilterType('all')}
+                                >
+                                    All
+                                </Button>
+                                <Button
+                                    variant={filterType === 'video' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setFilterType('video')}
+                                >
+                                    Videos
+                                </Button>
+                                <Button
+                                    variant={filterType === 'clip' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setFilterType('clip')}
+                                >
+                                    Clips
+                                </Button>
+                            </div>
+                            <div className="flex gap-2 w-80">
+                                <Input
+                                    placeholder="Paste YouTube URL..."
+                                    value={quickAddUrl}
+                                    onChange={(e) => setQuickAddUrl(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleQuickAdd()}
+                                    className="bg-background"
+                                />
+                                <Button onClick={handleQuickAdd} disabled={!quickAddUrl.trim()}>
+                                    <Plus className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        </div>
                     </div>
 
                     {filteredClips.length === 0 ? (
                         <div className="text-center py-20 border-2 border-dashed rounded-xl bg-muted/30">
-                            <h3 className="text-xl font-medium text-muted-foreground mb-4">No clips found</h3>
+                            <h3 className="text-xl font-medium text-muted-foreground mb-4">No videos found</h3>
                             <p className="text-muted-foreground mb-8">
                                 {selectedFolderId || selectedTagId
                                     ? "This folder/tag is empty."
-                                    : "Paste a YouTube link to start creating segments."}
+                                    : "Get started by adding your first video."}
                             </p>
-                            {!selectedFolderId && !selectedTagId && (
-                                <Button asChild>
-                                    <Link to="/create">Get Started</Link>
-                                </Button>
-                            )}
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -182,6 +256,15 @@ export function ClipsPage() {
                     )}
                 </div>
             </div>
+
+            <AddVideoSheet
+                isOpen={isAddVideoModalOpen}
+                onClose={() => setIsAddVideoModalOpen(false)}
+                onSave={handleSaveVideo}
+                folders={folders}
+                tags={tags}
+                initialUrl={quickAddUrl}
+            />
         </div>
     );
 }

@@ -96,6 +96,57 @@ app.post('/api/download', async (req, res) => {
     });
 });
 
+app.get('/api/info', async (req, res) => {
+    const { videoId } = req.query;
+
+    if (!videoId || typeof videoId !== 'string') {
+        return res.status(400).json({ error: 'Missing videoId' });
+    }
+
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    console.log(`Fetching info for: ${videoId}`);
+
+    const ytdlp = spawn('yt-dlp', [
+        '--dump-json',
+        '--no-playlist',
+        '--quiet',
+        videoUrl
+    ]);
+
+    let output = '';
+    let errorOutput = '';
+
+    ytdlp.stdout.on('data', (data) => {
+        output += data.toString();
+    });
+
+    ytdlp.stderr.on('data', (data) => {
+        errorOutput += data.toString();
+    });
+
+    ytdlp.on('close', (code) => {
+        if (code === 0) {
+            try {
+                const info = JSON.parse(output);
+                res.json({
+                    title: info.title,
+                    thumbnail: info.thumbnail,
+                    duration: info.duration,
+                    uploadDate: info.upload_date,
+                    uploader: info.uploader,
+                    viewCount: info.view_count
+                });
+            } catch (e) {
+                console.error('Failed to parse yt-dlp output', e);
+                res.status(500).json({ error: 'Failed to parse video info' });
+            }
+        } else {
+            console.error(`yt-dlp info failed: ${errorOutput}`);
+            res.status(500).json({ error: 'Failed to fetch video info' });
+        }
+    });
+});
+
 app.delete('/api/cleanup', (req, res) => {
     const { filename } = req.body;
     if (!filename) {
