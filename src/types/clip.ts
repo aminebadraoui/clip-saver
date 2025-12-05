@@ -13,4 +13,10 @@ export interface Clip {
     aiPrompt?: string;
     originalVideoUrl?: string;
     sourceVideoId?: string;
+    subscriberCount?: number;
+    viewCount?: number;
+    uploadDate?: string;
+    viralRatio?: number;
+    timeSinceUploadRatio?: number;
+    engagementScore?: number;
 }

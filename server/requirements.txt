@@ -5,3 +5,10 @@ python-multipart
 ffmpeg-python
 google-api-python-client
 python-dotenv
+sqlmodel
+alembic
+psycopg2-binary
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
+bcrypt==4.0.1

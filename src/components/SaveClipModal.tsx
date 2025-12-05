@@ -21,6 +21,7 @@ export function SaveClipModal({ isOpen, onClose, onSave, folders, tags, clips }:
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
     const [notes, setNotes] = useState("");
     const [prompt, setPrompt] = useState("");
+    const [clipTitles, setClipTitles] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (isOpen) {
@@ -29,8 +30,12 @@ export function SaveClipModal({ isOpen, onClose, onSave, folders, tags, clips }:
             setSelectedTagIds([]);
             setNotes("");
             setPrompt("");
+
+            const titles: Record<string, string> = {};
+            clips.forEach(c => titles[c.id] = c.title);
+            setClipTitles(titles);
         }
-    }, [isOpen]);
+    }, [isOpen, clips]);
 
     const handleSave = () => {
         onSave({
@@ -38,6 +43,7 @@ export function SaveClipModal({ isOpen, onClose, onSave, folders, tags, clips }:
             tagIds: selectedTagIds,
             notes,
             aiPrompt: prompt,
+            clipTitles,
         });
         onClose();
     };
@@ -61,15 +67,23 @@ export function SaveClipModal({ isOpen, onClose, onSave, folders, tags, clips }:
 
                 <div className="space-y-6 py-4">
                     {/* Preview of clips */}
-                    <div className="flex gap-2 overflow-x-auto pb-2">
+                    <div className="flex gap-4 overflow-x-auto pb-4">
                         {clips.map(clip => (
-                            <div key={clip.id} className="flex-shrink-0 w-32 space-y-1">
+                            <div key={clip.id} className="flex-shrink-0 w-48 space-y-2">
                                 <img
                                     src={clip.thumbnail}
                                     alt={clip.title}
-                                    className="w-32 h-20 object-cover rounded-md bg-muted"
+                                    className="w-full h-28 object-cover rounded-md bg-muted"
                                 />
-                                <p className="text-xs truncate text-muted-foreground">{clip.title}</p>
+                                <div className="space-y-1">
+                                    <Label htmlFor={`title-${clip.id}`} className="text-xs">Title</Label>
+                                    <input
+                                        id={`title-${clip.id}`}
+                                        className="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={clipTitles[clip.id] || clip.title}
+                                        onChange={(e) => setClipTitles(prev => ({ ...prev, [clip.id]: e.target.value }))}
+                                    />
+                                </div>
                             </div>
                         ))}
                     </div>

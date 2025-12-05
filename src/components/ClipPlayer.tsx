@@ -36,10 +36,10 @@ export function ClipPlayer({ clip }: ClipPlayerProps) {
 
             <div className="flex justify-between items-center text-sm text-muted-foreground px-1">
                 <span>
-                    Segment: {formatTime(clip.start)} - {formatTime(clip.end)}
+                    Segment: {formatTime(clip.start || 0)} - {formatTime(clip.end || 0)}
                 </span>
                 <span>
-                    Duration: {formatTime(clip.end - clip.start)}
+                    Duration: {formatTime((clip.end || 0) - (clip.start || 0))}
                 </span>
             </div>
         </div>

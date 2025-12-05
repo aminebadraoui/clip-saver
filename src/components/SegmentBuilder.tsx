@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
-import YouTube, { type YouTubeEvent, type YouTubePlayer } from "react-youtube";
+import { type YouTubePlayer } from "react-youtube";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,20 +32,20 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave }: Segme
     const [end, setEnd] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [sliderValue, setSliderValue] = useState([0, 0]);
-    const [duration, setDuration] = useState<number>(0);
-    const [isPlaying, setIsPlaying] = useState(false);
+    const [duration, _setDuration] = useState<number>(0);
+    const [isPlaying, _setIsPlaying] = useState(false);
 
     const playerRef = useRef<YouTubePlayer | null>(null);
     const previewIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const onPlayerReady = (event: YouTubeEvent) => {
-        playerRef.current = event.target;
-        setDuration(event.target.getDuration());
-    };
+    // const onPlayerReady = (event: YouTubeEvent) => {
+    //     playerRef.current = event.target;
+    //     setDuration(event.target.getDuration());
+    // };
 
-    const onStateChange = (event: YouTubeEvent) => {
-        setIsPlaying(event.data === 1); // 1 is playing
-    };
+    // const onStateChange = (event: YouTubeEvent) => {
+    //     setIsPlaying(event.data === 1); // 1 is playing
+    // };
 
     // Sync slider with inputs
     useEffect(() => {
@@ -238,6 +238,7 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave }: Segme
             const startSeconds = parseInt(seg.start);
             return {
                 id: uuidv4(),
+                type: 'clip',
                 videoId,
                 title: videoTitle,
                 thumbnail: seg.thumbnail || thumbnail,

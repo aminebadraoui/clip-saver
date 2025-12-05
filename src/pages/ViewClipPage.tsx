@@ -23,19 +23,22 @@ export function ViewClipPage() {
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
     useEffect(() => {
-        const allClips = getClips();
-        const foundClip = allClips.find((c) => c.id === id);
-        if (foundClip) {
-            setClip(foundClip);
-            setNotes(foundClip.notes || "");
-            setAiPrompt(foundClip.aiPrompt || "");
-            setSelectedTagIds(foundClip.tagIds || []);
-        }
-        setFolders(getFolders());
-        setTags(getTags());
+        const init = async () => {
+            const allClips = await getClips();
+            const foundClip = allClips.find((c) => c.id === id);
+            if (foundClip) {
+                setClip(foundClip);
+                setNotes(foundClip.notes || "");
+                setAiPrompt(foundClip.aiPrompt || "");
+                setSelectedTagIds(foundClip.tagIds || []);
+            }
+            setFolders(await getFolders());
+            setTags(await getTags());
+        };
+        init();
     }, [id]);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!clip) return;
         const updatedClip = {
             ...clip,
@@ -43,7 +46,7 @@ export function ViewClipPage() {
             aiPrompt,
             tagIds: selectedTagIds
         };
-        updateClip(updatedClip);
+        await updateClip(updatedClip);
         setClip(updatedClip);
         alert("Changes saved!");
     };
@@ -108,8 +111,8 @@ export function ViewClipPage() {
                                     key={tag.id}
                                     onClick={() => toggleTag(tag.id)}
                                     className={`px-3 py-1 rounded-full text-xs cursor-pointer border transition-colors ${selectedTagIds.includes(tag.id)
-                                            ? "bg-primary text-primary-foreground border-primary"
-                                            : "bg-muted hover:bg-muted/80 border-transparent"
+                                        ? "bg-primary text-primary-foreground border-primary"
+                                        : "bg-muted hover:bg-muted/80 border-transparent"
                                         }`}
                                 >
                                     {tag.name}

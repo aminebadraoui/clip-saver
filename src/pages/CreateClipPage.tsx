@@ -30,31 +30,34 @@ export function CreateClipPage() {
     const [clipsToSave, setClipsToSave] = useState<Clip[]>([]);
 
     useEffect(() => {
-        setFolders(getFolders());
-        setTags(getTags());
+        const init = async () => {
+            setFolders(await getFolders());
+            setTags(await getTags());
+        };
+        init();
     }, []);
 
     // Auto-fetch if URL is provided in query params or source ID
     useEffect(() => {
-        const queryUrl = searchParams.get("url");
-        const sourceId = searchParams.get("source");
+        const init = async () => {
+            const queryUrl = searchParams.get("url");
+            const sourceId = searchParams.get("source");
 
-        if (sourceId) {
-            const allClips = getClips();
-            const sourceClip = allClips.find(c => c.id === sourceId);
-            if (sourceClip) {
-                setVideoData({
-                    id: sourceClip.videoId,
-                    title: sourceClip.title,
-                    thumbnail: sourceClip.thumbnail,
-                });
-                // If it's a clip, maybe we should pre-fill start/end? 
-                // But SegmentBuilder expects videoId.
-                // If source is a video, we just load it.
+            if (sourceId) {
+                const allClips = await getClips();
+                const sourceClip = allClips.find(c => c.id === sourceId);
+                if (sourceClip) {
+                    setVideoData({
+                        id: sourceClip.videoId,
+                        title: sourceClip.title,
+                        thumbnail: sourceClip.thumbnail,
+                    });
+                }
+            } else if (queryUrl && !videoData && !loading) {
+                handleFetch(queryUrl);
             }
-        } else if (queryUrl && !videoData && !loading) {
-            handleFetch(queryUrl);
-        }
+        };
+        init();
     }, []); // Run once on mount
 
     const handleFetch = async (inputUrl?: string) => {
@@ -97,16 +100,19 @@ export function CreateClipPage() {
         setIsSaveModalOpen(true);
     };
 
-    const handleModalSave = (metadata: any) => {
+    const handleModalSave = async (metadata: any) => {
+        const { clipTitles, ...restMetadata } = metadata;
+
         const clipsWithMetadata = clipsToSave.map(clip => ({
             ...clip,
-            ...metadata,
+            ...restMetadata,
+            title: clipTitles?.[clip.id] || clip.title,
             type: 'clip' as const, // Ensure type is clip
             sourceVideoId: searchParams.get("source") || undefined,
             originalVideoUrl: url || undefined,
         }));
 
-        saveClips(clipsWithMetadata);
+        await saveClips(clipsWithMetadata);
         navigate("/");
     };
 
