@@ -55,6 +55,7 @@ class Clip(SQLModel, table=True):
     aiPrompt: Optional[str] = None
     originalVideoUrl: Optional[str] = None
     sourceVideoId: Optional[str] = None
+    originalTitle: Optional[str] = None
 
     # New Metrics
     subscriberCount: Optional[int] = None

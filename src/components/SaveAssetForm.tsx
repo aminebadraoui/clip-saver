@@ -9,6 +9,7 @@ import type { Folder } from "@/types/folder";
 import type { Tag } from "@/types/tag";
 import type { Clip } from "@/types/clip";
 import { Save, Plus } from "lucide-react";
+import { toast } from "sonner";
 
 interface SaveAssetFormProps {
     initialAssets: Partial<Clip>[];
@@ -68,7 +69,7 @@ export function SaveAssetForm({ initialAssets, initialUrl, onSave, onCancel }: S
 
         // If manual entry, validate title
         if (assets.length === 1 && !assets[0].videoId && !url && !title) {
-            alert("Please enter at least a title or URL");
+            toast.error("Please enter at least a title or URL");
             return;
         }
 
@@ -102,7 +103,8 @@ export function SaveAssetForm({ initialAssets, initialUrl, onSave, onCancel }: S
                 folderId: selectedFolderId || null,
                 tagIds: selectedTagIds,
                 notes,
-                aiPrompt
+                aiPrompt,
+                originalTitle: assetTitle
             } as Clip;
         });
 

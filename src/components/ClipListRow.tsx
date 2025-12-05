@@ -31,9 +31,9 @@ export function ClipListRow({ clip, folders, tags, onDelete, onCinemaMode }: Cli
                 <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1 rounded">
                     {clip.type === 'clip' ? 'CLIP' : 'VIDEO'}
                 </div>
-                {clip.engagementScore !== undefined && (
+                {clip.engagementScore != null && (
                     <div className="absolute top-1 left-1 bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm z-10">
-                        {clip.engagementScore.toFixed(1)}
+                        {Number(clip.engagementScore).toFixed(1)}
                     </div>
                 )}
             </div>

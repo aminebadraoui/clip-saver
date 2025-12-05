@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { Folder } from "@/types/folder";
+
 import type { Tag } from "@/types/tag";
 import type { Clip } from "@/types/clip";
 
@@ -11,13 +11,11 @@ interface SaveClipModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (metadata: any) => void;
-    folders: Folder[];
     tags: Tag[];
     clips: Clip[];
 }
 
-export function SaveClipModal({ isOpen, onClose, onSave, folders, tags, clips }: SaveClipModalProps) {
-    const [selectedFolderId, setSelectedFolderId] = useState<string>("");
+export function SaveClipModal({ isOpen, onClose, onSave, tags, clips }: SaveClipModalProps) {
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
     const [notes, setNotes] = useState("");
     const [prompt, setPrompt] = useState("");
@@ -26,7 +24,6 @@ export function SaveClipModal({ isOpen, onClose, onSave, folders, tags, clips }:
     useEffect(() => {
         if (isOpen) {
             // Reset form or pre-fill if needed
-            setSelectedFolderId("");
             setSelectedTagIds([]);
             setNotes("");
             setPrompt("");
@@ -39,7 +36,7 @@ export function SaveClipModal({ isOpen, onClose, onSave, folders, tags, clips }:
 
     const handleSave = () => {
         onSave({
-            folderId: selectedFolderId || null,
+            folderId: null,
             tagIds: selectedTagIds,
             notes,
             aiPrompt: prompt,
@@ -88,23 +85,7 @@ export function SaveClipModal({ isOpen, onClose, onSave, folders, tags, clips }:
                         ))}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>Folder</Label>
-                            <select
-                                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                value={selectedFolderId}
-                                onChange={(e) => setSelectedFolderId(e.target.value)}
-                            >
-                                <option value="">No Folder</option>
-                                {folders.map(folder => (
-                                    <option key={folder.id} value={folder.id}>
-                                        {folder.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
+
 
                     <div className="space-y-2">
                         <Label>Tags</Label>
