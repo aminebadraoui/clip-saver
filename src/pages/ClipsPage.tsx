@@ -21,9 +21,17 @@ import type { Tag } from "@/types/tag";
 import { ClipCard } from "@/components/ClipCard";
 import { Sidebar } from "@/components/Sidebar";
 import { AddVideoSheet } from "@/components/AddVideoSheet";
+import { CinemaModeModal } from "@/components/CinemaModeModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus } from "lucide-react";
+import { Plus, LayoutGrid, List, ArrowUpDown, TrendingUp } from "lucide-react";
+import { ClipListRow } from "@/components/ClipListRow";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 
 export function ClipsPage() {
@@ -33,89 +41,115 @@ export function ClipsPage() {
 
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
     const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
-    const [filterType, setFilterType] = useState<'all' | 'video' | 'clip'>('all');
+    const [filterType] = useState<'all' | 'video' | 'clip'>('all');
     const [isAddVideoModalOpen, setIsAddVideoModalOpen] = useState(false);
     const [quickAddUrl, setQuickAddUrl] = useState("");
 
+    // New UX State
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+    const [sortBy, setSortBy] = useState<'date' | 'viralRatio' | 'timeRatio' | 'engagementScore'>('date');
+    const [selectedClipForCinema, setSelectedClipForCinema] = useState<Clip | null>(null);
+
     useEffect(() => {
-        initializeFolders();
-        refreshData();
+        const init = async () => {
+            await initializeFolders();
+            await refreshData();
+        };
+        init();
     }, []);
 
-    const refreshData = () => {
-        setClips(getClips());
-        setFolders(getFolders());
-        setTags(getTags());
+    const refreshData = async () => {
+        setClips(await getClips());
+        setFolders(await getFolders());
+        setTags(await getTags());
     };
 
-    const handleDeleteClip = (id: string) => {
-        deleteClip(id);
-        refreshData();
+    const handleDeleteClip = async (id: string) => {
+        await deleteClip(id);
+        await refreshData();
     };
 
-    const handleUpdateClip = (updatedClip: Clip) => {
-        updateClip(updatedClip);
-        refreshData();
+    const handleUpdateClip = async (updatedClip: Clip) => {
+        await updateClip(updatedClip);
+        await refreshData();
     };
 
     // Folder handlers
-    const handleCreateFolder = (name: string, parentId: string | null, category: 'video' | 'image' = 'video') => {
+    const handleCreateFolder = async (name: string, parentId: string | null, category: 'video' | 'image' = 'video') => {
+        // Check for duplicates
+        const duplicate = folders.find(f => f.name.toLowerCase() === name.toLowerCase() && f.parentId === parentId);
+        if (duplicate) {
+            alert(`Folder "${name}" already exists.`);
+            throw new Error("Folder already exists");
+        }
+
+        const id = uuidv4();
         const newFolder: Folder = {
-            id: uuidv4(),
+            id,
             name,
             parentId,
             category,
             createdAt: Date.now(),
         };
-        saveFolder(newFolder);
-        refreshData();
+        await saveFolder(newFolder);
+        await refreshData();
+        return id;
     };
 
-    const handleDeleteFolder = (id: string) => {
+    const handleDeleteFolder = async (id: string) => {
         if (confirm("Are you sure you want to delete this folder? Subfolders will be deleted and clips moved to root.")) {
-            deleteFolder(id);
-            refreshData();
+            await deleteFolder(id);
+            await refreshData();
             if (selectedFolderId === id) setSelectedFolderId(null);
         }
     };
 
-    const handleRenameFolder = (id: string, newName: string) => {
+    const handleRenameFolder = async (id: string, newName: string) => {
         const folder = folders.find(f => f.id === id);
         if (folder) {
-            updateFolder({ ...folder, name: newName });
-            refreshData();
+            await updateFolder({ ...folder, name: newName });
+            await refreshData();
         }
     };
 
     // Tag handlers
-    const handleCreateTag = (name: string, color: string) => {
+    const handleCreateTag = async (name: string, color: string) => {
+        // Check for duplicates
+        const duplicate = tags.find(t => t.name.toLowerCase() === name.toLowerCase());
+        if (duplicate) {
+            alert(`Tag "${name}" already exists.`);
+            throw new Error("Tag already exists");
+        }
+
+        const id = uuidv4();
         const newTag: Tag = {
-            id: uuidv4(),
+            id,
             name,
             color,
             createdAt: Date.now(),
         };
-        saveTag(newTag);
-        refreshData();
+        await saveTag(newTag);
+        await refreshData();
+        return id;
     };
 
-    const handleDeleteTag = (id: string) => {
+    const handleDeleteTag = async (id: string) => {
         if (confirm("Are you sure you want to delete this tag?")) {
-            deleteTag(id);
-            refreshData();
+            await deleteTag(id);
+            await refreshData();
             if (selectedTagId === id) setSelectedTagId(null);
         }
     };
 
     // Video/Clip handlers
-    const handleSaveVideo = (videoData: any) => {
+    const handleSaveVideo = async (videoData: any) => {
         const newVideo: Clip = {
             id: uuidv4(),
             type: 'video',
             createdAt: Date.now(),
             ...videoData
         };
-        saveClip(newVideo);
+        await saveClip(newVideo);
         // Update local state immediately to avoid refresh requirement
         setClips(prev => [newVideo, ...prev]);
         setQuickAddUrl(""); // Clear input
@@ -166,6 +200,14 @@ export function ClipsPage() {
         return type === filterType;
     });
 
+    const sortedClips = [...filteredClips].sort((a, b) => {
+        if (sortBy === 'date') return b.createdAt - a.createdAt;
+        if (sortBy === 'viralRatio') return (b.viralRatio || 0) - (a.viralRatio || 0);
+        if (sortBy === 'timeRatio') return (b.timeSinceUploadRatio || 0) - (a.timeSinceUploadRatio || 0);
+        if (sortBy === 'engagementScore') return (b.engagementScore || 0) - (a.engagementScore || 0);
+        return 0;
+    });
+
     return (
         <div className="flex h-[calc(100vh-4rem)] -m-6">
             <Sidebar
@@ -195,28 +237,57 @@ export function ClipsPage() {
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
                                 <Button
-                                    variant={filterType === 'all' ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={() => setFilterType('all')}
+                                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => setViewMode('grid')}
                                 >
-                                    All
+                                    <LayoutGrid className="h-4 w-4" />
                                 </Button>
                                 <Button
-                                    variant={filterType === 'video' ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={() => setFilterType('video')}
+                                    variant={viewMode === 'list' ? 'default' : 'ghost'}
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => setViewMode('list')}
                                 >
-                                    Videos
-                                </Button>
-                                <Button
-                                    variant={filterType === 'clip' ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={() => setFilterType('clip')}
-                                >
-                                    Clips
+                                    <List className="h-4 w-4" />
                                 </Button>
                             </div>
-                            <div className="flex gap-2 w-80">
+
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="gap-2">
+                                        <ArrowUpDown className="h-4 w-4" />
+                                        Sort
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => setSortBy('date')}>
+                                        Date Added
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setSortBy('viralRatio')}>
+                                        Viral Ratio (Views/Subs)
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setSortBy('timeRatio')}>
+                                        Velocity (Views/Time)
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setSortBy('engagementScore')}>
+                                        Engagement Score
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            <Button
+                                variant={sortBy === 'engagementScore' ? 'default' : 'outline'}
+                                size="sm"
+                                className="gap-2"
+                                onClick={() => setSortBy('engagementScore')}
+                            >
+                                <TrendingUp className="h-4 w-4" />
+                                Top Performing
+                            </Button>
+
+                            <div className="flex gap-2 w-64">
                                 <Input
                                     placeholder="Paste YouTube URL..."
                                     value={quickAddUrl}
@@ -224,7 +295,7 @@ export function ClipsPage() {
                                     onKeyDown={(e) => e.key === 'Enter' && handleQuickAdd()}
                                     className="bg-background"
                                 />
-                                <Button onClick={handleQuickAdd} disabled={!quickAddUrl.trim()}>
+                                <Button onClick={handleQuickAdd} disabled={!quickAddUrl.trim()} size="icon">
                                     <Plus className="w-4 h-4" />
                                 </Button>
                             </div>
@@ -241,16 +312,31 @@ export function ClipsPage() {
                             </p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {filteredClips.map((clip) => (
-                                <ClipCard
-                                    key={clip.id}
-                                    clip={clip}
-                                    folders={folders}
-                                    tags={tags}
-                                    onDelete={handleDeleteClip}
-                                    onUpdate={handleUpdateClip}
-                                />
+                        <div className={viewMode === 'grid'
+                            ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+                            : "flex flex-col gap-4"
+                        }>
+                            {sortedClips.map((clip) => (
+                                viewMode === 'grid' ? (
+                                    <ClipCard
+                                        key={clip.id}
+                                        clip={clip}
+                                        folders={folders}
+                                        tags={tags}
+                                        onDelete={handleDeleteClip}
+                                        onUpdate={handleUpdateClip}
+                                        onCinemaMode={setSelectedClipForCinema}
+                                    />
+                                ) : (
+                                    <ClipListRow
+                                        key={clip.id}
+                                        clip={clip}
+                                        folders={folders}
+                                        tags={tags}
+                                        onDelete={handleDeleteClip}
+                                        onCinemaMode={setSelectedClipForCinema}
+                                    />
+                                )
                             ))}
                         </div>
                     )}
@@ -264,7 +350,17 @@ export function ClipsPage() {
                 folders={folders}
                 tags={tags}
                 initialUrl={quickAddUrl}
+                onCreateFolder={handleCreateFolder}
+                onCreateTag={handleCreateTag}
+                clips={clips}
             />
-        </div>
+
+            <CinemaModeModal
+                isOpen={!!selectedClipForCinema}
+                onClose={() => setSelectedClipForCinema(null)}
+                clip={selectedClipForCinema}
+                onUpdateClip={handleUpdateClip}
+            />
+        </div >
     );
 }

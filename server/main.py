@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -13,16 +14,26 @@ from dotenv import load_dotenv
 import threading
 import time
 import json
-
+from sqlmodel import Session, select
+from database import get_session, engine, create_db_and_tables
+from models import Clip, Folder, Tag, ClipTagLink, User
+from fastapi import Depends, status
+from fastapi.security import OAuth2PasswordRequestForm
+from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 # Load environment variables
 load_dotenv()
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db_and_tables()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -127,6 +138,47 @@ async def get_video_info(videoId: str):
     if not videoId:
         raise HTTPException(status_code=400, detail="Missing videoId")
     
+    # Try using YouTube Data API first if key is available
+    api_key = os.getenv("YOUTUBE_API_KEY")
+    if api_key:
+        try:
+            youtube = build("youtube", "v3", developerKey=api_key)
+            
+            # Get video details
+            video_response = youtube.videos().list(
+                part="snippet,statistics,contentDetails",
+                id=videoId
+            ).execute()
+            
+            if video_response.get("items"):
+                video_item = video_response["items"][0]
+                snippet = video_item["snippet"]
+                statistics = video_item["statistics"]
+                channel_id = snippet["channelId"]
+                
+                # Get channel details for subscriber count
+                channel_response = youtube.channels().list(
+                    part="statistics",
+                    id=channel_id
+                ).execute()
+                
+                subscriber_count = 0
+                if channel_response.get("items"):
+                    subscriber_count = int(channel_response["items"][0]["statistics"].get("subscriberCount", 0))
+                
+                return JSONResponse({
+                    "title": snippet["title"],
+                    "thumbnail": snippet["thumbnails"]["high"]["url"],
+                    "duration": video_item["contentDetails"]["duration"], # ISO format, might need parsing if frontend expects seconds
+                    "uploadDate": snippet["publishedAt"].split("T")[0].replace("-", ""), # Format YYYYMMDD
+                    "uploader": snippet["channelTitle"],
+                    "viewCount": int(statistics.get("viewCount", 0)),
+                    "subscriberCount": subscriber_count
+                })
+        except Exception as e:
+            print(f"YouTube API failed, falling back to yt-dlp: {e}")
+
+    # Fallback to yt-dlp
     video_url = f"https://www.youtube.com/watch?v={videoId}"
     
     ydl_opts = {
@@ -146,7 +198,8 @@ async def get_video_info(videoId: str):
             "duration": info.get('duration'),
             "uploadDate": info.get('upload_date'),
             "uploader": info.get('uploader'),
-            "viewCount": info.get('view_count')
+            "viewCount": info.get('view_count'),
+            "subscriberCount": info.get('channel_follower_count') or info.get('subscriber_count')
         })
     except Exception as e:
         print(f"Error fetching video info: {str(e)}")
@@ -635,6 +688,257 @@ async def cleanup_video(request: CleanupRequest):
     
     return JSONResponse({"success": True})
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=3001)
+# --- Auth Endpoints ---
+
+class UserCreate(BaseModel):
+    email: str
+    password: str
+
+@app.post("/auth/register")
+def register(user_data: UserCreate, session: Session = Depends(get_session)):
+    existing_user = session.exec(select(User).where(User.email == user_data.email)).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    hashed_password = get_password_hash(user_data.password)
+    user = User(
+        email=user_data.email,
+        password_hash=hashed_password,
+        created_at=int(time.time() * 1000)
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return {"id": user.id, "email": user.email}
+
+@app.post("/auth/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+    user = session.exec(select(User).where(User.email == form_data.username)).first()
+    if not user:
+        print(f"DEBUG: User not found: {form_data.username}")
+    elif not verify_password(form_data.password, user.password_hash):
+        print(f"DEBUG: Password verification failed for {form_data.username}")
+    else:
+        print(f"DEBUG: Login successful for {form_data.username}")
+
+    if not user or not verify_password(form_data.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+# --- Database Endpoints ---
+
+@app.get("/api/clips")
+def read_clips(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    clips = session.exec(select(Clip).where(Clip.user_id == current_user.id)).all()
+    # Convert to frontend format (include tagIds)
+    result = []
+    for clip in clips:
+        clip_dict = clip.model_dump()
+        clip_dict["tagIds"] = [tag.id for tag in clip.tags]
+        result.append(clip_dict)
+    return result
+
+from typing import Optional, List
+
+class ClipCreate(BaseModel):
+    id: str
+    type: str
+    videoId: str
+    start: Optional[float] = None
+    end: Optional[float] = None
+    title: str
+    thumbnail: str
+    createdAt: int
+    folderId: Optional[str] = None
+    tagIds: List[str] = []
+    notes: Optional[str] = None
+    aiPrompt: Optional[str] = None
+    originalVideoUrl: Optional[str] = None
+    sourceVideoId: Optional[str] = None
+    subscriberCount: Optional[int] = None
+    viewCount: Optional[int] = None
+    uploadDate: Optional[str] = None
+    viralRatio: Optional[float] = None
+    timeSinceUploadRatio: Optional[float] = None
+    engagementScore: Optional[float] = None
+
+@app.post("/api/clips")
+def create_clip(clip_data: ClipCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    # Check if clip exists for this user
+    existing_clip = session.exec(select(Clip).where(Clip.id == clip_data.id, Clip.user_id == current_user.id)).first()
+    if existing_clip:
+        # Update existing
+        return update_clip(clip_data.id, clip_data, session, current_user)
+
+    clip = Clip.model_validate(clip_data, update={"tags": [], "user_id": current_user.id})
+    
+    # Handle tags (ensure they belong to user or are global?)
+    # For now, assuming tags are also user-scoped
+    if clip_data.tagIds:
+        for tag_id in clip_data.tagIds:
+            tag = session.exec(select(Tag).where(Tag.id == tag_id, Tag.user_id == current_user.id)).first()
+            if tag:
+                clip.tags.append(tag)
+    
+    # Calculate metrics
+    if clip.viewCount is not None and clip.subscriberCount is not None and clip.subscriberCount > 0:
+        # Calculate metrics
+        try:
+            # Viral Ratio (Raw)
+            viral_ratio_norm = 0.0
+            if clip.subscriberCount and clip.subscriberCount > 0:
+                clip.viralRatio = clip.viewCount / clip.subscriberCount
+                # Normalize for Engagement Score calculation
+                # 0.01x = 0, 1x = 5, 100x = 10
+                import math
+                viral_ratio_norm = min(10.0, max(0.0, (math.log10(max(clip.viralRatio, 0.0001)) + 2) * 2.5))
+            
+            # Time Ratio / Velocity (Normalized 0-10)
+            upload_dt = datetime.strptime(clip.uploadDate, "%Y%m%d")
+            days_since = (datetime.now() - upload_dt).days
+            if days_since < 1: days_since = 1
+            raw_velocity = clip.viewCount / days_since
+            # 100k views/day = 10
+            clip.timeSinceUploadRatio = min(10.0, (math.log10(raw_velocity + 1) / 5) * 10)
+            
+            # Engagement Score (Average of Normalized Ratios)
+            if clip.viralRatio is not None and clip.timeSinceUploadRatio is not None:
+                clip.engagementScore = (viral_ratio_norm + clip.timeSinceUploadRatio) / 2
+                
+        except ValueError:
+            pass
+            
+    session.add(clip)
+    session.commit()
+    session.refresh(clip)
+    return clip
+
+@app.put("/api/clips/{clip_id}")
+def update_clip(clip_id: str, clip_data: ClipCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    clip = session.exec(select(Clip).where(Clip.id == clip_id, Clip.user_id == current_user.id)).first()
+    if not clip:
+        raise HTTPException(status_code=404, detail="Clip not found")
+    
+    clip_data_dict = clip_data.model_dump(exclude={"tagIds"})
+    for key, value in clip_data_dict.items():
+        setattr(clip, key, value)
+    
+    # Update tags
+    clip.tags = []
+    if clip_data.tagIds:
+        for tag_id in clip_data.tagIds:
+            tag = session.exec(select(Tag).where(Tag.id == tag_id, Tag.user_id == current_user.id)).first()
+            if tag:
+                clip.tags.append(tag)
+                
+    session.add(clip)
+    session.commit()
+    session.refresh(clip)
+    return clip
+
+@app.delete("/api/clips/{clip_id}")
+def delete_clip(clip_id: str, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    clip = session.exec(select(Clip).where(Clip.id == clip_id, Clip.user_id == current_user.id)).first()
+    if not clip:
+        raise HTTPException(status_code=404, detail="Clip not found")
+    session.delete(clip)
+    session.commit()
+    return {"ok": True}
+
+@app.get("/api/folders")
+def read_folders(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    return session.exec(select(Folder).where(Folder.user_id == current_user.id)).all()
+
+class FolderCreate(BaseModel):
+    id: str
+    name: str
+    parentId: Optional[str] = None
+    category: str
+    createdAt: int
+
+@app.post("/api/folders")
+def create_folder(folder_data: FolderCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    existing = session.exec(select(Folder).where(Folder.id == folder_data.id, Folder.user_id == current_user.id)).first()
+    if existing:
+        for key, value in folder_data.model_dump().items():
+            setattr(existing, key, value)
+        session.add(existing)
+        session.commit()
+        session.refresh(existing)
+        return existing
+
+    folder = Folder.model_validate(folder_data, update={"user_id": current_user.id})
+    session.add(folder)
+    session.commit()
+    session.refresh(folder)
+    return folder
+
+@app.put("/api/folders/{folder_id}")
+def update_folder(folder_id: str, folder_data: FolderCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    folder = session.exec(select(Folder).where(Folder.id == folder_id, Folder.user_id == current_user.id)).first()
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    
+    for key, value in folder_data.model_dump().items():
+        setattr(folder, key, value)
+        
+    session.add(folder)
+    session.commit()
+    session.refresh(folder)
+    return folder
+
+@app.delete("/api/folders/{folder_id}")
+def delete_folder(folder_id: str, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    folder = session.exec(select(Folder).where(Folder.id == folder_id, Folder.user_id == current_user.id)).first()
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    
+    # Logic to handle subfolders/clips? 
+    # For now just delete the folder. 
+    # Frontend logic handles recursive deletion of IDs, but backend should ideally handle it too.
+    # But let's keep it simple as requested.
+    session.delete(folder)
+    session.commit()
+    return {"ok": True}
+
+@app.get("/api/tags")
+def read_tags(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    return session.exec(select(Tag).where(Tag.user_id == current_user.id)).all()
+
+class TagCreate(BaseModel):
+    id: str
+    name: str
+    color: str
+    createdAt: int
+
+@app.post("/api/tags")
+def create_tag(tag_data: TagCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    existing = session.exec(select(Tag).where(Tag.id == tag_data.id, Tag.user_id == current_user.id)).first()
+    if existing:
+        return existing # Or update?
+
+    tag = Tag.model_validate(tag_data, update={"user_id": current_user.id})
+    session.add(tag)
+    session.commit()
+    session.refresh(tag)
+    return tag
+
+@app.delete("/api/tags/{tag_id}")
+def delete_tag(tag_id: str, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    tag = session.exec(select(Tag).where(Tag.id == tag_id, Tag.user_id == current_user.id)).first()
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag not found")
+    session.delete(tag)
+    session.commit()
+    return {"ok": True}
+
+

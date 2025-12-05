@@ -24,9 +24,10 @@ interface ClipCardProps {
     tags?: Tag[];
     onDelete: (id: string) => void;
     onUpdate?: (clip: Clip) => void;
+    onCinemaMode?: (clip: Clip) => void;
 }
 
-export function ClipCard({ clip, folders = [], tags = [], onDelete, onUpdate }: ClipCardProps) {
+export function ClipCard({ clip, folders = [], tags = [], onDelete, onUpdate, onCinemaMode }: ClipCardProps) {
     const handleMoveToFolder = (folderId: string | null) => {
         if (onUpdate) {
             onUpdate({ ...clip, folderId });
@@ -47,7 +48,10 @@ export function ClipCard({ clip, folders = [], tags = [], onDelete, onUpdate }: 
 
     return (
         <Card className="overflow-hidden flex flex-col h-full hover:shadow-md transition-shadow group">
-            <div className="relative aspect-video bg-muted">
+            <div
+                className={`relative aspect-video bg-muted ${clip.type === 'video' ? 'cursor-pointer' : ''}`}
+                onClick={() => clip.type === 'video' && onCinemaMode?.(clip)}
+            >
                 <img
                     src={clip.thumbnail}
                     alt={clip.title}
@@ -57,6 +61,11 @@ export function ClipCard({ clip, folders = [], tags = [], onDelete, onUpdate }: 
                 {clip.type === 'clip' && typeof clip.start === 'number' && typeof clip.end === 'number' && (
                     <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
                         {formatTime(clip.start)} - {formatTime(clip.end)}
+                    </div>
+                )}
+                {clip.engagementScore !== undefined && (
+                    <div className="absolute top-2 left-2 bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded shadow-md z-10">
+                        {clip.engagementScore.toFixed(1)}
                     </div>
                 )}
 
@@ -119,10 +128,28 @@ export function ClipCard({ clip, folders = [], tags = [], onDelete, onUpdate }: 
                 </div>
             </div>
 
-            <CardContent className="p-4 flex-1 space-y-2">
-                <h3 className="font-semibold line-clamp-2 text-sm sm:text-base" title={clip.title}>
+            <CardContent className="p-4 flex-1 space-y-3">
+                <h3 className="font-semibold line-clamp-2 text-sm sm:text-base leading-tight" title={clip.title}>
                     {clip.title}
                 </h3>
+
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    {clip.viewCount !== undefined && (
+                        <span>
+                            {new Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 1 }).format(clip.viewCount)} views
+                        </span>
+                    )}
+                    {clip.viralRatio !== undefined && (
+                        <span className="text-blue-600 dark:text-blue-400 font-medium">
+                            Viral: {clip.viralRatio.toFixed(2)}x
+                        </span>
+                    )}
+                    {clip.timeSinceUploadRatio !== undefined && (
+                        <span className="text-green-600 dark:text-green-400 font-medium">
+                            Vel: {clip.timeSinceUploadRatio.toFixed(1)}
+                        </span>
+                    )}
+                </div>
 
                 {clipTags.length > 0 && (
                     <div className="flex flex-wrap gap-1">

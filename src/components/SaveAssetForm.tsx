@@ -56,11 +56,14 @@ export function SaveAssetForm({ initialAssets, initialUrl, onSave, onCancel }: S
 
     // Load initial data
     useEffect(() => {
-        setFolders(getFolders());
-        setTags(getTags());
+        const init = async () => {
+            setFolders(await getFolders());
+            setTags(await getTags());
+        };
+        init();
     }, []);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (assets.length === 0) return;
 
         // If manual entry, validate title
@@ -103,11 +106,13 @@ export function SaveAssetForm({ initialAssets, initialUrl, onSave, onCancel }: S
             } as Clip;
         });
 
-        updatedAssets.forEach(clip => saveClip(clip));
+        for (const clip of updatedAssets) {
+            await saveClip(clip);
+        }
         onSave();
     };
 
-    const handleCreateTag = () => {
+    const handleCreateTag = async () => {
         if (!newTagName.trim()) return;
         const newTag: Tag = {
             id: uuidv4(),
@@ -115,8 +120,8 @@ export function SaveAssetForm({ initialAssets, initialUrl, onSave, onCancel }: S
             color: "#3b82f6", // Default blue
             createdAt: Date.now()
         };
-        saveTag(newTag);
-        setTags(getTags()); // Refresh
+        await saveTag(newTag);
+        setTags(await getTags()); // Refresh
         setSelectedTagIds([...selectedTagIds, newTag.id]); // Auto-select
         setNewTagName("");
     };
