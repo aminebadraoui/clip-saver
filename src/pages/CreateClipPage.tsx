@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { SaveClipModal } from "@/components/SaveClipModal";
-import { getFolders, getTags, getClips, saveClips } from "@/utils/storage";
+import { getTags, getClips, saveClips } from "@/utils/storage";
 import type { Clip } from "@/types/clip";
-import type { Folder } from "@/types/folder";
+
 import type { Tag } from "@/types/tag";
+import { toast } from "sonner";
 
 export function CreateClipPage() {
     const navigate = useNavigate();
@@ -24,14 +25,14 @@ export function CreateClipPage() {
         thumbnail: string;
     } | null>(null);
 
-    const [folders, setFolders] = useState<Folder[]>([]);
+
     const [tags, setTags] = useState<Tag[]>([]);
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
     const [clipsToSave, setClipsToSave] = useState<Clip[]>([]);
 
     useEffect(() => {
         const init = async () => {
-            setFolders(await getFolders());
+
             setTags(await getTags());
         };
         init();
@@ -110,10 +111,12 @@ export function CreateClipPage() {
             type: 'clip' as const, // Ensure type is clip
             sourceVideoId: searchParams.get("source") || undefined,
             originalVideoUrl: url || undefined,
+            originalTitle: videoData?.title,
         }));
 
         await saveClips(clipsWithMetadata);
-        navigate("/");
+        toast.success("Clips saved successfully");
+        navigate("/?filter=clip");
     };
 
     return (
@@ -184,7 +187,7 @@ export function CreateClipPage() {
                 isOpen={isSaveModalOpen}
                 onClose={() => setIsSaveModalOpen(false)}
                 onSave={handleModalSave}
-                folders={folders}
+
                 tags={tags}
                 clips={clipsToSave}
             />

@@ -1,76 +1,71 @@
 import { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { type YouTubePlayer } from "react-youtube";
+import YouTube, { type YouTubePlayer } from "react-youtube";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Slider } from "@/components/ui/slider";
-import { formatTime } from "@/utils/formatTime";
-import { Trash2, Plus, Save, Play, Pause, Loader2 } from "lucide-react";
-import type { Clip } from "@/types/clip";
 
-interface Segment {
-    id: string;
-    start: string;
-    end: string;
-    thumbnail?: string | null;
-    isGeneratingThumbnail?: boolean;
-}
+import { formatTime } from "@/utils/formatTime";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Save, Play, Pause, Loader2, Plus, Trash2 } from "lucide-react";
+import type { Clip } from "@/types/clip";
+import type { Tag } from "@/types/tag";
 
 interface SegmentBuilderProps {
     videoId: string;
     videoTitle: string;
     thumbnail: string;
     onSave: (clips: Clip[]) => void;
+    tags?: Tag[];
+    onCreateTag?: (name: string, color: string) => Promise<string>;
 }
 
-export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave }: SegmentBuilderProps) {
-    const [segments, setSegments] = useState<Segment[]>([]);
-    const [start, setStart] = useState("");
-    const [end, setEnd] = useState("");
-    const [error, setError] = useState<string | null>(null);
-    const [sliderValue, setSliderValue] = useState([0, 0]);
-    const [duration, _setDuration] = useState<number>(0);
+export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = [], onCreateTag }: SegmentBuilderProps) {
+    const [start, setStart] = useState("0");
+    const [end, setEnd] = useState("0"); // Default end to 0 as requested, or maybe just empty? User said "end button is off until there is a start"
+    // Let's default end to 0 so it's "off" logic can be applied (end <= start)
+    const [duration, _setDuration] = useState(0);
     const [isPlaying, _setIsPlaying] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // New state for individual clip saving
+    const [title, setTitle] = useState("");
+    const [notes, setNotes] = useState("");
+    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+    const [newTagName, setNewTagName] = useState("");
+    const [isCreatingTag, setIsCreatingTag] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Restored state for multi-segment accumulation
+    interface PendingSegment {
+        id: string;
+        title?: string;
+        start: number;
+        end: number;
+        notes: string;
+        tagIds: string[];
+        thumbnail: string;
+        isThumbnailLoading?: boolean;
+    }
+    const [segments, setSegments] = useState<PendingSegment[]>([]);
 
     const playerRef = useRef<YouTubePlayer | null>(null);
     const previewIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // const onPlayerReady = (event: YouTubeEvent) => {
-    //     playerRef.current = event.target;
-    //     setDuration(event.target.getDuration());
-    // };
-
-    // const onStateChange = (event: YouTubeEvent) => {
-    //     setIsPlaying(event.data === 1); // 1 is playing
-    // };
-
-    // Sync slider with inputs
-    useEffect(() => {
-        const s = parseInt(start) || 0;
-        const e = parseInt(end) || 0;
-        setSliderValue([s, e]);
-    }, [start, end]);
-
-    const handleSliderChange = (value: number[]) => {
-        const prevStart = sliderValue[0];
-        const prevEnd = sliderValue[1];
-
-        setSliderValue(value);
-        setStart(value[0].toString());
-        setEnd(value[1].toString());
-
-        if (playerRef.current) {
-            // Determine which thumb was moved and seek accordingly
-            if (value[0] !== prevStart) {
-                playerRef.current.seekTo(value[0], true);
-            } else if (value[1] !== prevEnd) {
-                playerRef.current.seekTo(value[1], true);
-            }
-        }
+    const onPlayerReady = (event: any) => {
+        playerRef.current = event.target;
+        _setDuration(event.target.getDuration());
     };
+
+    const onStateChange = (event: any) => {
+        _setIsPlaying(event.data === 1); // 1 is playing
+    };
+
+    // Sync slider with inputs removed
+
+    // handleSliderChange removed
 
     const previewSegment = () => {
         if (!playerRef.current) return;
@@ -111,14 +106,13 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave }: Segme
         };
     }, []);
 
-    const addSegment = () => {
-        console.log("DEBUG: addSegment called", { start, end });
+    const handleAddSegment = async (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.currentTarget.blur(); // Remove focus to prevent spacebar from triggering again
         setError(null);
         const startNum = parseInt(start);
         const endNum = parseInt(end);
 
         if (isNaN(startNum) || isNaN(endNum)) {
-            console.log("DEBUG: Invalid numbers");
             setError("Start and end times must be valid numbers (seconds).");
             return;
         }
@@ -133,236 +127,323 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave }: Segme
             return;
         }
 
-        // Optional: Check overlap
-        const hasOverlap = segments.some(seg => {
-            const s = parseInt(seg.start);
-            const e = parseInt(seg.end);
-            return (startNum >= s && startNum < e) || (endNum > s && endNum <= e) || (startNum <= s && endNum >= e);
-        });
-
-        if (hasOverlap) {
-            setError("This segment overlaps with an existing one.");
-            return;
-        }
-
-        console.log("DEBUG: Validation passed, creating segment...");
-        // Optimistic update
-        const tempId = uuidv4();
-        const newSegment: Segment = {
-            id: tempId,
-            start: start,
-            end: end,
-            thumbnail: null, // Will be updated
+        const newSegmentId = uuidv4();
+        const newSegment: PendingSegment = {
+            id: newSegmentId,
+            title: title.trim() || undefined,
+            start: startNum,
+            end: endNum,
+            notes,
+            tagIds: selectedTagIds,
+            thumbnail: thumbnail, // Default to video thumbnail initially
+            isThumbnailLoading: true
         };
 
-        setSegments([...segments, newSegment]);
-        setStart("");
-        setEnd("");
-        setSliderValue([0, 0]);
+        setSegments(prev => [...prev, newSegment]);
 
-        // Trigger server-side capture
-        console.log("DEBUG: Sending capture request...", { videoId, timestamp: startNum });
+        // Reset form
+        setStart(endNum.toString());
+        setEnd((endNum + 10).toString());
+        setTitle("");
+        setNotes("");
+        setSelectedTagIds([]);
+
+        // Trigger background thumbnail generation with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
         fetch('/api/capture-thumbnail', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 videoId,
                 timestamp: startNum
-            })
+            }),
+            signal: controller.signal
         })
-            .then(async res => {
-                console.log("DEBUG: Capture response status:", res.status);
-                if (!res.ok) {
-                    const text = await res.text();
-                    throw new Error(`Server error: ${res.status} ${text}`);
-                }
-                return res.json();
+            .then(res => {
+                if (res.ok) return res.json();
+                throw new Error("Failed to generate thumbnail");
             })
             .then(data => {
-                console.log("DEBUG: Capture success:", data);
+                clearTimeout(timeoutId);
                 if (data.url) {
                     setSegments(prev => prev.map(s =>
-                        s.id === tempId
-                            ? { ...s, thumbnail: data.url }
+                        s.id === newSegmentId
+                            ? { ...s, thumbnail: data.url, isThumbnailLoading: false }
                             : s
                     ));
                 } else {
-                    // Fallback to smart thumbnail if capture fails
                     setSegments(prev => prev.map(s =>
-                        s.id === tempId
-                            ? { ...s, thumbnail: getSmartThumbnail(startNum) }
+                        s.id === newSegmentId
+                            ? { ...s, isThumbnailLoading: false }
                             : s
                     ));
                 }
             })
-            .catch(err => {
-                console.error("DEBUG: Thumbnail capture failed:", err);
-                // Fallback
+            .catch(e => {
+                clearTimeout(timeoutId);
+                console.error("Thumbnail capture failed", e);
                 setSegments(prev => prev.map(s =>
-                    s.id === tempId
-                        ? { ...s, thumbnail: getSmartThumbnail(startNum) }
+                    s.id === newSegmentId
+                        ? { ...s, isThumbnailLoading: false }
                         : s
                 ));
             });
     };
 
     const removeSegment = (id: string) => {
-        setSegments(segments.filter((s) => s.id !== id));
+        setSegments(segments.filter(s => s.id !== id));
     };
 
-    const getSmartThumbnail = (start: number) => {
-        // Use standard YouTube thumbnails
-        // 0 = default (480x360), 1, 2, 3 = generated thumbnails
-        // hqdefault = 480x360
-        // mqdefault = 320x180
-        // default = 120x90
-
-        // We can try to pick one of the 3 generated thumbnails based on start time relative to duration
-        // But since we don't know exact duration until player loads, and we want this to be simple
-        // Let's just use the high quality default for now, or maybe try to map to 1/2/3 if we have duration
-
-        if (duration > 0) {
-            const ratio = start / duration;
-            if (ratio < 0.33) return `https://img.youtube.com/vi/${videoId}/1.jpg`;
-            if (ratio < 0.66) return `https://img.youtube.com/vi/${videoId}/2.jpg`;
-            return `https://img.youtube.com/vi/${videoId}/3.jpg`;
-        }
-
-        return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-    };
-
-    const handleSave = () => {
-        if (segments.length === 0) return;
-
-        const clips: Clip[] = segments.map((seg) => {
-            const startSeconds = parseInt(seg.start);
-            return {
+    const handleSaveAll = () => {
+        setIsSaving(true);
+        try {
+            const newClips: Clip[] = segments.map(seg => ({
                 id: uuidv4(),
                 type: 'clip',
                 videoId,
-                title: videoTitle,
-                thumbnail: seg.thumbnail || thumbnail,
-                start: startSeconds,
-                end: parseInt(seg.end),
+                title: seg.title || videoTitle,
+                thumbnail: seg.thumbnail,
+                start: seg.start,
+                end: seg.end,
                 createdAt: Date.now(),
-            };
-        });
+                notes: seg.notes,
+                tagIds: seg.tagIds
+            }));
 
-        onSave(clips);
+            onSave(newClips);
+            setSegments([]);
+        } catch (e) {
+            console.error("Failed to save clips", e);
+            setError("Failed to save clips.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const toggleTag = (tagId: string) => {
+        if (selectedTagIds.includes(tagId)) {
+            setSelectedTagIds(selectedTagIds.filter(id => id !== tagId));
+        } else {
+            setSelectedTagIds([...selectedTagIds, tagId]);
+        }
+    };
+
+    const handleCreateTag = async () => {
+        if (!newTagName.trim() || !onCreateTag) return;
+        setIsCreatingTag(true);
+        try {
+            const newTagId = await onCreateTag(newTagName, "#3b82f6"); // Default blue
+            setSelectedTagIds([...selectedTagIds, newTagId]);
+            setNewTagName("");
+        } catch (e) {
+            console.error("Failed to create tag", e);
+            setError("Failed to create tag.");
+        } finally {
+            setIsCreatingTag(false);
+        }
     };
 
     return (
         <div className="space-y-6">
             <Card className="overflow-hidden bg-black">
                 <div className="w-full h-[400px] flex items-center justify-center">
-                    <iframe
-                        width="100%"
-                        height="100%"
-                        src={`https://www.youtube.com/embed/${videoId}`}
-                        title="YouTube video player"
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                        allowFullScreen
-                    ></iframe>
+                    <YouTube
+                        videoId={videoId}
+                        opts={{
+                            height: '100%',
+                            width: '100%',
+                            playerVars: {
+                                autoplay: 0,
+                            },
+                        }}
+                        className="w-full h-full"
+                        iframeClassName="w-full h-full"
+                        onReady={onPlayerReady}
+                        onStateChange={onStateChange}
+                    />
                 </div>
             </Card>
 
             <div className="space-y-4">
-                <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>00:00</span>
-                    <span>{formatTime(duration)}</span>
-                </div>
-                <Slider
-                    defaultValue={[0, 0]}
-                    value={sliderValue}
-                    max={duration || 100}
-                    step={1}
-                    minStepsBetweenThumbs={1}
-                    onValueChange={handleSliderChange}
-                    className="py-4"
-                />
-            </div>
+                <h3 className="font-semibold text-lg">Create Clip</h3>
 
-            <div className="grid grid-cols-2 gap-4 items-end">
-                <div className="space-y-2">
-                    <Label htmlFor="start-time">Start Time (s)</Label>
-                    <Input
-                        id="start-time"
-                        type="number"
-                        placeholder="0"
-                        value={start}
-                        onChange={(e) => setStart(e.target.value)}
-                        min="0"
-                    />
+                {/* Time Controls */}
+                <div className="flex items-center gap-4">
+                    <div className="flex-1 space-y-2">
+                        <Label>Start Time</Label>
+                        <div className="flex gap-2">
+                            <Input
+                                type="number"
+                                value={start}
+                                onChange={(e) => setStart(e.target.value)}
+                                className="font-mono"
+                            />
+                            <Button
+                                variant="secondary"
+                                onClick={async () => {
+                                    if (playerRef.current) {
+                                        const time = await playerRef.current.getCurrentTime();
+                                        setStart(Math.floor(time).toString());
+                                    }
+                                }}
+                            >
+                                Set Start
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 space-y-2">
+                        <Label>End Time</Label>
+                        <div className="flex gap-2">
+                            <Input
+                                type="number"
+                                value={end}
+                                onChange={(e) => setEnd(e.target.value)}
+                                className="font-mono"
+                            />
+                            <Button
+                                variant="secondary"
+                                disabled={!start || parseInt(start) < 0}
+                                onClick={async () => {
+                                    if (playerRef.current) {
+                                        const time = await playerRef.current.getCurrentTime();
+                                        setEnd(Math.ceil(time).toString());
+                                    }
+                                }}
+                            >
+                                Set End
+                            </Button>
+                        </div>
+                    </div>
                 </div>
-                <div className="space-y-2">
-                    <Label htmlFor="end-time">End Time (s)</Label>
-                    <Input
-                        id="end-time"
-                        type="number"
-                        placeholder="10"
-                        value={end}
-                        onChange={(e) => setEnd(e.target.value)}
-                        min="0"
-                    />
+
+                {/* Visual Timeline (Optional replacement for slider, or just remove) */}
+                {/* User asked to remove slider, so we remove it. */}
+
+                <div className="flex justify-between text-xs text-muted-foreground px-1">
+                    <span>Duration: {formatTime(Math.max(0, parseInt(end) - parseInt(start)))}</span>
+                    <span>Video Length: {formatTime(duration)}</span>
                 </div>
             </div>
 
             {error && <p className="text-sm text-destructive">{error}</p>}
 
-            <div className="flex gap-2">
-                <Button onClick={previewSegment} variant="outline" className="flex-1" disabled={!start || !end}>
-                    {isPlaying ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
-                    Preview Segment
-                </Button>
-                <Button onClick={addSegment} className="flex-1" variant="secondary">
-                    <Plus className="w-4 h-4 mr-2" /> Add Segment
-                </Button>
+            <div className="space-y-4">
+                <div className="space-y-2">
+                    <Label>Title (Optional)</Label>
+                    <Input
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder={videoTitle}
+                    />
+                </div>
+
+                <div className="space-y-2">
+                    <Label>Notes</Label>
+                    <Textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Add notes for this clip..."
+                        className="h-20 resize-none"
+                    />
+                </div>
+
+                <div className="space-y-2">
+                    <Label>Tags</Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                        {tags.map(tag => (
+                            <Badge
+                                key={tag.id}
+                                variant={selectedTagIds.includes(tag.id) ? "default" : "outline"}
+                                className="cursor-pointer"
+                                onClick={() => toggleTag(tag.id)}
+                                style={selectedTagIds.includes(tag.id) ? { backgroundColor: tag.color } : { borderColor: tag.color, color: tag.color }}
+                            >
+                                {tag.name}
+                            </Badge>
+                        ))}
+                    </div>
+                    {onCreateTag && (
+                        <div className="flex gap-2">
+                            <Input
+                                value={newTagName}
+                                onChange={(e) => setNewTagName(e.target.value)}
+                                placeholder="Create new tag..."
+                                onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
+                                className="h-8 text-sm"
+                            />
+                            <Button variant="outline" size="sm" onClick={handleCreateTag} disabled={isCreatingTag || !newTagName.trim()}>
+                                {isCreatingTag ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                            </Button>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex gap-2">
+                    <Button onClick={previewSegment} variant="outline" className="flex-1" disabled={!start || !end}>
+                        {isPlaying ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
+                        Preview
+                    </Button>
+                    <Button onClick={handleAddSegment} className="flex-1" disabled={!start || !end}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Segment
+                    </Button>
+                </div>
             </div>
 
+            {/* List of Pending Segments */}
             {segments.length > 0 && (
-                <div className="space-y-4">
-                    <Separator />
-                    <h3 className="font-medium text-lg text-muted-foreground">Segments to Save</h3>
+                <div className="space-y-4 pt-4 border-t">
+                    <h3 className="font-semibold text-lg">Segments to Save ({segments.length})</h3>
                     <div className="space-y-3">
                         {segments.map((seg) => (
-                            <Card key={seg.id} className="p-4 flex items-center gap-4 bg-muted/50">
-                                <div className="relative w-40 aspect-video rounded-md overflow-hidden flex-shrink-0 border border-border bg-black/10 flex items-center justify-center">
-                                    {seg.thumbnail ? (
-                                        <img
-                                            src={seg.thumbnail}
-                                            alt="Segment thumbnail"
-                                            className="w-full h-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center text-muted-foreground">
-                                            <Loader2 className="w-6 h-6 animate-spin mb-1" />
-                                            <span className="text-xs">Generating...</span>
+                            <Card key={seg.id} className="p-3 flex gap-3 bg-muted/50 relative group">
+                                <div className="w-32 aspect-video rounded bg-black/20 flex-shrink-0 overflow-hidden relative">
+                                    <img src={seg.thumbnail} alt="Thumbnail" className={`w-full h-full object-cover ${seg.isThumbnailLoading ? 'opacity-50' : ''}`} />
+                                    {seg.isThumbnailLoading && (
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <Loader2 className="w-6 h-6 animate-spin text-white" />
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex-1">
-                                    <div className="font-medium text-lg">
-                                        {formatTime(parseInt(seg.start))} - {formatTime(parseInt(seg.end))}
+                                <div className="flex-1 min-w-0">
+                                    <div className="font-medium truncate">
+                                        {seg.title || "Untitled Segment"}
                                     </div>
-                                    <div className="text-sm text-muted-foreground">
-                                        Duration: {formatTime(parseInt(seg.end) - parseInt(seg.start))}
+                                    <div className="text-xs text-muted-foreground mb-1">
+                                        {formatTime(seg.start)} - {formatTime(seg.end)}
+                                    </div>
+                                    {seg.notes && (
+                                        <p className="text-sm text-muted-foreground truncate">{seg.notes}</p>
+                                    )}
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                        {seg.tagIds.map(tid => {
+                                            const t = tags.find(tag => tag.id === tid);
+                                            return t ? (
+                                                <Badge key={tid} variant="outline" className="text-[10px] h-5 px-1" style={{ color: t.color, borderColor: t.color }}>
+                                                    {t.name}
+                                                </Badge>
+                                            ) : null;
+                                        })}
                                     </div>
                                 </div>
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-10 w-10 text-muted-foreground hover:text-destructive flex-shrink-0"
+                                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                                     onClick={() => removeSegment(seg.id)}
                                 >
-                                    <Trash2 className="w-5 h-5" />
+                                    <Trash2 className="w-4 h-4" />
                                 </Button>
                             </Card>
                         ))}
                     </div>
 
-                    <Button onClick={handleSave} className="w-full h-12 text-lg" size="lg">
-                        <Save className="w-5 h-5 mr-2" /> Save All Segments
+                    <Button onClick={handleSaveAll} className="w-full h-12 text-lg" size="lg" disabled={isSaving || segments.some(s => s.isThumbnailLoading)}>
+                        {isSaving || segments.some(s => s.isThumbnailLoading) ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Save className="w-5 h-5 mr-2" />}
+                        Save All Segments
                     </Button>
                 </div>
             )}

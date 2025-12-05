@@ -5,23 +5,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { Folder } from "@/types/folder";
-import type { Tag } from "@/types/tag";
+
 import type { Clip } from "@/types/clip";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface AddVideoSheetProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (videoData: any) => Promise<void>;
     folders: Folder[];
-    tags: Tag[];
     clips: Clip[];
     initialUrl?: string;
     onCreateFolder: (name: string, parentId: string | null) => Promise<string>;
-    onCreateTag: (name: string, color: string) => Promise<string>;
 }
 
-export function AddVideoSheet({ isOpen, onClose, onSave, folders, tags, clips, initialUrl = "", onCreateFolder, onCreateTag }: AddVideoSheetProps) {
+export function AddVideoSheet({ isOpen, onClose, onSave, folders, clips, initialUrl = "", onCreateFolder }: AddVideoSheetProps) {
     const [url, setUrl] = useState(initialUrl);
     const [isLoading, setIsLoading] = useState(false);
     const [step, setStep] = useState<'url' | 'details'>('url');
@@ -31,7 +30,7 @@ export function AddVideoSheet({ isOpen, onClose, onSave, folders, tags, clips, i
     const [thumbnail, setThumbnail] = useState("");
     const [videoId, setVideoId] = useState("");
     const [selectedFolderId, setSelectedFolderId] = useState<string>("");
-    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+
     const [notes, setNotes] = useState("");
     // const [prompt, setPrompt] = useState(""); // Removed AI Prompt state
 
@@ -48,9 +47,7 @@ export function AddVideoSheet({ isOpen, onClose, onSave, folders, tags, clips, i
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
     const [isSavingFolder, setIsSavingFolder] = useState(false);
-    const [isCreatingTag, setIsCreatingTag] = useState(false);
-    const [newTagName, setNewTagName] = useState("");
-    const [isSavingTag, setIsSavingTag] = useState(false);
+
     const [isSavingVideo, setIsSavingVideo] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -61,7 +58,7 @@ export function AddVideoSheet({ isOpen, onClose, onSave, folders, tags, clips, i
         setThumbnail("");
         setVideoId("");
         setSelectedFolderId("");
-        setSelectedTagIds([]);
+        setSelectedFolderId("");
         setNotes("");
         // setPrompt(""); // Removed AI Prompt reset
         // setPrompt(""); // Removed AI Prompt reset
@@ -73,11 +70,10 @@ export function AddVideoSheet({ isOpen, onClose, onSave, folders, tags, clips, i
         setEngagementScore(undefined);
         setIsCreatingFolder(false);
         setNewFolderName("");
-        setIsCreatingTag(false);
-        setNewTagName("");
+        setNewFolderName("");
         setError(null);
         setIsSavingFolder(false);
-        setIsSavingTag(false);
+        setIsSavingFolder(false);
         setIsSavingVideo(false);
     };
 
@@ -91,17 +87,7 @@ export function AddVideoSheet({ isOpen, onClose, onSave, folders, tags, clips, i
                 setSelectedFolderId(savedFolderId);
             }
 
-            const savedTagIds = localStorage.getItem("lastUsedTagIds");
-            if (savedTagIds) {
-                try {
-                    const parsedTags = JSON.parse(savedTagIds);
-                    if (Array.isArray(parsedTags)) {
-                        setSelectedTagIds(parsedTags);
-                    }
-                } catch (e) {
-                    console.error("Failed to parse saved tags", e);
-                }
-            }
+
 
             if (initialUrl) {
                 setUrl(initialUrl);
@@ -123,7 +109,7 @@ export function AddVideoSheet({ isOpen, onClose, onSave, folders, tags, clips, i
         const id = extractVideoId(urlToUse);
         if (!id) {
             // Only alert if it's a manual submission or if we really expect a valid URL
-            if (!overrideUrl) alert("Invalid YouTube URL");
+            if (!overrideUrl) toast.error("Invalid YouTube URL");
             return;
         }
 
@@ -177,7 +163,7 @@ export function AddVideoSheet({ isOpen, onClose, onSave, folders, tags, clips, i
             setStep('details');
         } catch (error) {
             console.error(error);
-            alert("Failed to load video details. Please try again.");
+            toast.error("Failed to load video details. Please try again.");
         } finally {
             setIsLoading(false);
         }
@@ -204,7 +190,7 @@ export function AddVideoSheet({ isOpen, onClose, onSave, folders, tags, clips, i
                 title,
                 thumbnail,
                 folderId: selectedFolderId || null,
-                tagIds: selectedTagIds,
+                tagIds: [],
                 notes,
 
                 // aiPrompt: prompt, // Removed AI Prompt
@@ -221,10 +207,8 @@ export function AddVideoSheet({ isOpen, onClose, onSave, folders, tags, clips, i
             if (selectedFolderId) {
                 localStorage.setItem("lastUsedFolderId", selectedFolderId);
             }
-            if (selectedTagIds.length > 0) {
-                localStorage.setItem("lastUsedTagIds", JSON.stringify(selectedTagIds));
-            }
 
+            toast.success("Video saved successfully");
             onClose();
         } catch (err) {
             console.error(err);
@@ -234,13 +218,7 @@ export function AddVideoSheet({ isOpen, onClose, onSave, folders, tags, clips, i
         }
     };
 
-    const toggleTag = (tagId: string) => {
-        setSelectedTagIds(prev =>
-            prev.includes(tagId)
-                ? prev.filter(id => id !== tagId)
-                : [...prev, tagId]
-        );
-    };
+
 
     return (
         <Sheet open={isOpen} onOpenChange={onClose}>
@@ -369,7 +347,7 @@ export function AddVideoSheet({ isOpen, onClose, onSave, folders, tags, clips, i
                                                     console.error(err);
                                                     // Could set a specific folder error, but for now log it.
                                                     // Ideally show a small error message here.
-                                                    alert("Failed to create folder");
+                                                    toast.error("Failed to create folder");
                                                 } finally {
                                                     setIsSavingFolder(false);
                                                 }
@@ -395,69 +373,7 @@ export function AddVideoSheet({ isOpen, onClose, onSave, folders, tags, clips, i
                             )}
                         </div>
 
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <Label>Tags</Label>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 text-xs"
-                                    onClick={() => setIsCreatingTag(!isCreatingTag)}
-                                >
-                                    {isCreatingTag ? "Cancel" : "+ New Tag"}
-                                </Button>
-                            </div>
 
-                            {isCreatingTag && (
-                                <div className="flex gap-2 mb-2">
-                                    <Input
-                                        placeholder="Tag Name"
-                                        value={newTagName}
-                                        onChange={(e) => setNewTagName(e.target.value)}
-                                        className="h-9"
-                                        disabled={isSavingTag}
-                                    />
-                                    <Button
-                                        size="sm"
-                                        disabled={isSavingTag || !newTagName.trim()}
-                                        onClick={async () => {
-                                            if (newTagName.trim()) {
-                                                setIsSavingTag(true);
-                                                try {
-                                                    const newId = await onCreateTag(newTagName, "#3b82f6"); // Default blue
-                                                    toggleTag(newId);
-                                                    setNewTagName("");
-                                                    setIsCreatingTag(false);
-                                                } catch (err) {
-                                                    console.error(err);
-                                                    alert("Failed to create tag");
-                                                } finally {
-                                                    setIsSavingTag(false);
-                                                }
-                                            }
-                                        }}
-                                    >
-                                        {isSavingTag ? <Loader2 className="h-3 w-3 animate-spin" /> : "Create"}
-                                    </Button>
-                                </div>
-                            )}
-
-                            <div className="flex flex-wrap gap-2">
-                                {tags.map(tag => (
-                                    <div
-                                        key={tag.id}
-                                        onClick={() => toggleTag(tag.id)}
-                                        className={`px-2 py-1 rounded-full text-xs cursor-pointer border transition-colors ${selectedTagIds.includes(tag.id)
-                                            ? "bg-primary text-primary-foreground border-primary"
-                                            : "bg-background hover:bg-muted border-input"
-                                            }`}
-                                    >
-                                        {tag.name}
-                                    </div>
-                                ))}
-                                {tags.length === 0 && !isCreatingTag && <span className="text-sm text-muted-foreground">No tags available</span>}
-                            </div>
-                        </div>
 
                         <div className="space-y-2">
                             <Label htmlFor="notes">Notes</Label>

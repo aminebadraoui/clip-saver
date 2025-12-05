@@ -574,8 +574,6 @@ async def capture_thumbnail(request: CaptureRequest):
     try:
         print("DEBUG: Starting capture process...")
         # 1. Get the streaming URL using yt-dlp
-        # We use -g to get the URL, and we select a format that is video-only or combined, 
-        # preferably 720p or best available to ensure good thumbnail quality but fast response.
         cmd_get_url = [
             "yt-dlp",
             "-g",
@@ -589,43 +587,45 @@ async def capture_thumbnail(request: CaptureRequest):
             stderr=asyncio.subprocess.PIPE
         )
         try:
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10.0)
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=15.0) # Increased timeout
         except asyncio.TimeoutError:
             process.kill()
             print("DEBUG: yt-dlp -g timed out")
-            raise Exception("yt-dlp timed out")
+            # Don't raise immediately, try fallback
+            stdout = b""
+            stderr = b"Timeout"
         
-        if process.returncode != 0:
-            print(f"yt-dlp error: {stderr.decode()}")
-            raise Exception("Failed to get video URL")
-            
-        stream_url = stdout.decode().strip().split('\n')[0] # Take the first URL (video)
+        if process.returncode != 0 or not stdout:
+            print(f"yt-dlp error (will try fallback): {stderr.decode()}")
+            stream_url = None
+        else:
+            stream_url = stdout.decode().strip().split('\n')[0]
 
-        # 2. Use ffmpeg to extract the frame directly from the stream
-        # -ss seeks to the timestamp
-        # -i input url
-        # -frames:v 1 captures one frame
-        # -q:v 2 sets high quality jpeg
-        cmd_ffmpeg = [
-            "ffmpeg",
-            "-ss", str(timestamp),
-            "-i", stream_url,
-            "-frames:v", "1",
-            "-q:v", "2",
-            "-y", # Overwrite
-            str(output_image_path)
-        ]
-        
-        process_ffmpeg = await asyncio.create_subprocess_exec(
-            *cmd_ffmpeg,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        await process_ffmpeg.communicate()
-        
-        if process_ffmpeg.returncode != 0 or not output_image_path.exists():
+        if stream_url:
+            # 2. Use ffmpeg to extract the frame directly from the stream
+            cmd_ffmpeg = [
+                "ffmpeg",
+                "-ss", str(timestamp),
+                "-i", stream_url,
+                "-frames:v", "1",
+                "-q:v", "2",
+                "-y", # Overwrite
+                str(output_image_path)
+            ]
+            
+            process_ffmpeg = await asyncio.create_subprocess_exec(
+                *cmd_ffmpeg,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout_ffmpeg, stderr_ffmpeg = await process_ffmpeg.communicate()
+            
+            if process_ffmpeg.returncode != 0:
+                print(f"ffmpeg stream capture failed: {stderr_ffmpeg.decode()}")
+
+        if not output_image_path.exists():
              # Fallback: Try downloading a small section if streaming fails (slower but more robust)
-             print("Direct stream capture failed, trying download section...")
+             print("Direct stream capture failed or skipped, trying download section...")
              
              ydl_opts = {
                 'format': 'bestvideo[height<=720]/best[height<=720]',
@@ -636,37 +636,47 @@ async def capture_thumbnail(request: CaptureRequest):
              }
              
              # Run blocking yt-dlp in thread
-             loop = asyncio.get_event_loop()
-             await loop.run_in_executor(None, lambda: yt_dlp.YoutubeDL(ydl_opts).download([f"https://www.youtube.com/watch?v={video_id}"]))
-             
-             # Now extract frame from local file
-             cmd_ffmpeg_local = [
-                "ffmpeg",
-                "-i", str(temp_video_path),
-                "-frames:v", "1",
-                "-q:v", "2",
-                "-y",
-                str(output_image_path)
-             ]
-             
-             process_local = await asyncio.create_subprocess_exec(
-                *cmd_ffmpeg_local,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-             )
-             await process_local.communicate()
-             
-             # Cleanup temp video
-             if temp_video_path.exists():
-                 os.remove(temp_video_path)
+             try:
+                 loop = asyncio.get_event_loop()
+                 await loop.run_in_executor(None, lambda: yt_dlp.YoutubeDL(ydl_opts).download([f"https://www.youtube.com/watch?v={video_id}"]))
+                 
+                 if temp_video_path.exists():
+                     # Now extract frame from local file
+                     cmd_ffmpeg_local = [
+                        "ffmpeg",
+                        "-i", str(temp_video_path),
+                        "-frames:v", "1",
+                        "-q:v", "2",
+                        "-y",
+                        str(output_image_path)
+                     ]
+                     
+                     process_local = await asyncio.create_subprocess_exec(
+                        *cmd_ffmpeg_local,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                     )
+                     out, err = await process_local.communicate()
+                     if process_local.returncode != 0:
+                         print(f"ffmpeg local capture failed: {err.decode()}")
+                     
+                     # Cleanup temp video
+                     os.remove(temp_video_path)
+                 else:
+                     print("Fallback download failed: Temp video file not created")
+
+             except Exception as e:
+                 print(f"Fallback download exception: {str(e)}")
 
         if output_image_path.exists():
             return JSONResponse({"url": f"/temp/{output_image_path.name}"})
         else:
-            raise Exception("Failed to generate thumbnail image")
+            raise Exception("Failed to generate thumbnail image after all attempts")
 
     except Exception as e:
         print(f"Thumbnail capture error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/cleanup")
@@ -764,6 +774,7 @@ class ClipCreate(BaseModel):
     aiPrompt: Optional[str] = None
     originalVideoUrl: Optional[str] = None
     sourceVideoId: Optional[str] = None
+    originalTitle: Optional[str] = None
     subscriberCount: Optional[int] = None
     viewCount: Optional[int] = None
     uploadDate: Optional[str] = None

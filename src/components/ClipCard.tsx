@@ -4,8 +4,7 @@ import type { Tag } from "@/types/tag";
 import { formatTime } from "@/utils/formatTime";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Trash2, MoreVertical, FolderInput, Tag as TagIcon, Scissors } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Play, Trash2, MoreVertical, FolderInput, Tag as TagIcon, Eye, Clock, Film } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -20,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 
 interface ClipCardProps {
     clip: Clip;
+    originalVideo?: Clip | null;
     folders?: Folder[];
     tags?: Tag[];
     onDelete: (id: string) => void;
@@ -27,7 +27,7 @@ interface ClipCardProps {
     onCinemaMode?: (clip: Clip) => void;
 }
 
-export function ClipCard({ clip, folders = [], tags = [], onDelete, onUpdate, onCinemaMode }: ClipCardProps) {
+export function ClipCard({ clip, originalVideo, folders = [], tags = [], onDelete, onUpdate, onCinemaMode }: ClipCardProps) {
     const handleMoveToFolder = (folderId: string | null) => {
         if (onUpdate) {
             onUpdate({ ...clip, folderId });
@@ -46,38 +46,57 @@ export function ClipCard({ clip, folders = [], tags = [], onDelete, onUpdate, on
 
     const clipTags = tags.filter(tag => clip.tagIds?.includes(tag.id));
 
+    // Determine what title and metrics to show
+    // Main title is always the clip's title
+    const displayTitle = clip.title;
+    const originalTitle = originalVideo?.title || clip.originalTitle;
+
+    const displayViewCount = originalVideo?.viewCount ?? clip.viewCount;
+    const displayViralRatio = originalVideo?.viralRatio ?? clip.viralRatio;
+    const displayEngagementScore = originalVideo?.engagementScore ?? clip.engagementScore;
+
     return (
-        <Card className="overflow-hidden flex flex-col h-full hover:shadow-md transition-shadow group">
+        <Card className="group overflow-hidden flex flex-col h-full border-border/50 bg-card/50 backdrop-blur-sm hover:shadow-xl hover:border-primary/20 transition-all duration-300">
             <div
-                className={`relative aspect-video bg-muted ${clip.type === 'video' ? 'cursor-pointer' : ''}`}
-                onClick={() => clip.type === 'video' && onCinemaMode?.(clip)}
+                className="relative aspect-video overflow-hidden cursor-pointer"
+                onClick={() => onCinemaMode?.(clip)}
             >
+                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors z-10" />
                 <img
                     src={clip.thumbnail}
-                    alt={clip.title}
-                    className="object-cover w-full h-full"
+                    alt={displayTitle}
+                    className="object-cover w-full h-full transform group-hover:scale-105 transition-transform duration-500 ease-out"
                     loading="lazy"
                 />
+
+                {/* Duration Badge */}
                 {clip.type === 'clip' && typeof clip.start === 'number' && typeof clip.end === 'number' && (
-                    <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                        {formatTime(clip.start)} - {formatTime(clip.end)}
+                    <div className="absolute bottom-2 right-2 z-20">
+                        <Badge variant="secondary" className="bg-black/60 backdrop-blur-md text-white border-none text-[10px] px-1.5 h-5 font-medium">
+                            {formatTime(clip.start)} - {formatTime(clip.end)}
+                        </Badge>
                     </div>
                 )}
-                {clip.engagementScore !== undefined && (
-                    <div className="absolute top-2 left-2 bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded shadow-md z-10">
-                        {clip.engagementScore.toFixed(1)}
+
+                {/* Engagement Score Badge */}
+                {displayEngagementScore != null && (
+                    <div className="absolute top-2 left-2 z-20">
+                        <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md text-white px-2 py-1 rounded-md border border-white/10 shadow-lg">
+                            <span className="text-xs font-medium text-purple-400">Score</span>
+                            <span className="text-sm font-bold">{Number(displayEngagementScore).toFixed(1)}</span>
+                        </div>
                     </div>
                 )}
 
                 {/* Overlay actions */}
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-2 right-2 z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-200" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full bg-black/50 hover:bg-black/70 text-white border-none">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/60 backdrop-blur-md hover:bg-black/80 text-white border border-white/10">
                                 <MoreVertical className="w-4 h-4" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuSub>
                                 <DropdownMenuSubTrigger>
                                     <FolderInput className="w-4 h-4 mr-2" />
@@ -119,7 +138,10 @@ export function ClipCard({ clip, folders = [], tags = [], onDelete, onUpdate, on
 
                             <DropdownMenuItem
                                 className="text-destructive focus:text-destructive"
-                                onClick={() => onDelete(clip.id)}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDelete(clip.id);
+                                }}
                             >
                                 <Trash2 className="w-4 h-4 mr-2" /> Delete Clip
                             </DropdownMenuItem>
@@ -128,37 +150,70 @@ export function ClipCard({ clip, folders = [], tags = [], onDelete, onUpdate, on
                 </div>
             </div>
 
-            <CardContent className="p-4 flex-1 space-y-3">
-                <h3 className="font-semibold line-clamp-2 text-sm sm:text-base leading-tight" title={clip.title}>
-                    {clip.title}
-                </h3>
+            <CardContent className="p-4 flex-1 flex flex-col gap-3">
+                <div className="space-y-1">
+                    <h3 className="font-semibold line-clamp-2 text-sm sm:text-base leading-snug group-hover:text-primary transition-colors" title={displayTitle}>
+                        {displayTitle}
+                    </h3>
 
-                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                    {clip.viewCount !== undefined && (
-                        <span>
-                            {new Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 1 }).format(clip.viewCount)} views
-                        </span>
-                    )}
-                    {clip.viralRatio !== undefined && (
-                        <span className="text-blue-600 dark:text-blue-400 font-medium">
-                            Viral: {clip.viralRatio.toFixed(2)}x
-                        </span>
-                    )}
-                    {clip.timeSinceUploadRatio !== undefined && (
-                        <span className="text-green-600 dark:text-green-400 font-medium">
-                            Vel: {clip.timeSinceUploadRatio.toFixed(1)}
-                        </span>
-                    )}
+                    {/* Metrics Row */}
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        {displayViewCount !== undefined && (
+                            <div className="flex items-center gap-1">
+                                <Eye className="w-3 h-3" />
+                                <span>
+                                    {new Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 1 }).format(displayViewCount)}
+                                </span>
+                            </div>
+                        )}
+                        {clip.createdAt && (
+                            <div className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                <span>{new Date(clip.createdAt).toLocaleDateString()}</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
+                {/* Viral Ratio Pill */}
+                {displayViralRatio != null && (
+                    <div className="flex">
+                        <div className={`
+                            inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm border border-white/10
+                            ${displayViralRatio >= 1.0 ? "bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-pink-500 border-pink-500/20" :
+                                displayViralRatio >= 0.5 ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-purple-500 border-purple-500/20" :
+                                    displayViralRatio >= 0.1 ? "bg-gradient-to-r from-green-500/20 to-blue-500/20 text-blue-500 border-blue-500/20" :
+                                        "bg-gray-500/10 text-gray-500 border-gray-500/20"
+                            }
+                        `}>
+                            Viral Ratio: {Number(displayViralRatio).toFixed(2)}x
+                        </div>
+                    </div>
+                )}
+
+                {/* Original Video Info for Clips (Subtitle) */}
+                {clip.type === 'clip' && originalTitle && (
+                    <div className="pt-2 mt-auto border-t border-border/50">
+                        <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs text-muted-foreground line-clamp-1 flex-1" title={`From: ${originalTitle}`}>
+                                <span className="opacity-70">From:</span> {originalTitle}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {clipTags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1.5 mt-1">
                         {clipTags.map(tag => (
                             <Badge
                                 key={tag.id}
-                                variant="secondary"
-                                className="text-[10px] px-1.5 h-5 font-normal"
-                                style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
+                                variant="outline"
+                                className="text-[10px] px-2 py-0 h-5 font-normal border-0"
+                                style={{
+                                    backgroundColor: `${tag.color}15`,
+                                    color: tag.color,
+                                    boxShadow: `0 0 0 1px ${tag.color}30 inset`
+                                }}
                             >
                                 {tag.name}
                             </Badge>
@@ -167,21 +222,25 @@ export function ClipCard({ clip, folders = [], tags = [], onDelete, onUpdate, on
                 )}
             </CardContent>
 
-            <CardFooter className="p-4 pt-0 gap-2">
-                <Button asChild variant="default" size="sm" className="flex-1">
-                    <Link to={`/clip/${clip.id}`}>
-                        <Play className="w-4 h-4 mr-2" />
-                        {clip.type === 'video' ? 'Watch' : 'Play'}
-                    </Link>
+            <CardFooter className="p-4 pt-0">
+                <Button
+                    variant="default"
+                    size="sm"
+                    className="w-full bg-primary/90 hover:bg-primary shadow-sm hover:shadow transition-all"
+                    onClick={() => onCinemaMode?.(clip)}
+                >
+                    {clip.type === 'video' ? (
+                        <>
+                            <Play className="w-3.5 h-3.5 mr-2 fill-current" />
+                            Details
+                        </>
+                    ) : (
+                        <>
+                            <Film className="w-3.5 h-3.5 mr-2" />
+                            See Details
+                        </>
+                    )}
                 </Button>
-                {clip.type === 'video' && (
-                    <Button asChild variant="secondary" size="sm" className="flex-1">
-                        <Link to={`/create?source=${clip.id}`}>
-                            <Scissors className="w-4 h-4 mr-2" />
-                            Clip
-                        </Link>
-                    </Button>
-                )}
             </CardFooter>
         </Card>
     );

@@ -8,6 +8,7 @@ import { LoginPage } from "@/pages/LoginPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { Toaster } from "sonner";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
           <Route path="/viral-tracker" element={<Layout><ViralTrackerPage /></Layout>} />
         </Route>
       </Routes>
+      <Toaster />
     </AuthProvider>
   );
 }
