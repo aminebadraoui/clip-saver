@@ -59,58 +59,84 @@ function createDropdown(x, y, videoData, anchorElement) {
     const rect = dropdown.getBoundingClientRect(); if (rect.right > window.innerWidth) dropdown.style.left = `${window.innerWidth - rect.width - 20}px`; if (rect.bottom > window.innerHeight) dropdown.style.top = `${window.innerHeight - rect.height - 20}px`;
 }
 
-function injectButton(container, videoDataContainer) {
-    if (container.querySelector('.clip-saver-btn')) return;
-    const btn = document.createElement('button'); btn.className = 'clip-saver-btn'; btn.textContent = 'SNAP';
-    btn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); handleSnapClick(e, btn, videoDataContainer); };
-    container.style.position = 'relative'; // Ensure relative
-    container.appendChild(btn);
-}
-
 // --- Observer & Injection ---
 console.log("Clip Saver: Content script initialized. Observing mutations...");
-const observer = new MutationObserver(injectAll);
-observer.observe(document.body, { childList: true, subtree: true });
 
 function injectAll() {
-    // 1. Standard Layout: Target #details within ytd-rich-item-renderer
-    const detailsContainers = document.querySelectorAll('ytd-rich-item-renderer #details, ytd-compact-video-renderer #details');
-    detailsContainers.forEach(details => {
-        // We inject button into #details, but need video data from parent ytd-rich-item-renderer
-        const parentRenderer = details.closest('ytd-rich-item-renderer, ytd-compact-video-renderer');
+    // 1. Home/Channel Grid: Target #meta within ytd-rich-item-renderer
+    // We target #meta to append the button *below* the text stack, preventing it from
+    // squeezing the title horizontally which happens if we inject into the flex-row #details.
+    const richMetaContainers = document.querySelectorAll('ytd-rich-item-renderer #meta');
+    richMetaContainers.forEach(meta => {
+        const parentRenderer = meta.closest('ytd-rich-item-renderer');
+        if (parentRenderer) injectButton(meta, parentRenderer);
+    });
+
+    // 2. Sidebar: Target #details within ytd-compact-video-renderer
+    const compactDetailsContainers = document.querySelectorAll('ytd-compact-video-renderer #details');
+    compactDetailsContainers.forEach(details => {
+        const parentRenderer = details.closest('ytd-compact-video-renderer');
         if (parentRenderer) injectButton(details, parentRenderer);
     });
 
-    // 2. New Layout: Target .yt-lockup-metadata-view-model__text-container
-    // This ensures it flows *after* the title and metadata (views)
-    const textContainers = document.querySelectorAll('.yt-lockup-metadata-view-model__text-container');
-    textContainers.forEach(container => {
-        // We inject into the text container
-        // The data comes from the closest lockup-view-model
-        const parentLockup = container.closest('yt-lockup-view-model');
-        if (parentLockup) injectButton(container, parentLockup);
+    // 3. Search Page: Target #meta within ytd-video-renderer (List View)
+    const searchMetaContainers = document.querySelectorAll('ytd-video-renderer #meta');
+    searchMetaContainers.forEach(meta => {
+        const parentRenderer = meta.closest('ytd-video-renderer');
+        if (parentRenderer) injectButton(meta, parentRenderer, 'search');
     });
 
-    // 3. Main Player
+    // 3. New UI / Shorts / Ad Layouts
+    const textContainers = document.querySelectorAll('.yt-lockup-metadata-view-model__text-container');
+    textContainers.forEach(container => {
+        const parentLockup = container.closest('yt-lockup-view-model');
+        if (parentLockup) injectButton(container, parentLockup, 'lockup');
+    });
+
+    // 4. Main Player
     const player = document.querySelector('#movie_player');
     if (player) {
-        // for main player, keep absolute top-right behavior?
-        // The user said "under number of views". On main player that's hard (view count is in description/info).
-        // Let's keep main player button in the player overlay for now as it's the most reliable spot, 
-        // expecting the user meant thumbnails in the list.
-        // We might need to handle player distinct styles?
-        // We can add a class for player button if needed.
-        if (!player.querySelector('.clip-saver-btn')) {
-            injectButton(player, player);
-            // Force absolute for player button only
-            const btn = player.querySelector('.clip-saver-btn');
-            if (btn) {
-                btn.style.position = 'absolute';
-                btn.style.top = '10px';
-                btn.style.right = '10px';
-            }
+        if (!player.querySelector('.clip-saver-wrapper')) {
+            injectButton(player, player, 'player');
         }
     }
+}
+
+function injectButton(container, videoDataContainer, context = 'default') {
+    if (container.querySelector('.clip-saver-wrapper')) return;
+
+    // Create a wrapper to isolate our button from flex/grid layouts
+    const wrapper = document.createElement('div');
+    wrapper.className = 'clip-saver-wrapper';
+
+    // Add context-specific class to wrapper
+    if (context === 'search') wrapper.classList.add('clip-saver-wrapper-search');
+    if (context === 'lockup') wrapper.classList.add('clip-saver-wrapper-lockup');
+    if (context === 'player') wrapper.classList.add('clip-saver-wrapper-player');
+
+    const btn = document.createElement('button');
+    btn.className = 'clip-saver-btn';
+    btn.textContent = 'SNAP';
+
+    btn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); handleSnapClick(e, btn, videoDataContainer); };
+
+    wrapper.appendChild(btn);
+
+    // Context specific injection logic
+    if (context === 'player') {
+        wrapper.style.position = 'absolute';
+        wrapper.style.top = '10px';
+        wrapper.style.right = '10px';
+        wrapper.style.zIndex = '2000';
+    } else {
+        // For other contexts, ensure the container is relative for proper positioning of the wrapper
+        const computedStyle = window.getComputedStyle(container);
+        if (computedStyle.position === 'static') {
+            container.style.position = 'relative';
+        }
+    }
+
+    container.appendChild(wrapper);
 }
 
 async function handleSnapClick(e, btn, dataContainer) {
@@ -137,8 +163,17 @@ async function handleSnapClick(e, btn, dataContainer) {
         }
     }
 
-    if (videoData) { const rect = btn.getBoundingClientRect(); createDropdown(rect.left, rect.bottom + 5, videoData, btn); } else { alert("Could not snap this video."); }
+    if (videoData) {
+        const rect = btn.getBoundingClientRect();
+        createDropdown(rect.left, rect.bottom + 5, videoData, btn);
+    } else {
+        alert("Could not snap this video.");
+    }
 }
+
+// Start observing and injecting
+const observer = new MutationObserver(injectAll);
+observer.observe(document.body, { childList: true, subtree: true });
 
 setInterval(injectAll, 2000);
 injectAll();

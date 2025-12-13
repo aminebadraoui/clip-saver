@@ -99,17 +99,19 @@ export function TagManager({ tags, selectedTagId, onSelectTag, onCreateTag, onDe
                             <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
                             <span className="text-sm truncate">{tag.name}</span>
                         </div>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onDeleteTag(tag.id);
-                            }}
-                        >
-                            <Trash2 className="w-3 h-3" />
-                        </Button>
+                        {tag.user_id && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDeleteTag(tag.id);
+                                }}
+                            >
+                                <Trash2 className="w-3 h-3" />
+                            </Button>
+                        )}
                     </div>
                 ))}
             </div>

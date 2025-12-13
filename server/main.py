@@ -23,9 +23,34 @@ from auth import get_password_hash, verify_password, create_access_token, get_cu
 # Load environment variables
 load_dotenv()
 
+# Valid base tags
+BASE_TAGS = [
+    "educational", "entertainment", "2d animation", "3d animation", 
+    "anime style", "talking head", "compilation", "documentary", 
+    "avatar", "vlog", "motivational"
+]
+
+def init_global_tags(session: Session):
+    for tag_name in BASE_TAGS:
+        # Check if exists as a global tag
+        existing = session.exec(select(Tag).where(Tag.name == tag_name, Tag.user_id == None)).first()
+        if not existing:
+            # Create global tag
+            tag = Tag(
+                name=tag_name,
+                color="#71717a", # Default gray
+                createdAt=int(time.time() * 1000),
+                user_id=None
+            )
+            session.add(tag)
+    session.commit()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
+    # Initialize global tags
+    with Session(engine) as session:
+        init_global_tags(session)
     yield
 
 app = FastAPI(lifespan=lifespan)
@@ -748,13 +773,21 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
 
 # --- Tag Endpoints ---
 
+
 class TagCreate(BaseModel):
     name: str
     color: str
 
 @app.get("/api/tags")
 def read_tags(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    return session.exec(select(Tag).where(Tag.user_id == current_user.id)).all()
+    # Return both user tags and global tags
+    # We use distinct to avoid duplicates if a user somehow has a tag with same name as global (should prevent that on creation ideally)
+    
+    # Or just fetch both:
+    user_tags = session.exec(select(Tag).where(Tag.user_id == current_user.id)).all()
+    global_tags = session.exec(select(Tag).where(Tag.user_id == None)).all()
+    
+    return user_tags + global_tags
 
 @app.post("/api/tags")
 def create_tag(tag_data: TagCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
@@ -762,6 +795,11 @@ def create_tag(tag_data: TagCreate, session: Session = Depends(get_session), cur
     existing_tag = session.exec(select(Tag).where(Tag.name == tag_data.name, Tag.user_id == current_user.id)).first()
     if existing_tag:
         return existing_tag
+    
+    # Check if a global tag exists with this name, if so, return it (user can't assume ownership but can use it)
+    global_tag = session.exec(select(Tag).where(Tag.name == tag_data.name, Tag.user_id == None)).first()
+    if global_tag:
+        return global_tag
     
     tag = Tag(
         name=tag_data.name,
