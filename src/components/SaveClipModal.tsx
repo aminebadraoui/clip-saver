@@ -24,13 +24,15 @@ export function SaveClipModal({ isOpen, onClose, onSave, tags, clips }: SaveClip
     useEffect(() => {
         if (isOpen) {
             // Reset form or pre-fill if needed
-            setSelectedTagIds([]);
             setNotes("");
             setPrompt("");
 
             const titles: Record<string, string> = {};
             clips.forEach(c => titles[c.id] = c.title);
             setClipTitles(titles);
+
+            // We no longer automatically select global tags as requested
+            setSelectedTagIds([]);
         }
     }, [isOpen, clips]);
 

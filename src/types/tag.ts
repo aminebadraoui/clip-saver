@@ -3,4 +3,5 @@ export interface Tag {
     name: string;
     color: string;
     createdAt: number;
+    user_id?: string | null;
 }
