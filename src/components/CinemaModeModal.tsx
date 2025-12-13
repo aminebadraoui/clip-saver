@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useState, useEffect, useRef } from "react";
+import ReactPlayer from 'react-player';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { SegmentBuilder } from "@/components/SegmentBuilder";
 import type { Clip } from "@/types/clip";
-import { Save, Play, Plus } from "lucide-react";
+import { Save, Play, Plus, X } from "lucide-react";
 import type { Tag } from "@/types/tag";
 import { saveClips } from "@/utils/storage";
 import { toast } from "sonner";
@@ -29,11 +30,39 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
     const [newTagName, setNewTagName] = useState("");
     const [isCreatingTag, setIsCreatingTag] = useState(false);
 
+    const mainPlayerRef = useRef<ReactPlayer | null>(null);
+
     useEffect(() => {
         if (isOpen && clip) {
+            console.log('CinemaModeModal opened with clip:', clip);
             setNotes(clip.notes || "");
         }
     }, [isOpen, clip]);
+
+    // Helper to extract video ID
+    const extractVideoId = (input: string): string => {
+        if (!input) return "";
+        const trimmedInput = input.trim();
+        if (/^[a-zA-Z0-9_-]{11}$/.test(trimmedInput)) {
+            return trimmedInput;
+        }
+        try {
+            const url = new URL(trimmedInput.startsWith('http') ? trimmedInput : `https://${trimmedInput}`);
+            if (url.hostname.includes('youtube.com')) {
+                return url.searchParams.get('v') || "";
+            }
+            if (url.hostname.includes('youtu.be')) {
+                return url.pathname.slice(1) || "";
+            }
+        } catch (e) {
+            return trimmedInput;
+        }
+        return trimmedInput;
+    };
+
+    const videoId = clip ? extractVideoId(clip.videoId) : "";
+    const videoUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : "";
+    const isValidVideo = videoId && videoId.length === 11;
 
     if (!clip) return null;
 
@@ -103,53 +132,97 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
     const displayOriginalViralRatio = originalVideo?.viralRatio ?? clip.viralRatio;
 
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-7xl h-[90vh] flex flex-col p-0 gap-0 bg-background/95 backdrop-blur-xl border-border/50">
-                <div className="flex items-center justify-end p-2 border-b">
-                </div>
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent className="max-w-[95vw] w-full h-[90vh] p-0 gap-0 bg-background/95 backdrop-blur-xl border-white/10">
+                <DialogHeader className="sr-only">
+                    <DialogTitle>Cinema Mode</DialogTitle>
+                    <DialogDescription>
+                        Viewing video: {clip.title}
+                    </DialogDescription>
+                </DialogHeader>
 
-                <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-2">
-                    {/* Left Column: Video Player */}
-                    <div className="bg-black flex flex-col overflow-y-auto">
-                        {isClip ? (
-                            <div className="flex items-center justify-center h-full bg-black">
-                                <iframe
-                                    width="100%"
-                                    height="100%"
-                                    src={`https://www.youtube.com/embed/${clip.videoId}?start=${Math.floor(clip.start || 0)}&end=${Math.ceil(clip.end || 0)}&autoplay=1&rel=0`}
-                                    title={clip.title}
-                                    frameBorder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowFullScreen
-                                    className="aspect-video w-full h-full"
-                                />
+                <div className="flex h-full overflow-hidden">
+                    {/* Video Player Section */}
+                    <div className="w-1/2 bg-black relative overflow-y-auto">
+                        {/* Close button for video area */}
+                        <div className="absolute top-4 left-4 z-50">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="rounded-full bg-black/50 hover:bg-black/70 text-white"
+                                onClick={() => onClose()}
+                            >
+                                <X className="w-5 h-5" />
+                            </Button>
+                        </div>
+
+                        <div className="p-6 space-y-6">
+                            {/* Video Player - show for both videos and clips */}
+                            <div className="relative w-full bg-black aspect-video">
+                                {!isValidVideo ? (
+                                    <div className="text-white flex items-center justify-center h-full">
+                                        Invalid Video ID
+                                    </div>
+                                ) : (
+                                    <div className="absolute inset-0">
+                                        <ReactPlayer
+                                            key={videoId}
+                                            ref={mainPlayerRef}
+                                            url={videoUrl}
+                                            width="100%"
+                                            height="100%"
+                                            controls={true}
+                                            playing={true}
+                                            config={{
+                                                youtube: {
+                                                    playerVars: {
+                                                        start: clip.start ? Math.floor(clip.start) : undefined,
+                                                        end: clip.end ? Math.floor(clip.end) : undefined,
+                                                        origin: window.location.origin,
+                                                    }
+                                                }
+                                            }}
+                                            onReady={(player) => {
+                                                console.log("Player ready");
+                                                if (clip.start) {
+                                                    player.seekTo(clip.start);
+                                                }
+                                            }}
+                                            onError={(e) => {
+                                                console.error("Video player error:", e);
+                                            }}
+                                        />
+                                    </div>
+                                )}
                             </div>
-                        ) : (
-                            /* Create Clip Section for Videos */
-                            <div className="p-6 space-y-4 h-full">
-                                <div className="rounded-lg border bg-background/10 p-4 h-full">
+
+                            {/* Clip Creation Section - only for videos */}
+                            {!isClip && (
+                                <div className="rounded-lg border bg-background/10 p-4">
                                     <SegmentBuilder
-                                        videoId={clip.videoId}
+                                        videoId={videoId}
                                         videoTitle={clip.title}
                                         thumbnail={clip.thumbnail}
                                         onSave={handleSaveClips}
                                         tags={tags}
                                         onCreateTag={onCreateTag}
+                                        hideVideo={true}
+                                        externalPlayerRef={mainPlayerRef as React.RefObject<ReactPlayer>}
                                     />
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
 
                     {/* Right Column: Notes & Clipping */}
-                    <div className="flex flex-col h-full border-l bg-card/50 overflow-y-auto">
+                    <div className="w-1/2 flex flex-col h-full border-l bg-card/50 overflow-y-auto">
                         {/* Title & Thumbnail Section */}
                         <div className="p-6 border-b space-y-4">
                             <div className="space-y-2">
                                 <h2 className="text-xl font-bold leading-tight">{clip.title}</h2>
                             </div>
 
-                            {/* Original Video Info Card */}
+                            {/* Original Video Info Card - only for clips */}
                             {isClip && (displayOriginalTitle || originalVideo) && (
                                 <div className="rounded-lg border bg-card/50 p-3 space-y-3">
                                     <div className="flex items-start justify-between gap-2">
@@ -214,47 +287,63 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
                                             variant={isSelected ? "default" : "outline"}
                                             className="cursor-pointer hover:opacity-80 transition-opacity"
                                             onClick={() => handleToggleTag(tag.id)}
-                                            style={isSelected ? { backgroundColor: tag.color } : { borderColor: tag.color, color: tag.color }}
                                         >
                                             {tag.name}
                                         </Badge>
                                     );
                                 })}
-                            </div>
-                            {onCreateTag && (
-                                <div className="flex gap-2 mt-2">
-                                    <Input
-                                        value={newTagName}
-                                        onChange={(e) => setNewTagName(e.target.value)}
-                                        placeholder="New tag..."
-                                        className="h-8 text-sm"
-                                        onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
-                                    />
-                                    <Button size="sm" variant="outline" onClick={handleCreateTag} disabled={isCreatingTag || !newTagName.trim()}>
-                                        <Plus className="w-4 h-4" />
-                                    </Button>
+                                <div className="flex items-center gap-2">
+                                    {isCreatingTag ? (
+                                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2">
+                                            <Input
+                                                value={newTagName}
+                                                onChange={(e) => setNewTagName(e.target.value)}
+                                                placeholder="New tag..."
+                                                className="h-6 w-24 text-xs"
+                                                autoFocus
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') handleCreateTag();
+                                                    if (e.key === 'Escape') setIsCreatingTag(false);
+                                                }}
+                                            />
+                                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={handleCreateTag}>
+                                                <Plus className="w-3 h-3" />
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-6 text-xs border-dashed"
+                                            onClick={() => setIsCreatingTag(true)}
+                                        >
+                                            <Plus className="w-3 h-3 mr-1" />
+                                            New Tag
+                                        </Button>
+                                    )}
                                 </div>
-                            )}
+                            </div>
                         </div>
 
                         {/* Notes Section */}
-                        <div className="p-6 space-y-4 flex-1">
+                        <div className="flex-1 p-6 space-y-4">
                             <div className="flex items-center justify-between">
-                                <h3 className="font-semibold text-lg">Notes</h3>
+                                <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Notes</h3>
                                 <Button
                                     size="sm"
                                     onClick={handleSaveNotes}
-                                    disabled={isSavingNotes || notes === clip.notes}
+                                    disabled={isSavingNotes}
+                                    className="gap-2"
                                 >
+                                    <Save className="w-4 h-4" />
                                     {isSavingNotes ? "Saving..." : "Save Notes"}
-                                    <Save className="w-4 h-4 ml-2" />
                                 </Button>
                             </div>
                             <Textarea
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
-                                placeholder="Add your notes here..."
-                                className="min-h-[200px] resize-none bg-background/50"
+                                placeholder="Add your notes, thoughts, and ideas here..."
+                                className="min-h-[200px] resize-none bg-background/50 focus:bg-background transition-colors"
                             />
                         </div>
                     </div>
@@ -263,3 +352,4 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
         </Dialog>
     );
 }
+// forcing rebuild

@@ -1,0 +1,51 @@
+{
+    "manifest_version": 3,
+    "name": "Clip Saver",
+    "version": "1.0",
+    "description": "Snap YouTube videos and save them to your Clip Saver app.",
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "storage"
+    ],
+    "host_permissions": [
+        "https://www.youtube.com/*",
+        "http://localhost:3001/*",
+        "http://localhost:5173/*"
+    ],
+    "action": {
+        "default_popup": "popup.html"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://www.youtube.com/watch*",
+                "https://www.youtube.com/*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "css": [
+                "styles.css"
+            ]
+        },
+        {
+            "matches": [
+                "http://localhost:5173/*"
+            ],
+            "js": [
+                "auth-sync.js"
+            ]
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "styles.css"
+            ],
+            "matches": [
+                "https://www.youtube.com/*"
+            ]
+        }
+    ]
+}
