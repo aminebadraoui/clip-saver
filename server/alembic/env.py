@@ -16,6 +16,10 @@ if config.config_file_name is not None:
 
 import sys
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 sys.path.append(os.getcwd())
 from sqlmodel import SQLModel
 from models import *
@@ -59,8 +63,10 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    configuration = config.get_section(config.config_ini_section, {})
+    configuration["sqlalchemy.url"] = os.getenv("DATABASE_URL")
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

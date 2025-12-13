@@ -33,7 +33,7 @@ app = FastAPI(lifespan=lifespan)
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "https://www.youtube.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -746,6 +746,34 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
 
 # --- Database Endpoints ---
 
+# --- Tag Endpoints ---
+
+class TagCreate(BaseModel):
+    name: str
+    color: str
+
+@app.get("/api/tags")
+def read_tags(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    return session.exec(select(Tag).where(Tag.user_id == current_user.id)).all()
+
+@app.post("/api/tags")
+def create_tag(tag_data: TagCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    # Check for existing tag with same name for this user
+    existing_tag = session.exec(select(Tag).where(Tag.name == tag_data.name, Tag.user_id == current_user.id)).first()
+    if existing_tag:
+        return existing_tag
+    
+    tag = Tag(
+        name=tag_data.name,
+        color=tag_data.color,
+        createdAt=int(time.time() * 1000),
+        user_id=current_user.id
+    )
+    session.add(tag)
+    session.commit()
+    session.refresh(tag)
+    return tag
+
 @app.get("/api/clips")
 def read_clips(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
     clips = session.exec(select(Clip).where(Clip.user_id == current_user.id)).all()
@@ -775,6 +803,7 @@ class ClipCreate(BaseModel):
     originalVideoUrl: Optional[str] = None
     sourceVideoId: Optional[str] = None
     originalTitle: Optional[str] = None
+    channelName: Optional[str] = None
     subscriberCount: Optional[int] = None
     viewCount: Optional[int] = None
     uploadDate: Optional[str] = None

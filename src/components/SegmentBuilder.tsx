@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
-import YouTube, { type YouTubePlayer } from "react-youtube";
+import ReactPlayer from 'react-player';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,12 +20,13 @@ interface SegmentBuilderProps {
     onSave: (clips: Clip[]) => void;
     tags?: Tag[];
     onCreateTag?: (name: string, color: string) => Promise<string>;
+    hideVideo?: boolean;
+    externalPlayerRef?: React.RefObject<ReactPlayer>;
 }
 
-export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = [], onCreateTag }: SegmentBuilderProps) {
+export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = [], onCreateTag, hideVideo = false, externalPlayerRef }: SegmentBuilderProps) {
     const [start, setStart] = useState("0");
-    const [end, setEnd] = useState("0"); // Default end to 0 as requested, or maybe just empty? User said "end button is off until there is a start"
-    // Let's default end to 0 so it's "off" logic can be applied (end <= start)
+    const [end, setEnd] = useState("0");
     const [duration, _setDuration] = useState(0);
     const [isPlaying, _setIsPlaying] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -51,31 +52,30 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = 
     }
     const [segments, setSegments] = useState<PendingSegment[]>([]);
 
-    const playerRef = useRef<YouTubePlayer | null>(null);
+    const playerRef = useRef<ReactPlayer | null>(null);
     const previewIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const onPlayerReady = (event: any) => {
-        playerRef.current = event.target;
-        _setDuration(event.target.getDuration());
+    // Use external player ref if provided and video is hidden
+    const activePlayerRef = (hideVideo && externalPlayerRef) ? externalPlayerRef : playerRef;
+
+    const onPlayerReady = (player: ReactPlayer) => {
+        playerRef.current = player;
+        _setDuration(player.getDuration());
     };
 
-    const onStateChange = (event: any) => {
-        _setIsPlaying(event.data === 1); // 1 is playing
+    const onProgress = (state: { played: number; playedSeconds: number; loaded: number; loadedSeconds: number }) => {
+        // Optional: Update progress if needed
     };
-
-    // Sync slider with inputs removed
-
-    // handleSliderChange removed
 
     const previewSegment = () => {
-        if (!playerRef.current) return;
+        if (!activePlayerRef.current) return;
 
         const s = parseInt(start);
         const e = parseInt(end);
 
         if (!isNaN(s) && !isNaN(e) && s < e) {
-            playerRef.current.seekTo(s, true);
-            playerRef.current.playVideo();
+            activePlayerRef.current.seekTo(s, 'seconds');
+            _setIsPlaying(true);
 
             // Clear existing interval
             if (previewIntervalRef.current) {
@@ -83,12 +83,12 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = 
             }
 
             // Stop at end time
-            previewIntervalRef.current = setInterval(async () => {
-                if (!playerRef.current) return;
-                const currentTime = await playerRef.current.getCurrentTime();
+            previewIntervalRef.current = setInterval(() => {
+                if (!activePlayerRef.current) return;
+                const currentTime = activePlayerRef.current.getCurrentTime();
 
                 if (currentTime >= e) {
-                    playerRef.current.pauseVideo();
+                    _setIsPlaying(false); // Pause
                     if (previewIntervalRef.current) {
                         clearInterval(previewIntervalRef.current);
                     }
@@ -247,24 +247,36 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = 
 
     return (
         <div className="space-y-6">
-            <Card className="overflow-hidden bg-black">
-                <div className="w-full h-[400px] flex items-center justify-center">
-                    <YouTube
-                        videoId={videoId}
-                        opts={{
-                            height: '100%',
-                            width: '100%',
-                            playerVars: {
-                                autoplay: 0,
-                            },
-                        }}
-                        className="w-full h-full"
-                        iframeClassName="w-full h-full"
-                        onReady={onPlayerReady}
-                        onStateChange={onStateChange}
-                    />
-                </div>
-            </Card>
+            {!hideVideo && (
+                <Card className="overflow-hidden bg-black">
+                    <div className="w-full h-[400px] flex items-center justify-center">
+                        {console.log('SegmentBuilder: Rendering with videoId:', videoId)}
+                        <ReactPlayer
+                            ref={playerRef}
+                            url="https://www.youtube.com/watch?v=dQw4w9WgXcQ" // DEBUG: Hardcoded URL
+                            width="100%"
+                            height="100%"
+                            playing={isPlaying}
+                            controls
+                            onReady={(player) => {
+                                console.log('SegmentBuilder: Player Ready');
+                                onPlayerReady(player);
+                            }}
+                            onError={(e) => console.error('SegmentBuilder: Player Error', e)}
+                            onPlay={() => _setIsPlaying(true)}
+                            onPause={() => _setIsPlaying(false)}
+                            onProgress={onProgress}
+                            config={{
+                                youtube: {
+                                    playerVars: {
+                                        origin: window.location.origin,
+                                    }
+                                } as any
+                            }}
+                        />
+                    </div>
+                </Card>
+            )}
 
             <div className="space-y-4">
                 <h3 className="font-semibold text-lg">Create Clip</h3>
@@ -282,9 +294,9 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = 
                             />
                             <Button
                                 variant="secondary"
-                                onClick={async () => {
-                                    if (playerRef.current) {
-                                        const time = await playerRef.current.getCurrentTime();
+                                onClick={() => {
+                                    if (activePlayerRef.current) {
+                                        const time = activePlayerRef.current.getCurrentTime();
                                         setStart(Math.floor(time).toString());
                                     }
                                 }}
@@ -306,9 +318,9 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = 
                             <Button
                                 variant="secondary"
                                 disabled={!start || parseInt(start) < 0}
-                                onClick={async () => {
-                                    if (playerRef.current) {
-                                        const time = await playerRef.current.getCurrentTime();
+                                onClick={() => {
+                                    if (activePlayerRef.current) {
+                                        const time = activePlayerRef.current.getCurrentTime();
                                         setEnd(Math.ceil(time).toString());
                                     }
                                 }}
@@ -318,9 +330,6 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = 
                         </div>
                     </div>
                 </div>
-
-                {/* Visual Timeline (Optional replacement for slider, or just remove) */}
-                {/* User asked to remove slider, so we remove it. */}
 
                 <div className="flex justify-between text-xs text-muted-foreground px-1">
                     <span>Duration: {formatTime(Math.max(0, parseInt(end) - parseInt(start)))}</span>

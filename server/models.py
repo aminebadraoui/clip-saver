@@ -56,6 +56,7 @@ class Clip(SQLModel, table=True):
     originalVideoUrl: Optional[str] = None
     sourceVideoId: Optional[str] = None
     originalTitle: Optional[str] = None
+    channelName: Optional[str] = None
 
     # New Metrics
     subscriberCount: Optional[int] = None

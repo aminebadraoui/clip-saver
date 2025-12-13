@@ -1,4 +1,5 @@
 import * as React from "react"
+// UI Component: Dialog
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 
