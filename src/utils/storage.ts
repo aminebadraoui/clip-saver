@@ -1,6 +1,7 @@
 import type { Clip } from "@/types/clip";
 import type { Folder } from "@/types/folder";
 import type { Tag } from "@/types/tag";
+import type { Note } from "@/types/clip";
 import { v4 as uuidv4 } from "uuid";
 
 const API_BASE_URL = 'http://localhost:3001/api';
@@ -123,6 +124,26 @@ export const deleteTag = async (tagId: string): Promise<void> => {
         headers: getHeaders()
     });
     if (!response.ok) throw new Error('Failed to delete tag');
+};
+
+// --- Notes ---
+
+export const saveNote = async (clipId: string, content: string, category: string): Promise<Note> => {
+    const response = await fetch(`${API_BASE_URL}/notes`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ clip_id: clipId, content, category }),
+    });
+    if (!response.ok) throw new Error('Failed to save note');
+    return response.json();
+};
+
+export const deleteNote = async (noteId: string): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/notes/${noteId}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+    });
+    if (!response.ok) throw new Error('Failed to delete note');
 };
 
 export const initializeFolders = async (): Promise<void> => {

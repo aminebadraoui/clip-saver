@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
-import ReactPlayer from 'react-player';
+import YouTube, { type YouTubePlayer, type YouTubeProps } from 'react-youtube';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,12 +19,12 @@ interface SegmentBuilderProps {
     thumbnail: string;
     onSave: (clips: Clip[]) => void;
     tags?: Tag[];
-    onCreateTag?: (name: string, color: string) => Promise<string>;
+    onCreateTag?: (name: string, color: string, category?: string) => Promise<string>;
     hideVideo?: boolean;
-    externalPlayerRef?: React.RefObject<ReactPlayer>;
+    externalPlayer?: YouTubePlayer | null;
 }
 
-export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = [], onCreateTag, hideVideo = false, externalPlayerRef }: SegmentBuilderProps) {
+export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = [], onCreateTag, hideVideo = false, externalPlayer }: SegmentBuilderProps) {
     const [start, setStart] = useState("0");
     const [end, setEnd] = useState("0");
     const [duration, _setDuration] = useState(0);
@@ -52,29 +52,28 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = 
     }
     const [segments, setSegments] = useState<PendingSegment[]>([]);
 
-    const playerRef = useRef<ReactPlayer | null>(null);
+    const [internalPlayer, setInternalPlayer] = useState<YouTubePlayer | null>(null);
     const previewIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Use external player ref if provided and video is hidden
-    const activePlayerRef = (hideVideo && externalPlayerRef) ? externalPlayerRef : playerRef;
+    // Use external player if provided and video is hidden
+    const activePlayer = (hideVideo && externalPlayer) ? externalPlayer : internalPlayer;
 
-    const onPlayerReady = (player: ReactPlayer) => {
-        playerRef.current = player;
-        _setDuration(player.getDuration());
-    };
-
-    const onProgress = (state: { played: number; playedSeconds: number; loaded: number; loadedSeconds: number }) => {
-        // Optional: Update progress if needed
+    const onPlayerReady: YouTubeProps['onReady'] = (event) => {
+        setInternalPlayer(event.target);
+        if (event.target.getDuration) {
+            _setDuration(event.target.getDuration());
+        }
     };
 
     const previewSegment = () => {
-        if (!activePlayerRef.current) return;
+        if (!activePlayer) return;
 
         const s = parseInt(start);
         const e = parseInt(end);
 
         if (!isNaN(s) && !isNaN(e) && s < e) {
-            activePlayerRef.current.seekTo(s, 'seconds');
+            activePlayer.seekTo(s, true);
+            activePlayer.playVideo();
             _setIsPlaying(true);
 
             // Clear existing interval
@@ -84,11 +83,14 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = 
 
             // Stop at end time
             previewIntervalRef.current = setInterval(() => {
-                if (!activePlayerRef.current) return;
-                const currentTime = activePlayerRef.current.getCurrentTime();
+                // Check player state/time
+                if (!activePlayer || (activePlayer.getPlayerState && activePlayer.getPlayerState() !== 1)) return; // 1 is playing
+
+                const currentTime = activePlayer.getCurrentTime();
 
                 if (currentTime >= e) {
-                    _setIsPlaying(false); // Pause
+                    activePlayer.pauseVideo();
+                    _setIsPlaying(false);
                     if (previewIntervalRef.current) {
                         clearInterval(previewIntervalRef.current);
                     }
@@ -107,7 +109,7 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = 
     }, []);
 
     const handleAddSegment = async (e: React.MouseEvent<HTMLButtonElement>) => {
-        e.currentTarget.blur(); // Remove focus to prevent spacebar from triggering again
+        e.currentTarget.blur();
         setError(null);
         const startNum = parseInt(start);
         const endNum = parseInt(end);
@@ -234,7 +236,7 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = 
         if (!newTagName.trim() || !onCreateTag) return;
         setIsCreatingTag(true);
         try {
-            const newTagId = await onCreateTag(newTagName, "#3b82f6"); // Default blue
+            const newTagId = await onCreateTag(newTagName, "#3b82f6", "video"); // Default blue, video category
             setSelectedTagIds([...selectedTagIds, newTagId]);
             setNewTagName("");
         } catch (e) {
@@ -245,35 +247,32 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = 
         }
     };
 
+    const opts: YouTubeProps['opts'] = {
+        height: '100%',
+        width: '100%',
+        playerVars: {
+            origin: window.location.origin,
+            autoplay: isPlaying ? 1 : 0,
+        },
+    };
+
     return (
         <div className="space-y-6">
             {!hideVideo && (
                 <Card className="overflow-hidden bg-black">
-                    <div className="w-full h-[400px] flex items-center justify-center">
-                        {console.log('SegmentBuilder: Rendering with videoId:', videoId)}
-                        <ReactPlayer
-                            ref={playerRef}
-                            url="https://www.youtube.com/watch?v=dQw4w9WgXcQ" // DEBUG: Hardcoded URL
-                            width="100%"
-                            height="100%"
-                            playing={isPlaying}
-                            controls
-                            onReady={(player) => {
-                                console.log('SegmentBuilder: Player Ready');
-                                onPlayerReady(player);
-                            }}
-                            onError={(e) => console.error('SegmentBuilder: Player Error', e)}
-                            onPlay={() => _setIsPlaying(true)}
-                            onPause={() => _setIsPlaying(false)}
-                            onProgress={onProgress}
-                            config={{
-                                youtube: {
-                                    playerVars: {
-                                        origin: window.location.origin,
-                                    }
-                                } as any
-                            }}
-                        />
+                    <div className="w-full h-[400px] flex items-center justify-center relative">
+                        <div className="absolute inset-0">
+                            <YouTube
+                                videoId={videoId || "dQw4w9WgXcQ"}
+                                opts={opts}
+                                className="w-full h-full"
+                                iframeClassName="w-full h-full"
+                                onReady={onPlayerReady}
+                                onPlay={() => _setIsPlaying(true)}
+                                onPause={() => _setIsPlaying(false)}
+                                onError={(e) => console.error('SegmentBuilder: Player Error', e)}
+                            />
+                        </div>
                     </div>
                 </Card>
             )}
@@ -295,8 +294,8 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = 
                             <Button
                                 variant="secondary"
                                 onClick={() => {
-                                    if (activePlayerRef.current) {
-                                        const time = activePlayerRef.current.getCurrentTime();
+                                    if (activePlayer && activePlayer.getCurrentTime) {
+                                        const time = activePlayer.getCurrentTime();
                                         setStart(Math.floor(time).toString());
                                     }
                                 }}
@@ -319,8 +318,8 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = 
                                 variant="secondary"
                                 disabled={!start || parseInt(start) < 0}
                                 onClick={() => {
-                                    if (activePlayerRef.current) {
-                                        const time = activePlayerRef.current.getCurrentTime();
+                                    if (activePlayer && activePlayer.getCurrentTime) {
+                                        const time = activePlayer.getCurrentTime();
                                         setEnd(Math.ceil(time).toString());
                                     }
                                 }}
@@ -380,7 +379,9 @@ export function SegmentBuilder({ videoId, videoTitle, thumbnail, onSave, tags = 
                                 value={newTagName}
                                 onChange={(e) => setNewTagName(e.target.value)}
                                 placeholder="Create new tag..."
-                                onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") handleCreateTag();
+                                }}
                                 className="h-8 text-sm"
                             />
                             <Button variant="outline" size="sm" onClick={handleCreateTag} disabled={isCreatingTag || !newTagName.trim()}>

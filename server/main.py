@@ -16,7 +16,7 @@ import time
 import json
 from sqlmodel import Session, select
 from database import get_session, engine, create_db_and_tables
-from models import Clip, Folder, Tag, ClipTagLink, User
+from models import Clip, Folder, Tag, ClipTagLink, User, Note
 from fastapi import Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
@@ -838,11 +838,16 @@ def create_tag(tag_data: TagCreate, session: Session = Depends(get_session), cur
 @app.get("/api/clips")
 def read_clips(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
     clips = session.exec(select(Clip).where(Clip.user_id == current_user.id)).all()
-    # Convert to frontend format (include tagIds)
+    # Convert to frontend format (include tagIds and notes)
     result = []
     for clip in clips:
         clip_dict = clip.model_dump()
         clip_dict["tagIds"] = [tag.id for tag in clip.tags]
+        # Include granular notes
+        # We need to explicitly convert Note objects to dicts or rely on FastAPI/Pydantic serialization 
+        # But since we are manually building the dict, let's include them.
+        # Assuming notes_list is loaded or lazy loaded.
+        clip_dict["notesList"] = [note.model_dump() for note in clip.notes_list]
         result.append(clip_dict)
     return result
 
@@ -1011,4 +1016,47 @@ def delete_folder(folder_id: str, session: Session = Depends(get_session), curre
     session.delete(folder)
     session.commit()
     return {"ok": True}
+
+# --- Note Endpoints ---
+
+class NoteCreate(BaseModel):
+    clip_id: str
+    content: str
+    category: str
+
+@app.post("/api/notes")
+def create_note(note_data: NoteCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    # Verify clip ownership
+    clip = session.exec(select(Clip).where(Clip.id == note_data.clip_id, Clip.user_id == current_user.id)).first()
+    if not clip:
+         raise HTTPException(status_code=404, detail="Clip not found")
+         
+    note = Note(
+        content=note_data.content,
+        category=note_data.category,
+        clip_id=UUID(note_data.clip_id),
+        user_id=current_user.id,
+        createdAt=int(time.time() * 1000)
+    )
+    session.add(note)
+    session.commit()
+    session.refresh(note)
+    return note
+
+@app.delete("/api/notes/{note_id}")
+def delete_note(note_id: str, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    note = session.exec(select(Note).where(Note.id == note_id, Note.user_id == current_user.id)).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    session.delete(note)
+    session.commit()
+    return {"ok": True}
+
+from uuid import UUID
+
+@app.get("/api/notes/{clip_id}")
+def read_notes(clip_id: str, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    notes = session.exec(select(Note).where(Note.clip_id == UUID(clip_id), Note.user_id == current_user.id)).all()
+    return notes
 
