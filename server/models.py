@@ -72,3 +72,15 @@ class Clip(SQLModel, table=True):
 
     folder: Optional[Folder] = Relationship(back_populates="clips")
     tags: List[Tag] = Relationship(back_populates="clips", link_model=ClipTagLink)
+    notes_list: List["Note"] = Relationship(back_populates="clip", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+
+class Note(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    content: str
+    category: str = Field(default="general") # 'video' | 'title' | 'thumbnail'
+    createdAt: int = Field(sa_type=BigInteger)
+    
+    clip_id: Optional[uuid.UUID] = Field(default=None, foreign_key="clip.id")
+    clip: Optional[Clip] = Relationship(back_populates="notes_list")
+    
+    user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")

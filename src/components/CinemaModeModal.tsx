@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from "react";
-import ReactPlayer from 'react-player';
+import YouTube, { type YouTubePlayer, type YouTubeProps } from 'react-youtube';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { SegmentBuilder } from "@/components/SegmentBuilder";
-import type { Clip } from "@/types/clip";
-import { Save, Play, Plus, X } from "lucide-react";
+import type { Clip, Note } from "@/types/clip";
+import { Save, Play, Plus, X, Trash2 } from "lucide-react";
 import type { Tag } from "@/types/tag";
-import { saveClips } from "@/utils/storage";
+import { saveClips, saveNote, deleteNote } from "@/utils/storage";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -24,17 +24,166 @@ interface CinemaModeModalProps {
     onSwitchToClip?: (clipId: string) => void;
 }
 
-export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdateClip, tags = [], onCreateTag, onClipsSaved, onSwitchToClip }: CinemaModeModalProps) {
-    const [notes, setNotes] = useState("");
-    const [isSavingNotes, setIsSavingNotes] = useState(false);
-    // Removed unused state for legacy single tag creation
 
-    const mainPlayerRef = useRef<ReactPlayer | null>(null);
+interface TagSectionProps {
+    title?: string;
+    sectionTags: Tag[];
+    category: string;
+    compact?: boolean;
+    selectedTagIds: string[];
+    onToggleTag: (tagId: string) => void;
+    onCreateTag?: (name: string, color: string, category?: string) => Promise<string>;
+}
+
+function TagSection({ title, sectionTags, category, compact = false, selectedTagIds, onToggleTag, onCreateTag }: TagSectionProps) {
+    const [sectionNewTagName, setSectionNewTagName] = useState("");
+    const [sectionIsCreating, setSectionIsCreating] = useState(false);
+
+    const handleSectionCreate = async () => {
+        if (!sectionNewTagName.trim() || !onCreateTag) return;
+        setSectionIsCreating(true);
+        try {
+            const newTagId = await onCreateTag(sectionNewTagName, "#3b82f6", category);
+            onToggleTag(newTagId);
+            setSectionNewTagName("");
+        } catch (e) {
+            console.error("Failed to create tag", e);
+            toast.error("Failed to create tag");
+        } finally {
+            setSectionIsCreating(false);
+        }
+    };
+
+    return (
+        <div className={`space-y-2 ${compact ? 'mt-1' : ''}`}>
+            {title && <h3 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">{title}</h3>}
+            <div className="flex flex-wrap gap-2">
+                {sectionTags.map(tag => {
+                    const isSelected = selectedTagIds.includes(tag.id);
+                    return (
+                        <Badge
+                            key={tag.id}
+                            variant={isSelected ? "default" : "outline"}
+                            className={`cursor-pointer hover:opacity-80 transition-opacity ${compact ? 'text-[10px] h-5 px-1.5' : ''}`}
+                            onClick={() => onToggleTag(tag.id)}
+                        >
+                            {tag.name}
+                        </Badge>
+                    );
+                })}
+                <div className="flex items-center gap-2">
+                    {sectionIsCreating ? (
+                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2">
+                            <Input
+                                value={sectionNewTagName}
+                                onChange={(e) => setSectionNewTagName(e.target.value)}
+                                placeholder="New..."
+                                className={`w-20 text-xs ${compact ? 'h-5 text-[10px]' : 'h-6'}`}
+                                autoFocus
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSectionCreate();
+                                    if (e.key === 'Escape') setSectionIsCreating(false);
+                                }}
+                            />
+                            <Button size="sm" variant="ghost" className={`p-0 ${compact ? 'h-5 w-5' : 'h-6 w-6'}`} onClick={handleSectionCreate}>
+                                <Plus className="w-3 h-3" />
+                            </Button>
+                        </div>
+                    ) : (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className={`text-xs border-dashed ${compact ? 'h-5 px-1.5 text-[10px]' : 'h-6'}`}
+                            onClick={() => setSectionIsCreating(true)}
+                        >
+                            <Plus className="w-3 h-3 mr-1" />
+                            {compact ? 'Add' : 'New Tag'}
+                        </Button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+interface NoteListProps {
+    notes: Note[];
+    onAddNote: (content: string) => Promise<void>;
+    onDeleteNote: (noteId: string) => Promise<void>;
+}
+
+function NoteList({ notes, onAddNote, onDeleteNote }: NoteListProps) {
+    const [newNoteContent, setNewNoteContent] = useState("");
+    const [isAdding, setIsAdding] = useState(false);
+
+    const handleAdd = async () => {
+        if (!newNoteContent.trim()) return;
+        setIsAdding(true);
+        try {
+            await onAddNote(newNoteContent);
+            setNewNoteContent("");
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to add note");
+        } finally {
+            setIsAdding(false);
+        }
+    };
+
+    return (
+        <div className="space-y-2 mt-2">
+            <div className="space-y-2">
+                {notes.map(note => (
+                    <div key={note.id} className="group flex items-start justify-between gap-2 p-2 rounded-md bg-muted/50 hover:bg-muted text-sm transition-colors">
+                        <p className="whitespace-pre-wrap flex-1">{note.content}</p>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => onDeleteNote(note.id)}
+                        >
+                            <Trash2 className="w-3 h-3" />
+                        </Button>
+                    </div>
+                ))}
+            </div>
+            <div className="flex gap-2">
+                <Textarea
+                    value={newNoteContent}
+                    onChange={(e) => setNewNoteContent(e.target.value)}
+                    placeholder="Add a note... (Ctrl+Enter to save)"
+                    className="min-h-[60px] text-sm resize-none"
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                            e.preventDefault();
+                            handleAdd();
+                        }
+                    }}
+                />
+                <Button
+                    size="icon"
+                    variant="secondary"
+                    className="h-[60px] w-[40px] shrink-0"
+                    onClick={handleAdd}
+                    disabled={isAdding || !newNoteContent.trim()}
+                >
+                    <Plus className="w-4 h-4" />
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdateClip, tags = [], onCreateTag, onClipsSaved, onSwitchToClip }: CinemaModeModalProps) {
+    // Notes state (synced with clip.notesList)
+    const [localNotes, setLocalNotes] = useState<Note[]>([]);
+
+    const [player, setPlayer] = useState<YouTubePlayer | null>(null);
 
     useEffect(() => {
         if (isOpen && clip) {
             console.log('CinemaModeModal opened with clip:', clip);
-            setNotes(clip.notes || "");
+            setLocalNotes(clip.notesList || []);
         }
     }, [isOpen, clip]);
 
@@ -60,21 +209,36 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
     };
 
     const videoId = clip ? extractVideoId(clip.videoId) : "";
-    const videoUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : "";
     const isValidVideo = videoId && videoId.length === 11;
 
     if (!clip) return null;
 
-    const handleSaveNotes = async () => {
+    // Note Management Handlers
+    const handleAddNote = async (content: string, category: string) => {
         if (!clip) return;
-        setIsSavingNotes(true);
         try {
-            const updatedClip = { ...clip, notes };
-            onUpdateClip(updatedClip);
-        } catch (error) {
-            console.error("Failed to save notes:", error);
-        } finally {
-            setIsSavingNotes(false);
+            const newNote = await saveNote(clip.id, content, category);
+            const updatedNotes = [...localNotes, newNote];
+            setLocalNotes(updatedNotes);
+            onUpdateClip({ ...clip, notesList: updatedNotes });
+            toast.success("Note added");
+        } catch (e) {
+            console.error(e);
+            throw e; // Propagate to NoteList for error handling
+        }
+    };
+
+    const handleDeleteNote = async (noteId: string) => {
+        if (!clip) return;
+        try {
+            await deleteNote(noteId);
+            const updatedNotes = localNotes.filter(n => n.id !== noteId);
+            setLocalNotes(updatedNotes);
+            onUpdateClip({ ...clip, notesList: updatedNotes });
+            toast.success("Note deleted");
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to delete note");
         }
     };
 
@@ -109,88 +273,35 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
         onUpdateClip({ ...clip, tagIds: newTags });
     };
 
-
-
     const isClip = clip.type === 'clip';
     // Use passed originalVideo or fallback to clip's stored metadata
     const displayOriginalTitle = originalVideo?.title || clip.originalTitle;
     const displayOriginalScore = originalVideo?.engagementScore ?? clip.engagementScore;
     const displayOriginalViralRatio = originalVideo?.viralRatio ?? clip.viralRatio;
 
-    // Filter tags by category
+    // Filter tags/notes by category
     const videoTags = tags.filter(t => !t.category || t.category === 'video');
     const titleTags = tags.filter(t => t.category === 'title');
     const thumbnailTags = tags.filter(t => t.category === 'thumbnail');
 
-    const renderTagSection = (title: string, sectionTags: Tag[], category: string, compact = false) => {
-        const [sectionNewTagName, setSectionNewTagName] = useState("");
-        const [sectionIsCreating, setSectionIsCreating] = useState(false);
+    const getNotesByCategory = (cat: string) => localNotes.filter(n => n.category === cat);
 
-        const handleSectionCreate = async () => {
-            if (!sectionNewTagName.trim() || !onCreateTag) return;
-            setSectionIsCreating(true);
-            try {
-                const newTagId = await onCreateTag(sectionNewTagName, "#3b82f6", category);
-                handleToggleTag(newTagId);
-                setSectionNewTagName("");
-            } catch (e) {
-                console.error("Failed to create tag", e);
-                toast.error("Failed to create tag");
-            } finally {
-                setSectionIsCreating(false);
-            }
-        };
+    const onPlayerReady: YouTubeProps['onReady'] = (event) => {
+        setPlayer(event.target);
+        if (clip.start) {
+            event.target.seekTo(clip.start, true);
+        }
+    };
 
-        return (
-            <div className={`space-y-2 ${compact ? 'mt-2' : ''}`}>
-                {!compact && <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">{title}</h3>}
-                <div className="flex flex-wrap gap-2">
-                    {sectionTags.map(tag => {
-                        const isSelected = clip.tagIds?.includes(tag.id);
-                        return (
-                            <Badge
-                                key={tag.id}
-                                variant={isSelected ? "default" : "outline"}
-                                className={`cursor-pointer hover:opacity-80 transition-opacity ${compact ? 'text-[10px] h-5 px-1.5' : ''}`}
-                                onClick={() => handleToggleTag(tag.id)}
-                            >
-                                {tag.name}
-                            </Badge>
-                        );
-                    })}
-                    <div className="flex items-center gap-2">
-                        {sectionIsCreating ? (
-                            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2">
-                                <Input
-                                    value={sectionNewTagName}
-                                    onChange={(e) => setSectionNewTagName(e.target.value)}
-                                    placeholder="New..."
-                                    className={`w-20 text-xs ${compact ? 'h-5 text-[10px]' : 'h-6'}`}
-                                    autoFocus
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleSectionCreate();
-                                        if (e.key === 'Escape') setSectionIsCreating(false);
-                                    }}
-                                />
-                                <Button size="sm" variant="ghost" className={`p-0 ${compact ? 'h-5 w-5' : 'h-6 w-6'}`} onClick={handleSectionCreate}>
-                                    <Plus className="w-3 h-3" />
-                                </Button>
-                            </div>
-                        ) : (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className={`text-xs border-dashed ${compact ? 'h-5 px-1.5 text-[10px]' : 'h-6'}`}
-                                onClick={() => setSectionIsCreating(true)}
-                            >
-                                <Plus className="w-3 h-3 mr-1" />
-                                {compact ? 'Add' : 'New Tag'}
-                            </Button>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
+    const opts: YouTubeProps['opts'] = {
+        height: '100%',
+        width: '100%',
+        playerVars: {
+            start: clip.start ? Math.floor(clip.start) : undefined,
+            end: clip.end ? Math.floor(clip.end) : undefined,
+            origin: window.location.origin,
+            autoplay: 1,
+        },
     };
 
     return (
@@ -204,7 +315,7 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
                 </DialogHeader>
 
                 <div className="flex h-full overflow-hidden">
-                    {/* Video Player Section */}
+                    {/* Video Player Section (LEFT) */}
                     <div className="w-1/2 bg-black relative overflow-y-auto">
                         {/* Close button for video area */}
                         <div className="absolute top-4 left-4 z-50">
@@ -227,32 +338,13 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
                                     </div>
                                 ) : (
                                     <div className="absolute inset-0">
-                                        <ReactPlayer
-                                            key={videoId}
-                                            ref={mainPlayerRef}
-                                            url={videoUrl}
-                                            width="100%"
-                                            height="100%"
-                                            controls={true}
-                                            playing={true}
-                                            config={{
-                                                youtube: {
-                                                    playerVars: {
-                                                        start: clip.start ? Math.floor(clip.start) : undefined,
-                                                        end: clip.end ? Math.floor(clip.end) : undefined,
-                                                        origin: window.location.origin,
-                                                    }
-                                                }
-                                            }}
-                                            onReady={(player) => {
-                                                console.log("Player ready");
-                                                if (clip.start) {
-                                                    player.seekTo(clip.start);
-                                                }
-                                            }}
-                                            onError={(e) => {
-                                                console.error("Video player error:", e);
-                                            }}
+                                        <YouTube
+                                            videoId={videoId}
+                                            opts={opts}
+                                            className="w-full h-full"
+                                            iframeClassName="w-full h-full"
+                                            onReady={onPlayerReady}
+                                            onError={(e) => console.error("Video player error:", e)}
                                         />
                                     </div>
                                 )}
@@ -269,26 +361,41 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
                                         tags={tags}
                                         onCreateTag={onCreateTag}
                                         hideVideo={true}
-                                        externalPlayerRef={mainPlayerRef as React.RefObject<ReactPlayer>}
+                                        externalPlayer={player}
                                     />
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {/* Right Column: Notes & Clipping */}
-                    <div className="w-1/2 flex flex-col h-full border-l bg-card/50 overflow-y-auto">
-                        {/* Title & Thumbnail Section */}
+                    {/* Right Column: Title, Thumbnail, Video Sections (RIGHT) */}
+                    <div className="w-1/2 flex flex-col h-full border-l bg-card/50 overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+
+                        {/* 1. TITLE SECTION */}
                         <div className="p-6 border-b space-y-4">
-                            <div className="space-y-2">
+                            <h3 className="font-bold text-sm text-foreground/80 tracking-widest border-l-4 border-primary pl-3">TITLE</h3>
+                            <div className="space-y-4 pl-4 border-l border-border/40 ml-1.5">
                                 <h2 className="text-xl font-bold leading-tight">{clip.title}</h2>
-                                {/* Title Tags */}
-                                {renderTagSection("Title Tags", titleTags, "title", true)}
+
+                                <TagSection
+                                    sectionTags={titleTags}
+                                    category="title"
+                                    compact={true}
+                                    selectedTagIds={clip.tagIds || []}
+                                    onToggleTag={handleToggleTag}
+                                    onCreateTag={onCreateTag}
+                                />
+
+                                <NoteList
+                                    notes={getNotesByCategory("title")}
+                                    onAddNote={(c) => handleAddNote(c, "title")}
+                                    onDeleteNote={handleDeleteNote}
+                                />
                             </div>
 
                             {/* Original Video Info Card - only for clips */}
                             {isClip && (displayOriginalTitle || originalVideo) && (
-                                <div className="rounded-lg border bg-card/50 p-3 space-y-3">
+                                <div className="ml-4 rounded-lg border bg-card/50 p-3 space-y-3 mt-4">
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="space-y-1">
                                             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Original Video</p>
@@ -324,9 +431,13 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
                                     </div>
                                 </div>
                             )}
+                        </div>
 
-                            {!isClip && (
-                                <div className="space-y-2">
+                        {/* 2. THUMBNAIL SECTION (Only for videos or if clip has one) */}
+                        {!isClip && (
+                            <div className="p-6 border-b space-y-4">
+                                <h3 className="font-bold text-sm text-foreground/80 tracking-widest border-l-4 border-purple-500 pl-3">THUMBNAIL</h3>
+                                <div className="space-y-4 pl-4 border-l border-border/40 ml-1.5">
                                     <div className="aspect-video w-full rounded-lg overflow-hidden border shadow-sm">
                                         <img
                                             src={clip.thumbnail.replace('hqdefault', 'maxresdefault')}
@@ -337,37 +448,40 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
                                             }}
                                         />
                                     </div>
-                                    {/* Thumbnail Tags */}
-                                    {renderTagSection("Thumbnail Tags", thumbnailTags, "thumbnail", true)}
+                                    <TagSection
+                                        sectionTags={thumbnailTags}
+                                        category="thumbnail"
+                                        compact={true}
+                                        selectedTagIds={clip.tagIds || []}
+                                        onToggleTag={handleToggleTag}
+                                        onCreateTag={onCreateTag}
+                                    />
+                                    <NoteList
+                                        notes={getNotesByCategory("thumbnail")}
+                                        onAddNote={(c) => handleAddNote(c, "thumbnail")}
+                                        onDeleteNote={handleDeleteNote}
+                                    />
                                 </div>
-                            )}
-                        </div>
-
-                        {/* Video Tags Section */}
-                        <div className="p-6 border-b space-y-3">
-                            {renderTagSection("Video Tags", videoTags, "video")}
-                        </div>
-
-                        {/* Notes Section */}
-                        <div className="flex-1 p-6 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Notes</h3>
-                                <Button
-                                    size="sm"
-                                    onClick={handleSaveNotes}
-                                    disabled={isSavingNotes}
-                                    className="gap-2"
-                                >
-                                    <Save className="w-4 h-4" />
-                                    {isSavingNotes ? "Saving..." : "Save Notes"}
-                                </Button>
                             </div>
-                            <Textarea
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                                placeholder="Add your notes, thoughts, and ideas here..."
-                                className="min-h-[200px] resize-none bg-background/50 focus:bg-background transition-colors"
-                            />
+                        )}
+
+                        {/* 3. VIDEO SECTION */}
+                        <div className="flex-1 p-6 border-b space-y-4">
+                            <h3 className="font-bold text-sm text-foreground/80 tracking-widest border-l-4 border-blue-500 pl-3">VIDEO</h3>
+                            <div className="space-y-4 pl-4 border-l border-border/40 ml-1.5">
+                                <TagSection
+                                    sectionTags={videoTags}
+                                    category="video"
+                                    selectedTagIds={clip.tagIds || []}
+                                    onToggleTag={handleToggleTag}
+                                    onCreateTag={onCreateTag}
+                                />
+                                <NoteList
+                                    notes={getNotesByCategory("video")}
+                                    onAddNote={(c) => handleAddNote(c, "video")}
+                                    onDeleteNote={handleDeleteNote}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>

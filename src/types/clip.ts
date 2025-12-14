@@ -20,4 +20,14 @@ export interface Clip {
     viralRatio?: number;
     timeSinceUploadRatio?: number;
     engagementScore?: number;
+    notesList?: Note[];
+}
+
+export interface Note {
+    id: string;
+    content: string;
+    category: 'video' | 'title' | 'thumbnail';
+    createdAt: number;
+    clip_id?: string;
+    user_id?: string;
 }
