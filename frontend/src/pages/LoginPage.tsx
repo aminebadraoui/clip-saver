@@ -23,7 +23,7 @@ export function LoginPage() {
             formData.append("username", email);
             formData.append("password", password);
 
-            const response = await fetch("http://localhost:3001/auth/login", {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
                 method: "POST",
                 body: formData,
             });

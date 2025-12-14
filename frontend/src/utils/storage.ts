@@ -4,7 +4,7 @@ import type { Tag } from "@/types/tag";
 import type { Note } from "@/types/clip";
 import { v4 as uuidv4 } from "uuid";
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
 
 const getHeaders = () => {
     const token = localStorage.getItem('token');
