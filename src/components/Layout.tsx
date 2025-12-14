@@ -1,4 +1,5 @@
 import { Scissors, LogOut } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,10 +27,10 @@ export function Layout({ children }: LayoutProps) {
                 <div className="container max-w-6xl mx-auto px-6 py-4">
                     <div className="flex items-center justify-between gap-4">
                         {/* Logo/Title */}
-                        <div className="flex items-center gap-2 min-w-fit">
+                        <Link to="/" className="flex items-center gap-2 min-w-fit hover:opacity-80 transition-opacity">
                             <Scissors className="w-6 h-6 text-primary" />
-                            <h1 className="text-2xl font-bold tracking-tight">Clip Saver</h1>
-                        </div>
+                            <h1 className="text-2xl font-bold tracking-tight">ClipCoba</h1>
+                        </Link>
 
                         {/* Search/Add Input */}
                         <div className="flex-1 max-w-xl mx-auto">
