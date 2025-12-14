@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import YouTube, { type YouTubePlayer, type YouTubeProps } from 'react-youtube';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { SegmentBuilder } from "@/components/SegmentBuilder";
 import type { Clip, Note } from "@/types/clip";
-import { Save, Play, Plus, X, Trash2 } from "lucide-react";
+import { Play, Plus, X, Trash2 } from "lucide-react";
 import type { Tag } from "@/types/tag";
 import { saveClips, saveNote, deleteNote } from "@/utils/storage";
 import { toast } from "sonner";
@@ -55,7 +55,7 @@ function TagSection({ title, sectionTags, category, compact = false, selectedTag
     };
 
     return (
-        <div className={`space-y-2 ${compact ? 'mt-1' : ''}`}>
+        <div className={`space - y - 2 ${compact ? 'mt-1' : ''} `}>
             {title && <h3 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">{title}</h3>}
             <div className="flex flex-wrap gap-2">
                 {sectionTags.map(tag => {
@@ -64,7 +64,7 @@ function TagSection({ title, sectionTags, category, compact = false, selectedTag
                         <Badge
                             key={tag.id}
                             variant={isSelected ? "default" : "outline"}
-                            className={`cursor-pointer hover:opacity-80 transition-opacity ${compact ? 'text-[10px] h-5 px-1.5' : ''}`}
+                            className={`cursor - pointer hover: opacity - 80 transition - opacity ${compact ? 'text-[10px] h-5 px-1.5' : ''} `}
                             onClick={() => onToggleTag(tag.id)}
                         >
                             {tag.name}
@@ -78,14 +78,14 @@ function TagSection({ title, sectionTags, category, compact = false, selectedTag
                                 value={sectionNewTagName}
                                 onChange={(e) => setSectionNewTagName(e.target.value)}
                                 placeholder="New..."
-                                className={`w-20 text-xs ${compact ? 'h-5 text-[10px]' : 'h-6'}`}
+                                className={`w - 20 text - xs ${compact ? 'h-5 text-[10px]' : 'h-6'} `}
                                 autoFocus
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter') handleSectionCreate();
                                     if (e.key === 'Escape') setSectionIsCreating(false);
                                 }}
                             />
-                            <Button size="sm" variant="ghost" className={`p-0 ${compact ? 'h-5 w-5' : 'h-6 w-6'}`} onClick={handleSectionCreate}>
+                            <Button size="sm" variant="ghost" className={`p - 0 ${compact ? 'h-5 w-5' : 'h-6 w-6'} `} onClick={handleSectionCreate}>
                                 <Plus className="w-3 h-3" />
                             </Button>
                         </div>
@@ -93,7 +93,7 @@ function TagSection({ title, sectionTags, category, compact = false, selectedTag
                         <Button
                             variant="outline"
                             size="sm"
-                            className={`text-xs border-dashed ${compact ? 'h-5 px-1.5 text-[10px]' : 'h-6'}`}
+                            className={`text - xs border - dashed ${compact ? 'h-5 px-1.5 text-[10px]' : 'h-6'} `}
                             onClick={() => setSectionIsCreating(true)}
                         >
                             <Plus className="w-3 h-3 mr-1" />
