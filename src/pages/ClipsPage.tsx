@@ -1,31 +1,19 @@
 import { useState, useEffect } from "react";
-
-import { v4 as uuidv4 } from "uuid";
+import { useAppData } from "@/context/AppDataContext";
 import {
-    getClips,
+    saveClip,
     deleteClip,
-    getFolders,
-    saveFolder,
-    deleteFolder,
-    updateFolder,
-    getTags,
-    saveTag,
-    deleteTag,
-    updateClip,
-    initializeFolders,
-    saveClip
+    updateClip
 } from "@/utils/storage";
 import type { Clip } from "@/types/clip";
-import type { Folder } from "@/types/folder";
-import type { Tag } from "@/types/tag";
 import { ClipCard } from "@/components/ClipCard";
-import { Sidebar } from "@/components/Sidebar";
 import { AddVideoSheet } from "@/components/AddVideoSheet";
 import { CinemaModeModal } from "@/components/CinemaModeModal";
 import { Button } from "@/components/ui/button";
 import { LayoutGrid, List, ArrowUpDown, TrendingUp } from "lucide-react";
 import { ClipListRow } from "@/components/ClipListRow";
 import { toast } from "sonner";
+import { v4 as uuidv4 } from "uuid";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -35,13 +23,14 @@ import {
 
 
 export function ClipsPage() {
-    const [clips, setClips] = useState<Clip[]>([]);
-    const [folders, setFolders] = useState<Folder[]>([]);
-    const [tags, setTags] = useState<Tag[]>([]);
+    const {
+        clips, folders, tags,
+        selectedFolderId, selectedTagIds, filterType,
+        refreshData,
+        handleCreateFolder,
+        handleCreateTag
+    } = useAppData();
 
-    const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-    const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
-    const [filterType, setFilterType] = useState<'all' | 'video' | 'clip'>('video');
     const [isAddVideoModalOpen, setIsAddVideoModalOpen] = useState(false);
     const [quickAddUrl, setQuickAddUrl] = useState("");
 
@@ -49,14 +38,6 @@ export function ClipsPage() {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [sortBy, setSortBy] = useState<'date' | 'viralRatio' | 'timeRatio' | 'engagementScore'>('date');
     const [selectedClipForCinema, setSelectedClipForCinema] = useState<Clip | null>(null);
-
-    useEffect(() => {
-        const init = async () => {
-            await initializeFolders();
-            await refreshData();
-        };
-        init();
-    }, []);
 
     // Check for addVideo query param
     useEffect(() => {
@@ -68,20 +49,7 @@ export function ClipsPage() {
             // Clean up URL
             window.history.replaceState({}, '', '/');
         }
-
-        const filterParam = params.get('filter');
-        if (filterParam === 'clip') {
-            setFilterType('clip');
-            // Clear param
-            window.history.replaceState({}, '', '/');
-        }
     }, []);
-
-    const refreshData = async () => {
-        setClips(await getClips());
-        setFolders(await getFolders());
-        setTags(await getTags());
-    };
 
     const handleDeleteClip = async (id: string) => {
         await deleteClip(id);
@@ -93,73 +61,6 @@ export function ClipsPage() {
         await refreshData();
     };
 
-    // Folder handlers
-    const handleCreateFolder = async (name: string, parentId: string | null, category: 'video' | 'image' = 'video') => {
-        // Check for duplicates
-        const duplicate = folders.find(f => f.name.toLowerCase() === name.toLowerCase() && f.parentId === parentId);
-        if (duplicate) {
-            toast.error(`Folder "${name}" already exists.`);
-            throw new Error("Folder already exists");
-        }
-
-        const id = uuidv4();
-        const newFolder: Folder = {
-            id,
-            name,
-            parentId,
-            category,
-            createdAt: Date.now(),
-        };
-        await saveFolder(newFolder);
-        await refreshData();
-        return id;
-    };
-
-    const handleDeleteFolder = async (id: string) => {
-        if (confirm("Are you sure you want to delete this folder? Subfolders will be deleted and clips moved to root.")) {
-            await deleteFolder(id);
-            await refreshData();
-            if (selectedFolderId === id) setSelectedFolderId(null);
-        }
-    };
-
-    const handleRenameFolder = async (id: string, newName: string) => {
-        const folder = folders.find(f => f.id === id);
-        if (folder) {
-            await updateFolder({ ...folder, name: newName });
-            await refreshData();
-        }
-    };
-
-    // Tag handlers
-    const handleCreateTag = async (name: string, color: string) => {
-        // Check for duplicates
-        const duplicate = tags.find(t => t.name.toLowerCase() === name.toLowerCase());
-        if (duplicate) {
-            toast.error(`Tag "${name}" already exists.`);
-            throw new Error("Tag already exists");
-        }
-
-        const id = uuidv4();
-        const newTag: Tag = {
-            id,
-            name,
-            color,
-            createdAt: Date.now(),
-        };
-        await saveTag(newTag);
-        await refreshData();
-        return id;
-    };
-
-    const handleDeleteTag = async (id: string) => {
-        if (confirm("Are you sure you want to delete this tag?")) {
-            await deleteTag(id);
-            await refreshData();
-            if (selectedTagId === id) setSelectedTagId(null);
-        }
-    };
-
     // Video/Clip handlers
     const handleSaveVideo = async (videoData: any) => {
         const newVideo: Clip = {
@@ -169,40 +70,24 @@ export function ClipsPage() {
             ...videoData
         };
         await saveClip(newVideo);
-        // Update local state immediately to avoid refresh requirement
-        setClips(prev => [newVideo, ...prev]);
         setQuickAddUrl(""); // Clear input
-        // Also refresh full data to be safe
         await refreshData();
     };
 
-
-
-    // Selection handlers
-    const handleSelectFolder = (id: string | null) => {
-        setSelectedFolderId(id);
-        setSelectedTagId(null); // Mutually exclusive for now
-        if (id) {
-            setFilterType('video');
-        }
-    };
-
-    const handleSelectTag = (id: string | null) => {
-        setSelectedTagId(id);
-        setSelectedFolderId(null);
-        if (id) {
-            setFilterType('clip');
-        }
-    };
 
     // Filtering
     const filteredClips = clips.filter(clip => {
         if (selectedFolderId) {
             return clip.folderId === selectedFolderId;
         }
-        if (selectedTagId) {
-            return clip.tagIds?.includes(selectedTagId);
+
+        if (selectedTagIds.length > 0) {
+            if (!clip.tagIds) return false;
+            // AND logic: Clip must have ALL selected tags
+            const hasAllTags = selectedTagIds.every(tagId => clip.tagIds?.includes(tagId));
+            return hasAllTags;
         }
+
         return true;
     }).filter(clip => {
         // If specific folder/tag selected, we already filtered by it.
@@ -223,10 +108,6 @@ export function ClipsPage() {
             // Folders are for videos
             return type === 'video';
         }
-        if (selectedTagId) {
-            // Tags are for clips
-            return type === 'clip';
-        }
 
         // If no selection, strictly follow filterType
         if (filterType === 'all') return true;
@@ -242,129 +123,110 @@ export function ClipsPage() {
     });
 
     return (
-        <div className="flex h-[calc(100vh-4rem)] -m-6">
-            <Sidebar
-                folders={folders}
-                tags={tags}
-                selectedFolderId={selectedFolderId}
-                selectedTagId={selectedTagId}
-                filterType={filterType}
-                onSelectFolder={handleSelectFolder}
-                onSelectTag={handleSelectTag}
-                onSelectFilterType={setFilterType}
-                onCreateFolder={handleCreateFolder}
-                onDeleteFolder={handleDeleteFolder}
-                onRenameFolder={handleRenameFolder}
-                onCreateTag={handleCreateTag}
-                onDeleteTag={handleDeleteTag}
-            />
-
-            <div className="flex-1 p-6 overflow-y-auto">
-                <div className="space-y-8">
-                    <div className="flex items-center justify-between">
-                        <h1 className="text-3xl font-bold tracking-tight">
-                            {selectedFolderId
-                                ? folders.find(f => f.id === selectedFolderId)?.name
-                                : selectedTagId
-                                    ? `Tag: ${tags.find(t => t.id === selectedTagId)?.name}`
-                                    : filterType === 'video' ? "All Videos" : "All Clips"}
-                        </h1>
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
-                                <Button
-                                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => setViewMode('grid')}
-                                >
-                                    <LayoutGrid className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                    variant={viewMode === 'list' ? 'default' : 'ghost'}
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => setViewMode('list')}
-                                >
-                                    <List className="h-4 w-4" />
-                                </Button>
-                            </div>
-
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="gap-2">
-                                        <ArrowUpDown className="h-4 w-4" />
-                                        Sort
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => setSortBy('date')}>
-                                        Date Added
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => setSortBy('viralRatio')}>
-                                        Viral Ratio (Views/Subs)
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => setSortBy('timeRatio')}>
-                                        Velocity (Views/Time)
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => setSortBy('engagementScore')}>
-                                        Engagement Score
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-
-                            <Button
-                                variant={sortBy === 'engagementScore' ? 'default' : 'outline'}
-                                size="sm"
-                                className="gap-2"
-                                onClick={() => setSortBy('engagementScore')}
-                            >
-                                <TrendingUp className="h-4 w-4" />
-                                Top Performing
-                            </Button>
-                        </div>
+        <>
+            <div className="flex items-center justify-between">
+                <h1 className="text-3xl font-bold tracking-tight">
+                    {selectedFolderId
+                        ? folders.find(f => f.id === selectedFolderId)?.name
+                        : selectedTagIds.length > 0
+                            ? `Tags: ${selectedTagIds.map(id => tags.find(t => t.id === id)?.name).filter(Boolean).join(", ")}`
+                            : filterType === 'video' ? "All Videos" : "All Clips"}
+                </h1>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
+                        <Button
+                            variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setViewMode('grid')}
+                        >
+                            <LayoutGrid className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant={viewMode === 'list' ? 'default' : 'ghost'}
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setViewMode('list')}
+                        >
+                            <List className="h-4 w-4" />
+                        </Button>
                     </div>
 
-                    {filteredClips.length === 0 ? (
-                        <div className="text-center py-20 border-2 border-dashed rounded-xl bg-muted/30">
-                            <h3 className="text-xl font-medium text-muted-foreground mb-4">No videos found</h3>
-                            <p className="text-muted-foreground mb-8">
-                                {selectedFolderId || selectedTagId
-                                    ? "This folder/tag is empty."
-                                    : "Get started by adding your first video."}
-                            </p>
-                        </div>
-                    ) : (
-                        <div className={viewMode === 'grid'
-                            ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
-                            : "flex flex-col gap-4"
-                        }>
-                            {sortedClips.map((clip) => (
-                                viewMode === 'grid' ? (
-                                    <ClipCard
-                                        key={clip.id}
-                                        clip={clip}
-                                        originalVideo={clip.sourceVideoId ? clips.find(c => c.id === clip.sourceVideoId) : null}
-                                        folders={folders}
-                                        tags={tags}
-                                        onDelete={handleDeleteClip}
-                                        onUpdate={handleUpdateClip}
-                                        onCinemaMode={setSelectedClipForCinema}
-                                    />
-                                ) : (
-                                    <ClipListRow
-                                        key={clip.id}
-                                        clip={clip}
-                                        folders={folders}
-                                        tags={tags}
-                                        onDelete={handleDeleteClip}
-                                        onCinemaMode={setSelectedClipForCinema}
-                                    />
-                                )
-                            ))}
-                        </div>
-                    )}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="gap-2">
+                                <ArrowUpDown className="h-4 w-4" />
+                                Sort
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setSortBy('date')}>
+                                Date Added
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setSortBy('viralRatio')}>
+                                Viral Ratio (Views/Subs)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setSortBy('timeRatio')}>
+                                Velocity (Views/Time)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setSortBy('engagementScore')}>
+                                Engagement Score
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <Button
+                        variant={sortBy === 'engagementScore' ? 'default' : 'outline'}
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setSortBy('engagementScore')}
+                    >
+                        <TrendingUp className="h-4 w-4" />
+                        Top Performing
+                    </Button>
                 </div>
             </div>
+
+            {filteredClips.length === 0 ? (
+                <div className="text-center py-20 border-2 border-dashed rounded-xl bg-muted/30">
+                    <h3 className="text-xl font-medium text-muted-foreground mb-4">No videos found</h3>
+                    <p className="text-muted-foreground mb-8">
+                        {selectedFolderId || selectedTagIds.length > 0
+                            ? "This folder/tag filter is empty."
+                            : "Get started by adding your first video."}
+                    </p>
+                </div>
+            ) : (
+                <div className={viewMode === 'grid'
+                    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+                    : "flex flex-col gap-4"
+                }>
+                    {sortedClips.map((clip) => (
+                        viewMode === 'grid' ? (
+                            <ClipCard
+                                key={clip.id}
+                                clip={clip}
+                                originalVideo={clip.sourceVideoId ? clips.find(c => c.id === clip.sourceVideoId) : null}
+                                folders={folders}
+                                tags={tags}
+                                onDelete={handleDeleteClip}
+                                onUpdate={handleUpdateClip}
+                                onCinemaMode={setSelectedClipForCinema}
+                            />
+                        ) : (
+                            <ClipListRow
+                                key={clip.id}
+                                clip={clip}
+                                folders={folders}
+                                tags={tags}
+                                onDelete={handleDeleteClip}
+                                onCinemaMode={setSelectedClipForCinema}
+                            />
+                        )
+                    ))}
+                </div>
+            )}
+
 
             <AddVideoSheet
                 isOpen={isAddVideoModalOpen}
@@ -394,6 +256,7 @@ export function ClipsPage() {
                     }
                 }}
             />
-        </div >
+        </>
     );
 }
+

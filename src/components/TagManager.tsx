@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 interface TagManagerProps {
     tags: Tag[];
-    selectedTagId: string | null;
+    selectedTagIds: string[];
     onSelectTag: (id: string | null) => void;
     onCreateTag: (name: string, color: string) => void;
     onDeleteTag: (id: string) => void;
@@ -24,7 +24,7 @@ const COLORS = [
     "#ec4899", // pink
 ];
 
-export function TagManager({ tags, selectedTagId, onSelectTag, onCreateTag, onDeleteTag }: TagManagerProps) {
+export function TagManager({ tags, selectedTagIds, onSelectTag, onCreateTag, onDeleteTag }: TagManagerProps) {
     const [isCreating, setIsCreating] = useState(false);
     const [newTagName, setNewTagName] = useState("");
     const [selectedColor, setSelectedColor] = useState(COLORS[0]);
@@ -91,7 +91,7 @@ export function TagManager({ tags, selectedTagId, onSelectTag, onCreateTag, onDe
                         key={tag.id}
                         className={cn(
                             "flex items-center justify-between group px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent/50",
-                            selectedTagId === tag.id && "bg-accent text-accent-foreground"
+                            selectedTagIds.includes(tag.id) && "bg-accent text-accent-foreground"
                         )}
                         onClick={() => onSelectTag(tag.id)}
                     >

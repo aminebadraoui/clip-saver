@@ -19,7 +19,7 @@ interface CinemaModeModalProps {
     originalVideo?: Clip | null;
     onUpdateClip: (updatedClip: Clip) => void;
     tags?: Tag[];
-    onCreateTag?: (name: string, color: string) => Promise<string>;
+    onCreateTag?: (name: string, color: string, category?: string) => Promise<string>;
     onClipsSaved?: () => void;
     onSwitchToClip?: (clipId: string) => void;
 }
@@ -27,8 +27,7 @@ interface CinemaModeModalProps {
 export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdateClip, tags = [], onCreateTag, onClipsSaved, onSwitchToClip }: CinemaModeModalProps) {
     const [notes, setNotes] = useState("");
     const [isSavingNotes, setIsSavingNotes] = useState(false);
-    const [newTagName, setNewTagName] = useState("");
-    const [isCreatingTag, setIsCreatingTag] = useState(false);
+    // Removed unused state for legacy single tag creation
 
     const mainPlayerRef = useRef<ReactPlayer | null>(null);
 
@@ -110,26 +109,89 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
         onUpdateClip({ ...clip, tagIds: newTags });
     };
 
-    const handleCreateTag = async () => {
-        if (!newTagName.trim() || !onCreateTag) return;
-        setIsCreatingTag(true);
-        try {
-            const newTagId = await onCreateTag(newTagName, "#3b82f6");
-            handleToggleTag(newTagId);
-            setNewTagName("");
-        } catch (e) {
-            console.error("Failed to create tag", e);
-            toast.error("Failed to create tag");
-        } finally {
-            setIsCreatingTag(false);
-        }
-    };
+
 
     const isClip = clip.type === 'clip';
     // Use passed originalVideo or fallback to clip's stored metadata
     const displayOriginalTitle = originalVideo?.title || clip.originalTitle;
     const displayOriginalScore = originalVideo?.engagementScore ?? clip.engagementScore;
     const displayOriginalViralRatio = originalVideo?.viralRatio ?? clip.viralRatio;
+
+    // Filter tags by category
+    const videoTags = tags.filter(t => !t.category || t.category === 'video');
+    const titleTags = tags.filter(t => t.category === 'title');
+    const thumbnailTags = tags.filter(t => t.category === 'thumbnail');
+
+    const renderTagSection = (title: string, sectionTags: Tag[], category: string, compact = false) => {
+        const [sectionNewTagName, setSectionNewTagName] = useState("");
+        const [sectionIsCreating, setSectionIsCreating] = useState(false);
+
+        const handleSectionCreate = async () => {
+            if (!sectionNewTagName.trim() || !onCreateTag) return;
+            setSectionIsCreating(true);
+            try {
+                const newTagId = await onCreateTag(sectionNewTagName, "#3b82f6", category);
+                handleToggleTag(newTagId);
+                setSectionNewTagName("");
+            } catch (e) {
+                console.error("Failed to create tag", e);
+                toast.error("Failed to create tag");
+            } finally {
+                setSectionIsCreating(false);
+            }
+        };
+
+        return (
+            <div className={`space-y-2 ${compact ? 'mt-2' : ''}`}>
+                {!compact && <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">{title}</h3>}
+                <div className="flex flex-wrap gap-2">
+                    {sectionTags.map(tag => {
+                        const isSelected = clip.tagIds?.includes(tag.id);
+                        return (
+                            <Badge
+                                key={tag.id}
+                                variant={isSelected ? "default" : "outline"}
+                                className={`cursor-pointer hover:opacity-80 transition-opacity ${compact ? 'text-[10px] h-5 px-1.5' : ''}`}
+                                onClick={() => handleToggleTag(tag.id)}
+                            >
+                                {tag.name}
+                            </Badge>
+                        );
+                    })}
+                    <div className="flex items-center gap-2">
+                        {sectionIsCreating ? (
+                            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2">
+                                <Input
+                                    value={sectionNewTagName}
+                                    onChange={(e) => setSectionNewTagName(e.target.value)}
+                                    placeholder="New..."
+                                    className={`w-20 text-xs ${compact ? 'h-5 text-[10px]' : 'h-6'}`}
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleSectionCreate();
+                                        if (e.key === 'Escape') setSectionIsCreating(false);
+                                    }}
+                                />
+                                <Button size="sm" variant="ghost" className={`p-0 ${compact ? 'h-5 w-5' : 'h-6 w-6'}`} onClick={handleSectionCreate}>
+                                    <Plus className="w-3 h-3" />
+                                </Button>
+                            </div>
+                        ) : (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className={`text-xs border-dashed ${compact ? 'h-5 px-1.5 text-[10px]' : 'h-6'}`}
+                                onClick={() => setSectionIsCreating(true)}
+                            >
+                                <Plus className="w-3 h-3 mr-1" />
+                                {compact ? 'Add' : 'New Tag'}
+                            </Button>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -220,6 +282,8 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
                         <div className="p-6 border-b space-y-4">
                             <div className="space-y-2">
                                 <h2 className="text-xl font-bold leading-tight">{clip.title}</h2>
+                                {/* Title Tags */}
+                                {renderTagSection("Title Tags", titleTags, "title", true)}
                             </div>
 
                             {/* Original Video Info Card - only for clips */}
@@ -262,67 +326,26 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
                             )}
 
                             {!isClip && (
-                                <div className="aspect-video w-full rounded-lg overflow-hidden border shadow-sm">
-                                    <img
-                                        src={clip.thumbnail.replace('hqdefault', 'maxresdefault')}
-                                        alt={clip.title}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                            (e.target as HTMLImageElement).src = clip.thumbnail;
-                                        }}
-                                    />
+                                <div className="space-y-2">
+                                    <div className="aspect-video w-full rounded-lg overflow-hidden border shadow-sm">
+                                        <img
+                                            src={clip.thumbnail.replace('hqdefault', 'maxresdefault')}
+                                            alt={clip.title}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                (e.target as HTMLImageElement).src = clip.thumbnail;
+                                            }}
+                                        />
+                                    </div>
+                                    {/* Thumbnail Tags */}
+                                    {renderTagSection("Thumbnail Tags", thumbnailTags, "thumbnail", true)}
                                 </div>
                             )}
                         </div>
 
-                        {/* Tags Section */}
+                        {/* Video Tags Section */}
                         <div className="p-6 border-b space-y-3">
-                            <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Tags</h3>
-                            <div className="flex flex-wrap gap-2">
-                                {tags.map(tag => {
-                                    const isSelected = clip.tagIds?.includes(tag.id);
-                                    return (
-                                        <Badge
-                                            key={tag.id}
-                                            variant={isSelected ? "default" : "outline"}
-                                            className="cursor-pointer hover:opacity-80 transition-opacity"
-                                            onClick={() => handleToggleTag(tag.id)}
-                                        >
-                                            {tag.name}
-                                        </Badge>
-                                    );
-                                })}
-                                <div className="flex items-center gap-2">
-                                    {isCreatingTag ? (
-                                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2">
-                                            <Input
-                                                value={newTagName}
-                                                onChange={(e) => setNewTagName(e.target.value)}
-                                                placeholder="New tag..."
-                                                className="h-6 w-24 text-xs"
-                                                autoFocus
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') handleCreateTag();
-                                                    if (e.key === 'Escape') setIsCreatingTag(false);
-                                                }}
-                                            />
-                                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={handleCreateTag}>
-                                                <Plus className="w-3 h-3" />
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="h-6 text-xs border-dashed"
-                                            onClick={() => setIsCreatingTag(true)}
-                                        >
-                                            <Plus className="w-3 h-3 mr-1" />
-                                            New Tag
-                                        </Button>
-                                    )}
-                                </div>
-                            </div>
+                            {renderTagSection("Video Tags", videoTags, "video")}
                         </div>
 
                         {/* Notes Section */}

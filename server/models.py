@@ -22,6 +22,7 @@ class Tag(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     name: str
     color: str
+    category: str = Field(default="video") # 'video' | 'title' | 'thumbnail'
     createdAt: int = Field(sa_type=BigInteger) # Milliseconds timestamp
 
     user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")

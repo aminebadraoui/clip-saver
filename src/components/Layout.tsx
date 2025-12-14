@@ -1,3 +1,7 @@
+import { useNavigate } from "react-router-dom";
+import { AppDataProvider, useAppData } from "@/context/AppDataContext";
+import { Sidebar } from "@/components/Sidebar";
+import { RightSidebar } from "@/components/RightSidebar";
 import { Scissors, LogOut } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -19,12 +23,49 @@ function LogoutButton() {
     );
 }
 
+// LayoutContent component that uses the context
+function LayoutContent({ children }: { children: React.ReactNode }) {
+    const {
+        folders, tags, selectedFolderId, selectedTagIds, filterType,
+        handleSelectFolder, handleSelectTag, setFilterType,
+        handleCreateFolder, handleDeleteFolder, handleRenameFolder,
+    } = useAppData();
+
+    return (
+        <div className="flex h-[calc(100vh-4rem)] -m-6">
+            <Sidebar
+                folders={folders}
+                selectedFolderId={selectedFolderId}
+                filterType={filterType}
+                onSelectFolder={handleSelectFolder}
+                onSelectTag={handleSelectTag}
+                onSelectFilterType={setFilterType}
+                onCreateFolder={handleCreateFolder}
+                onDeleteFolder={handleDeleteFolder}
+                onRenameFolder={handleRenameFolder}
+            />
+
+            <div className="flex-1 p-6 overflow-y-auto">
+                <div className="space-y-8">
+                    {children}
+                </div>
+            </div>
+
+            <RightSidebar
+                tags={tags}
+                selectedTagIds={selectedTagIds}
+                onSelectTag={handleSelectTag}
+            />
+        </div>
+    );
+}
+
 export function Layout({ children }: LayoutProps) {
     return (
-        <div className="min-h-screen bg-background font-sans antialiased">
+        <div className="min-h-screen bg-background font-sans antialiased overflow-hidden">
             {/* Header with Navigation */}
             <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-background/60 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-                <div className="container max-w-6xl mx-auto px-6 py-4">
+                <div className="container max-w-[1920px] mx-auto px-6 py-4">
                     <div className="flex items-center justify-between gap-4">
                         {/* Logo/Title */}
                         <Link to="/" className="flex items-center gap-2 min-w-fit hover:opacity-80 transition-opacity">
@@ -59,9 +100,19 @@ export function Layout({ children }: LayoutProps) {
                 </div>
             </header>
 
-            {/* Main Content */}
-            <main className="container max-w-6xl mx-auto px-6 py-10">
-                {children}
+            {/* Main Content with Sidebars */}
+            <main className="container max-w-[1920px] mx-auto px-6 py-6 h-[calc(100vh-73px)]">
+                {/* 
+                   We need to ensure AppDataProvider is up the tree. 
+                   Since we are modifying Layout, and Layout wraps pages, 
+                   we can put the provider here, BUT it's better if it wraps everything.
+                   However, existing App.tsx wraps routes with Layout.
+                   To be safe and consistent, we can use the provider inside App.tsx or here.
+                   Using it here allows us to access context in the same file via a child component.
+                 */}
+                <AppDataProvider>
+                    <LayoutContent>{children}</LayoutContent>
+                </AppDataProvider>
             </main>
         </div>
     );
