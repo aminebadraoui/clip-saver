@@ -1,15 +1,11 @@
 import type { Folder } from "@/types/folder";
-import type { Tag } from "@/types/tag";
 import { FolderTree } from "./FolderTree";
-import { TagManager } from "./TagManager";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, Plus, Video, Scissors } from "lucide-react";
+import { LayoutGrid, Plus, Video } from "lucide-react";
 
 interface SidebarProps {
     folders: Folder[];
-    tags: Tag[];
     selectedFolderId: string | null;
-    selectedTagId: string | null;
     filterType: 'all' | 'video' | 'clip';
     onSelectFolder: (id: string | null) => void;
     onSelectTag: (id: string | null) => void;
@@ -17,15 +13,11 @@ interface SidebarProps {
     onCreateFolder: (name: string, parentId: string | null, category: 'video' | 'image') => void;
     onDeleteFolder: (id: string) => void;
     onRenameFolder: (id: string, newName: string) => void;
-    onCreateTag: (name: string, color: string) => void;
-    onDeleteTag: (id: string) => void;
 }
 
 export function Sidebar({
     folders,
-    tags,
     selectedFolderId,
-    selectedTagId,
     filterType,
     onSelectFolder,
     onSelectTag,
@@ -33,8 +25,6 @@ export function Sidebar({
     onCreateFolder,
     onDeleteFolder,
     onRenameFolder,
-    onCreateTag,
-    onDeleteTag,
 }: SidebarProps) {
     const videoFolders = folders.filter(f => f.category === 'video' || !f.category); // Default to video if missing
 
@@ -81,38 +71,7 @@ export function Sidebar({
                 />
             </div>
 
-            {/* Clips (Tags) */}
-            <div className="space-y-2">
-                <div className="flex items-center justify-between px-2">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                        <Scissors className="w-4 h-4" />
-                        <h3>Clips</h3>
-                    </div>
-                    {/* Tag creation is handled inside TagManager, but we can add a button here if needed. 
-                        TagManager handles it. */}
-                </div>
 
-                <Button
-                    variant={filterType === 'clip' && selectedTagId === null ? "secondary" : "ghost"}
-                    className="w-full justify-start"
-                    onClick={() => {
-                        onSelectFilterType('clip');
-                        onSelectFolder(null);
-                        onSelectTag(null);
-                    }}
-                >
-                    <LayoutGrid className="w-4 h-4 mr-2" />
-                    All Clips
-                </Button>
-
-                <TagManager
-                    tags={tags}
-                    selectedTagId={selectedTagId}
-                    onSelectTag={onSelectTag}
-                    onCreateTag={onCreateTag}
-                    onDeleteTag={onDeleteTag}
-                />
-            </div>
         </div>
     );
 }

@@ -24,26 +24,40 @@ from auth import get_password_hash, verify_password, create_access_token, get_cu
 load_dotenv()
 
 # Valid base tags
-BASE_TAGS = [
-    "educational", "entertainment", "2d animation", "3d animation", 
-    "anime style", "talking head", "compilation", "documentary", 
-    "avatar", "vlog", "motivational"
-]
+BASE_TAGS = {
+    "video": [
+        "educational", "entertainment", "2d animation", "3d animation", 
+        "anime style", "talking head", "compilation", "documentary", 
+        "avatar", "vlog", "motivational"
+    ],
+    "title": [
+        "List", "How to", "Casual", "Bold claim", "Order", "Personal experience", "Authority"
+    ],
+    "thumbnail": [
+        "High contrast", "Polished", "Amateur", "Face", "No face", "Text", "Graph", "Screenshot", "Minimalist"
+    ]
+}
 
 def init_global_tags(session: Session):
-    for tag_name in BASE_TAGS:
-        # Check if exists as a global tag
-        existing = session.exec(select(Tag).where(Tag.name == tag_name, Tag.user_id == None)).first()
-        if not existing:
-            # Create global tag
-            tag = Tag(
-                name=tag_name,
-                color="#71717a", # Default gray
-                createdAt=int(time.time() * 1000),
-                user_id=None
-            )
-            session.add(tag)
-    session.commit()
+    for category, tags in BASE_TAGS.items():
+        for tag_name in tags:
+            # Check if exists as a global tag with same category
+            existing = session.exec(select(Tag).where(Tag.name == tag_name, Tag.user_id == None, Tag.category == category)).first()
+            if not existing:
+                # Create global tag
+                tag = Tag(
+                    name=tag_name,
+                    color="#71717a", # Default gray
+                    category=category,
+                    createdAt=int(time.time() * 1000),
+                    user_id=None
+                )
+                try:
+                    session.add(tag)
+                    session.commit()
+                except Exception as e:
+                    print(f"Error creating tag {tag_name}: {e}")
+                    session.rollback()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -777,6 +791,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
 class TagCreate(BaseModel):
     name: str
     color: str
+    category: str = "video"
 
 @app.get("/api/tags")
 def read_tags(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
@@ -791,13 +806,21 @@ def read_tags(session: Session = Depends(get_session), current_user: User = Depe
 
 @app.post("/api/tags")
 def create_tag(tag_data: TagCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    # Check for existing tag with same name for this user
-    existing_tag = session.exec(select(Tag).where(Tag.name == tag_data.name, Tag.user_id == current_user.id)).first()
+    # Check for existing tag with same name and category for this user
+    existing_tag = session.exec(select(Tag).where(
+        Tag.name == tag_data.name, 
+        Tag.user_id == current_user.id,
+        Tag.category == tag_data.category
+    )).first()
     if existing_tag:
         return existing_tag
     
-    # Check if a global tag exists with this name, if so, return it (user can't assume ownership but can use it)
-    global_tag = session.exec(select(Tag).where(Tag.name == tag_data.name, Tag.user_id == None)).first()
+    # Check if a global tag exists with this name and category
+    global_tag = session.exec(select(Tag).where(
+        Tag.name == tag_data.name, 
+        Tag.user_id == None,
+        Tag.category == tag_data.category
+    )).first()
     if global_tag:
         return global_tag
     
