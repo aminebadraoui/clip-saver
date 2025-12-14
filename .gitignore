@@ -35,3 +35,6 @@ dist-ssr
 venv/
 __pycache__/
 *.py[cod]
+
+# Environment Variables
+.env

@@ -115,7 +115,7 @@ export function AddVideoSheet({ isOpen, onClose, onSave, folders, clips, initial
 
         setIsLoading(true);
         try {
-            const response = await fetch(`http://localhost:3001/api/info?videoId=${id}`);
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/info?videoId=${id}`);
             if (!response.ok) throw new Error("Failed to fetch video info");
 
             const data = await response.json();
