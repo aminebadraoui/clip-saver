@@ -22,3 +22,16 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Binaries
+**/bin/ffmpeg
+**/bin/ffprobe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
