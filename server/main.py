@@ -859,11 +859,11 @@ def create_clip(clip_data: ClipCreate, session: Session = Depends(get_session), 
 
     clip = Clip.model_validate(clip_data, update={"tags": [], "user_id": current_user.id})
     
-    # Handle tags (ensure they belong to user or are global?)
-    # For now, assuming tags are also user-scoped
+    # Handle tags (ensure they belong to user or are global)
     if clip_data.tagIds:
         for tag_id in clip_data.tagIds:
-            tag = session.exec(select(Tag).where(Tag.id == tag_id, Tag.user_id == current_user.id)).first()
+            # Allow user tags OR global tags (user_id is None)
+            tag = session.exec(select(Tag).where(Tag.id == tag_id, (Tag.user_id == current_user.id) | (Tag.user_id == None))).first()
             if tag:
                 clip.tags.append(tag)
     
@@ -914,7 +914,8 @@ def update_clip(clip_id: str, clip_data: ClipCreate, session: Session = Depends(
     clip.tags = []
     if clip_data.tagIds:
         for tag_id in clip_data.tagIds:
-            tag = session.exec(select(Tag).where(Tag.id == tag_id, Tag.user_id == current_user.id)).first()
+            # Allow user tags OR global tags
+            tag = session.exec(select(Tag).where(Tag.id == tag_id, (Tag.user_id == current_user.id) | (Tag.user_id == None))).first()
             if tag:
                 clip.tags.append(tag)
                 
@@ -987,36 +988,4 @@ def delete_folder(folder_id: str, session: Session = Depends(get_session), curre
     session.delete(folder)
     session.commit()
     return {"ok": True}
-
-@app.get("/api/tags")
-def read_tags(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    return session.exec(select(Tag).where(Tag.user_id == current_user.id)).all()
-
-class TagCreate(BaseModel):
-    id: str
-    name: str
-    color: str
-    createdAt: int
-
-@app.post("/api/tags")
-def create_tag(tag_data: TagCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    existing = session.exec(select(Tag).where(Tag.id == tag_data.id, Tag.user_id == current_user.id)).first()
-    if existing:
-        return existing # Or update?
-
-    tag = Tag.model_validate(tag_data, update={"user_id": current_user.id})
-    session.add(tag)
-    session.commit()
-    session.refresh(tag)
-    return tag
-
-@app.delete("/api/tags/{tag_id}")
-def delete_tag(tag_id: str, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    tag = session.exec(select(Tag).where(Tag.id == tag_id, Tag.user_id == current_user.id)).first()
-    if not tag:
-        raise HTTPException(status_code=404, detail="Tag not found")
-    session.delete(tag)
-    session.commit()
-    return {"ok": True}
-
 
