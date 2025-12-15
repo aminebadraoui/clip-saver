@@ -1,8 +1,14 @@
 {
     "manifest_version": 3,
-    "name": "Clip Saver",
+    "name": "Clip Coba",
     "version": "1.0",
-    "description": "Snap YouTube videos and save them to your Clip Saver app.",
+    "description": "Snap YouTube videos and save them to your Clip Coba app.",
+    "icons": {
+        "16": "icons/icon-16.png",
+        "32": "icons/icon-32.png",
+        "48": "icons/icon-48.png",
+        "128": "icons/icon-128.png"
+    },
     "permissions": [
         "activeTab",
         "scripting",
@@ -10,11 +16,19 @@
     ],
     "host_permissions": [
         "https://www.youtube.com/*",
+        "https://clipcoba.com/*",
+        "https://dev.clipcoba.com/*",
         "http://localhost:3001/*",
         "http://localhost:5173/*"
     ],
     "action": {
-        "default_popup": "popup.html"
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "icons/icon-16.png",
+            "32": "icons/icon-32.png",
+            "48": "icons/icon-48.png",
+            "128": "icons/icon-128.png"
+        }
     },
     "content_scripts": [
         {
@@ -31,7 +45,9 @@
         },
         {
             "matches": [
-                "http://localhost:5173/*"
+                "http://localhost:5173/*",
+                "https://clipcoba.com/*",
+                "https://dev.clipcoba.com/*"
             ],
             "js": [
                 "auth-sync.js"
@@ -41,7 +57,11 @@
     "web_accessible_resources": [
         {
             "resources": [
-                "styles.css"
+                "styles.css",
+                "icons/icon-16.png",
+                "icons/icon-32.png",
+                "icons/icon-48.png",
+                "icons/icon-128.png"
             ],
             "matches": [
                 "https://www.youtube.com/*"

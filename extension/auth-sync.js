@@ -1,4 +1,4 @@
-console.log("Clip Saver: Auth Sync Script Loaded");
+console.log("Clip Coba: Auth Sync Script Loaded");
 
 let syncInterval;
 
@@ -14,7 +14,7 @@ function syncToken() {
             chrome.storage.local.set({ 'authToken': token }, () => {
                 if (chrome.runtime.lastError) {
                     // Context might have died during set
-                    console.warn("Clip Saver: Context lost during sync");
+                    console.warn("Clip Coba: Context lost during sync");
                     clearInterval(syncInterval);
                 }
             });
@@ -25,10 +25,10 @@ function syncToken() {
         }
     } catch (e) {
         if (e.message.includes("Extension context invalidated")) {
-            console.log("Clip Saver: Extension reloaded. Stopping old sync script.");
+            console.log("Clip Coba: Extension reloaded. Stopping old sync script.");
             clearInterval(syncInterval);
         } else {
-            console.error("Clip Saver Sync Error:", e);
+            console.error("Clip Coba Sync Error:", e);
         }
     }
 }

@@ -1,5 +1,6 @@
 // --- Config & State ---
-const API_BASE = "http://localhost:3001/api";
+// To use local backend, switch to: "http://localhost:3001/api"
+const API_BASE = "https://clipcoba.com/api";
 let currentToken = null;
 let userTags = [];
 
@@ -36,7 +37,7 @@ async function fetchVideoInfo(videoId) {
 }
 
 async function saveClip(payload) {
-    if (!currentToken) throw new Error("Please log in to Clip Saver web app first.");
+    if (!currentToken) throw new Error("Please log in to Clip Coba web app first.");
     const res = await fetch(`${API_BASE}/clips`, { method: "POST", headers: { 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (!res.ok) throw new Error(await res.text()); return await res.json();
 }
@@ -49,7 +50,7 @@ function scrapeCurrentPage() { try { const videoId = new URLSearchParams(window.
 function createDropdown(x, y, videoData, anchorElement) {
     document.querySelectorAll('.clip-saver-dropdown').forEach(el => el.remove());
     const dropdown = document.createElement('div'); dropdown.className = 'clip-saver-dropdown'; dropdown.style.left = `${x}px`; dropdown.style.top = `${y}px`; let selectedTagIds = [];
-    dropdown.innerHTML = `<div class="clip-saver-header"><span class="clip-saver-title">Snap: ${videoData.title.substring(0, 20)}...</span><span class="clip-saver-close">&times;</span></div><div class="clip-saver-tags-list" id="cs-tags"></div><div class="clip-saver-new-tag"><input type="text" class="clip-saver-input" placeholder="New tag..." id="cs-new-tag-input"><button class="clip-saver-add-btn">+</button></div><button class="clip-saver-save-btn">SAVE CLIP</button><div class="clip-saver-status" id="cs-status"></div>`;
+    dropdown.innerHTML = `<div class="clip-saver-header"><span class="clip-saver-title">Snap to Clip Coba</span><span class="clip-saver-close">&times;</span></div><div class="clip-saver-tags-list" id="cs-tags"></div><div class="clip-saver-new-tag"><input type="text" class="clip-saver-input" placeholder="New tag..." id="cs-new-tag-input"><button class="clip-saver-add-btn">+</button></div><button class="clip-saver-save-btn">SAVE CLIP</button><div class="clip-saver-status" id="cs-status"></div>`;
     document.body.appendChild(dropdown); const tagsContainer = dropdown.querySelector('#cs-tags');
     function renderTags() { tagsContainer.innerHTML = ''; userTags.forEach(tag => { const chip = document.createElement('div'); chip.className = `clip-saver-tag-chip ${selectedTagIds.includes(tag.id) ? 'selected' : ''}`; chip.textContent = tag.name; chip.onclick = () => { if (selectedTagIds.includes(tag.id)) selectedTagIds = selectedTagIds.filter(id => id !== tag.id); else selectedTagIds.push(tag.id); renderTags(); }; tagsContainer.appendChild(chip); }); } renderTags();
     const closeBtn = dropdown.querySelector('.clip-saver-close'); closeBtn.onclick = () => dropdown.remove(); const addBtn = dropdown.querySelector('.clip-saver-add-btn'); const input = dropdown.querySelector('#cs-new-tag-input');
@@ -60,7 +61,7 @@ function createDropdown(x, y, videoData, anchorElement) {
 }
 
 // --- Observer & Injection ---
-console.log("Clip Saver: Content script initialized. Observing mutations...");
+console.log("Clip Coba: Content script initialized. Observing mutations...");
 
 function injectAll() {
     // 1. Home/Channel Grid: Target #meta within ytd-rich-item-renderer
@@ -140,7 +141,7 @@ function injectButton(container, videoDataContainer, context = 'default') {
 }
 
 async function handleSnapClick(e, btn, dataContainer) {
-    if (!currentToken) { alert("Clip Saver: Please log in to the web app first!"); return; }
+    if (!currentToken) { alert("Clip Coba: Please log in to the web app first!"); return; }
     let videoData = null;
 
     // 1. Player Case
