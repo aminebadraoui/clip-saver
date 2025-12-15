@@ -10,15 +10,23 @@ import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Toaster } from "sonner";
 
+import { useAuth } from "@/context/AuthContext";
+import { LandingPage } from "@/pages/LandingPage";
+
+const HomeRoute = () => {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <Layout><ClipsPage /></Layout> : <LandingPage />;
+};
+
 function App() {
   return (
     <AuthProvider>
       <Routes>
+        <Route path="/" element={<HomeRoute />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
         <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<Layout><ClipsPage /></Layout>} />
           <Route path="/create" element={<Layout><CreateClipPage /></Layout>} />
           <Route path="/clip/:id" element={<Layout><ViewClipPage /></Layout>} />
           <Route path="/viral-tracker" element={<Layout><ViralTrackerPage /></Layout>} />
