@@ -77,7 +77,8 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "https://www.youtube.com",
         "https://www.clipcoba.com",
-        "https://www.dev.clipcoba.com"
+        "https://www.dev.clipcoba.com",
+        "https://clipcoba.com"
     ],
     allow_origin_regex=r"https://.*\.clipcoba\.com",
     allow_credentials=True,
