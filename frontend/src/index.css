@@ -4,81 +4,72 @@
 
 @layer base {
   :root {
-    /* Default to the dark futuristic theme even in root, or keep light as fallback? 
-       User asked for "Redesign this app with a dark theme", implying it should be the main/only theme.
-       I will set the default variables to the dark theme values to ensure consistency. */
+    /* Softer Gray Theme (Zinc-based) */
 
-    /* Deep Space Black */
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
+    /* Background: Soft Dark Gray (Zinc 900/950 hybrid) */
+    --background: 240 5% 10%;
+    --foreground: 240 5% 90%;
 
-    /* Translucent Card/Popover Backgrounds (Glass effect base) */
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
+    /* Card: Slightly lighter gray */
+    --card: 240 4% 12%;
+    --card-foreground: 240 5% 90%;
 
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 240 4% 12%;
+    --popover-foreground: 240 5% 90%;
 
-    /* Neon Cyan Primary */
-    --primary: 180 100% 50%;
-    --primary-foreground: 240 10% 3.9%;
+    /* Primary: Muted Blue/Slate */
+    --primary: 210 100% 60%;
+    --primary-foreground: 0 0% 100%;
 
-    /* Deep Blue/Purple Secondary */
+    /* Secondary: Muted Gray */
     --secondary: 240 4% 16%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary-foreground: 240 5% 90%;
 
     --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 64.9%;
+    --muted-foreground: 240 5% 65%;
 
     --accent: 240 4% 16%;
-    --accent-foreground: 0 0% 98%;
+    --accent-foreground: 240 5% 90%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 60% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 240 4% 16%;
-    --input: 240 4% 16%;
-    --ring: 180 100% 50%;
+    --border: 240 4% 20%;
+    --input: 240 4% 20%;
+    --ring: 210 100% 60%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
   }
 
   .dark {
-    /* Futuristic Dark Theme - The Main Event */
+    /* Explicit Dark Mode Overrides (same as root for consistency if dark-only app) */
+    --background: 240 5% 10%;
+    --foreground: 240 5% 90%;
 
-    /* Background: Distinct Dark Gray (lighter than before) */
-    --background: 220 15% 16%;
-    --foreground: 210 40% 98%;
+    --card: 240 4% 12%;
+    --card-foreground: 240 5% 90%;
 
-    /* Cards: Slightly lighter/different tone for glassmorphism base */
-    --card: 220 15% 18%;
-    --card-foreground: 210 40% 98%;
+    --popover: 240 4% 12%;
+    --popover-foreground: 240 5% 90%;
 
-    --popover: 224 71% 8%;
-    --popover-foreground: 210 40% 98%;
+    --primary: 210 100% 60%;
+    --primary-foreground: 0 0% 100%;
 
-    /* Primary: Neon Cyan/Electric Blue */
-    --primary: 190 100% 50%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 240 5% 90%;
 
-    /* Secondary: Deep Indigo */
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 240 4% 18%;
+    --accent-foreground: 240 5% 90%;
 
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 240 5% 90%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-
-    /* Ring matches Primary for glowing focus states */
-    --ring: 190 100% 50%;
+    --border: 240 4% 20%;
+    --input: 240 4% 20%;
+    --ring: 210 100% 60%;
   }
 }
 

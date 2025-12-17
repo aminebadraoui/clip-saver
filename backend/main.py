@@ -20,6 +20,7 @@ from models import Clip, Folder, Tag, ClipTagLink, User, Note
 from fastapi import Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
+from routers import ideation as ideation_router
 # Load environment variables
 load_dotenv()
 
@@ -85,6 +86,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(ideation_router.router)
 
 # Ensure temp directory exists
 TEMP_DIR = Path(__file__).parent / "temp"

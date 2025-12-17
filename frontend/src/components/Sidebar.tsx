@@ -1,7 +1,8 @@
 import type { Folder } from "@/types/folder";
 import { FolderTree } from "./FolderTree";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, Plus, Video } from "lucide-react";
+import { Home, Plus, Sparkles } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 
 interface SidebarProps {
     folders: Folder[];
@@ -18,7 +19,6 @@ interface SidebarProps {
 export function Sidebar({
     folders,
     selectedFolderId,
-    filterType,
     onSelectFolder,
     onSelectTag,
     onSelectFilterType,
@@ -26,18 +26,43 @@ export function Sidebar({
     onDeleteFolder,
     onRenameFolder,
 }: SidebarProps) {
-    const videoFolders = folders.filter(f => f.category === 'video' || !f.category); // Default to video if missing
-
+    const location = useLocation();
+    const videoFolders = folders.filter(f => f.category === 'video' || !f.category);
+    const isHome = location.pathname === '/';
+    const isIdeation = location.pathname.startsWith('/ideation');
 
     return (
         <div className="w-64 border-r bg-muted/10 h-full flex flex-col gap-6 p-4 overflow-y-auto">
-            {/* Videos (Folders) */}
             <div className="space-y-2">
+                <Link to="/">
+                    <Button
+                        variant={isHome ? "secondary" : "ghost"}
+                        className="w-full justify-start"
+                        onClick={() => {
+                            onSelectFilterType('video');
+                            onSelectFolder(null);
+                            onSelectTag(null);
+                        }}
+                    >
+                        <Home className="w-4 h-4 mr-2" />
+                        Home
+                    </Button>
+                </Link>
+
+                <Link to="/ideation">
+                    <Button
+                        variant={isIdeation ? "secondary" : "ghost"}
+                        className="w-full justify-start"
+                    >
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Video Ideation
+                    </Button>
+                </Link>
+            </div>
+
+            <div className="space-y-2 pt-4 border-t border-border/50">
                 <div className="flex items-center justify-between px-2">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                        <Video className="w-4 h-4" />
-                        <h3>Videos</h3>
-                    </div>
+                    <span className="text-sm font-semibold text-muted-foreground">Folders</span>
                     <Button
                         variant="ghost"
                         size="icon"
@@ -48,19 +73,6 @@ export function Sidebar({
                     </Button>
                 </div>
 
-                <Button
-                    variant={filterType === 'video' && selectedFolderId === null ? "secondary" : "ghost"}
-                    className="w-full justify-start"
-                    onClick={() => {
-                        onSelectFilterType('video');
-                        onSelectFolder(null);
-                        onSelectTag(null);
-                    }}
-                >
-                    <LayoutGrid className="w-4 h-4 mr-2" />
-                    All Videos
-                </Button>
-
                 <FolderTree
                     folders={videoFolders}
                     selectedFolderId={selectedFolderId}
@@ -70,8 +82,6 @@ export function Sidebar({
                     onRenameFolder={onRenameFolder}
                 />
             </div>
-
-
         </div>
     );
 }
