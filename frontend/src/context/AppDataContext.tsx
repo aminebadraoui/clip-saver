@@ -23,6 +23,7 @@ interface AppDataContextType {
     selectedFolderId: string | null;
     selectedTagIds: string[];
     filterType: 'all' | 'video' | 'clip';
+    isLoading: boolean;
 
     // Actions
     refreshData: () => Promise<void>;
@@ -48,6 +49,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     const [clips, setClips] = useState<Clip[]>([]);
     const [folders, setFolders] = useState<Folder[]>([]);
     const [tags, setTags] = useState<Tag[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
     // State
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -67,8 +69,10 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         const init = async () => {
+            setIsLoading(true);
             await initializeFolders();
             await refreshData();
+            setIsLoading(false);
         };
         init();
 
@@ -179,6 +183,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
             selectedFolderId,
             selectedTagIds,
             filterType,
+            isLoading,
             refreshData,
             setSelectedFolderId,
             setSelectedTagIds,
