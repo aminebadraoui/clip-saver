@@ -1,9 +1,8 @@
-// import { useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { AppDataProvider, useAppData } from "@/context/AppDataContext";
 import { Sidebar } from "@/components/Sidebar";
 import { RightSidebar } from "@/components/RightSidebar";
 import { Scissors, LogOut } from "lucide-react";
-import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +29,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         handleSelectFolder, handleSelectTag, setFilterType,
         handleCreateFolder, handleDeleteFolder, handleRenameFolder,
     } = useAppData();
+    const location = useLocation();
+    const showRightSidebar = location.pathname === '/';
 
     return (
         <div className="flex h-[calc(100vh-4rem)] -m-6">
@@ -51,11 +52,13 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                 </div>
             </div>
 
-            <RightSidebar
-                tags={tags}
-                selectedTagIds={selectedTagIds}
-                onSelectTag={handleSelectTag}
-            />
+            {showRightSidebar && (
+                <RightSidebar
+                    tags={tags}
+                    selectedTagIds={selectedTagIds}
+                    onSelectTag={handleSelectTag}
+                />
+            )}
         </div>
     );
 }

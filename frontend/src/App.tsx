@@ -6,6 +6,7 @@ import { ViewClipPage } from "@/pages/ViewClipPage";
 import { ViralTrackerPage } from "@/pages/ViralTrackerPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { RegisterPage } from "@/pages/RegisterPage";
+import { IdeationPage } from "@/pages/IdeationPage";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Toaster } from "sonner";
@@ -30,6 +31,7 @@ function App() {
           <Route path="/create" element={<Layout><CreateClipPage /></Layout>} />
           <Route path="/clip/:id" element={<Layout><ViewClipPage /></Layout>} />
           <Route path="/viral-tracker" element={<Layout><ViralTrackerPage /></Layout>} />
+          <Route path="/ideation" element={<Layout><IdeationPage /></Layout>} />
         </Route>
       </Routes>
       <Toaster />
