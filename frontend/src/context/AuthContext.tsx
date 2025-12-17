@@ -18,12 +18,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+    const [token, setToken] = useState<string | null>(localStorage.getItem('clipcoba_token'));
     const navigate = useNavigate();
 
     useEffect(() => {
-        const storedToken = localStorage.getItem('token');
-        const storedUser = localStorage.getItem('user');
+        const storedToken = localStorage.getItem('clipcoba_token');
+        const storedUser = localStorage.getItem('clipcoba_user');
         if (storedToken && storedUser) {
             setToken(storedToken);
             setUser(JSON.parse(storedUser));
@@ -31,16 +31,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const login = (newToken: string, newUser: User) => {
-        localStorage.setItem('token', newToken);
-        localStorage.setItem('user', JSON.stringify(newUser));
+        localStorage.setItem('clipcoba_token', newToken);
+        localStorage.setItem('clipcoba_user', JSON.stringify(newUser));
         setToken(newToken);
         setUser(newUser);
         navigate('/');
     };
 
     const logout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        localStorage.removeItem('clipcoba_token');
+        localStorage.removeItem('clipcoba_user');
         setToken(null);
         setUser(null);
         navigate('/');

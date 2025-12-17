@@ -1,6 +1,6 @@
 // --- Config & State ---
 // To use local backend, switch to: "http://localhost:3001/api"
-const API_BASE = "https://clipcoba.com/api";
+const API_BASE = "https://api.clipcoba.com/api";
 let currentToken = null;
 let userTags = [];
 
