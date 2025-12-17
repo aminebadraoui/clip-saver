@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 
 
 interface IdeationProject {
@@ -44,6 +45,7 @@ export const IdeationPage = () => {
 
     const fetchProjects = async () => {
         if (!token) return;
+        setIsLoading(true);
         try {
             const res = await fetch(`${API_URL}/api/ideation`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -54,6 +56,8 @@ export const IdeationPage = () => {
             }
         } catch (e) {
             console.error("Failed to fetch projects", e);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -85,6 +89,8 @@ export const IdeationPage = () => {
 
     const handleLoadProject = async (id: string) => {
         setIsLoading(true);
+        setSelectedProjectId(id); // Switch to detail view immediately to show skeleton
+        setCurrentProject(null); // Clear current project to ensure skeleton renders
         try {
             const res = await fetch(`${API_URL}/api/ideation/${id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -92,10 +98,10 @@ export const IdeationPage = () => {
             if (res.ok) {
                 const project = await res.json();
                 setCurrentProject(parseProject(project));
-                setSelectedProjectId(id);
             }
         } catch (e) {
             toast.error("Failed to load project");
+            setSelectedProjectId(null); // Go back to list on error
         } finally {
             setIsLoading(false);
         }
@@ -146,7 +152,8 @@ export const IdeationPage = () => {
             });
             if (res.ok) {
                 toast.success("Saved successfully");
-                fetchProjects(); // Refresh list to update dates
+                // Update the project in the list locally to avoid full refetch
+                setProjects(prev => prev.map(p => p.id === currentProject.id ? { ...p, ...currentProject, updatedAt: Date.now() } : p));
             } else {
                 throw new Error("Save failed");
             }
@@ -169,20 +176,32 @@ export const IdeationPage = () => {
                 </div>
 
                 <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                    {projects.map(p => (
-                        <Card key={p.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleLoadProject(p.id)}>
-                            <CardHeader>
-                                <CardTitle className="flex justify-between items-center">
-                                    {p.projectName}
-                                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                                </CardTitle>
-                                <CardDescription>
-                                    Updated {new Date(p.updatedAt).toLocaleDateString()}
-                                </CardDescription>
-                            </CardHeader>
-                        </Card>
-                    ))}
-                    {projects.length === 0 && (
+                    {isLoading && projects.length === 0 ? (
+                        Array.from({ length: 6 }).map((_, i) => (
+                            <Card key={i} className="h-[120px]">
+                                <CardHeader>
+                                    <Skeleton className="h-6 w-3/4 mb-2" />
+                                    <Skeleton className="h-4 w-1/2" />
+                                </CardHeader>
+                            </Card>
+                        ))
+                    ) : (
+                        projects.map(p => (
+                            <Card key={p.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleLoadProject(p.id)}>
+                                <CardHeader>
+                                    <CardTitle className="flex justify-between items-center">
+                                        {p.projectName}
+                                        <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Updated {new Date(p.updatedAt).toLocaleDateString()}
+                                    </CardDescription>
+                                </CardHeader>
+                            </Card>
+                        ))
+                    )}
+
+                    {!isLoading && projects.length === 0 && (
                         <div className="col-span-full text-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
                             No projects yet. Start one!
                         </div>
@@ -192,7 +211,43 @@ export const IdeationPage = () => {
         );
     }
 
-    if (!currentProject) return <div className="p-8 text-center">Loading...</div>;
+    if (!currentProject || isLoading) {
+        return (
+            <div className="container mx-auto py-4 space-y-8">
+                <div className="flex items-center justify-between mb-6 py-2 border-b">
+                    <div className="flex items-center gap-4 flex-1 mr-4">
+                        <Skeleton className="w-10 h-10 rounded-md" /> {/* Back Button */}
+                        <Skeleton className="flex-1 h-10 max-w-xl" /> {/* Title Input */}
+                    </div>
+                    <Skeleton className="w-32 h-10" /> {/* Save Button */}
+                </div>
+
+                {/* Main Idea Skeleton */}
+                <div className="space-y-4">
+                    <Skeleton className="h-8 w-48" />
+                    <Skeleton className="h-[200px] w-full rounded-xl" />
+                </div>
+
+                {/* Split Sections Skeleton */}
+                <div className="grid gap-6 md:grid-cols-2">
+                    <div className="space-y-4">
+                        <Skeleton className="h-8 w-32" />
+                        <Skeleton className="h-[300px] w-full rounded-xl" />
+                    </div>
+                    <div className="space-y-4">
+                        <Skeleton className="h-8 w-32" />
+                        <Skeleton className="h-[300px] w-full rounded-xl" />
+                    </div>
+                </div>
+
+                {/* Outline Skeleton */}
+                <div className="space-y-4">
+                    <Skeleton className="h-8 w-32" />
+                    <Skeleton className="h-[150px] w-full rounded-xl" />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="container mx-auto py-4">

@@ -3,10 +3,11 @@ import { fetchViralVideos } from "@/utils/youtubeAPI";
 import type { ViralVideo, TimeFilter } from "@/types/youtube";
 import { TimeFilterBar } from "@/components/TimeFilterBar";
 import { ViralVideoCard } from "@/components/ViralVideoCard";
-import { Loader2, TrendingUp, AlertCircle, Search } from "lucide-react";
+import { TrendingUp, AlertCircle, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 import { TrendingKeywords } from "@/components/TrendingKeywords";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function ViralTrackerPage() {
     const [videos, setVideos] = useState<ViralVideo[]>([]);
@@ -78,9 +79,16 @@ export function ViralTrackerPage() {
 
             {/* Loading State */}
             {loading && (
-                <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                    <Loader2 className="w-12 h-12 animate-spin text-primary" />
-                    <p className="text-muted-foreground">Finding viral videos...</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} className="flex flex-col space-y-3">
+                            <Skeleton className="h-[200px] w-full rounded-xl" />
+                            <div className="space-y-2">
+                                <Skeleton className="h-4 w-[250px]" />
+                                <Skeleton className="h-4 w-[200px]" />
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
 

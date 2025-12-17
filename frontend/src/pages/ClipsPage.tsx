@@ -20,12 +20,14 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 
 
 export function ClipsPage() {
     const {
         clips, folders, tags,
         selectedFolderId, selectedTagIds, filterType,
+        isLoading,
         refreshData,
         handleCreateFolder,
         handleCreateTag
@@ -187,7 +189,32 @@ export function ClipsPage() {
                 </div>
             </div>
 
-            {filteredClips.length === 0 ? (
+            {isLoading ? (
+                <div className={viewMode === 'grid'
+                    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+                    : "flex flex-col gap-4"
+                }>
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        viewMode === 'grid' ? (
+                            <div key={i} className="flex flex-col space-y-3">
+                                <Skeleton className="h-[200px] w-full rounded-xl" />
+                                <div className="space-y-2">
+                                    <Skeleton className="h-4 w-[250px]" />
+                                    <Skeleton className="h-4 w-[200px]" />
+                                </div>
+                            </div>
+                        ) : (
+                            <div key={i} className="flex items-center space-x-4">
+                                <Skeleton className="h-12 w-12 rounded-full" />
+                                <div className="space-y-2">
+                                    <Skeleton className="h-4 w-[250px]" />
+                                    <Skeleton className="h-4 w-[200px]" />
+                                </div>
+                            </div>
+                        )
+                    ))}
+                </div>
+            ) : filteredClips.length === 0 ? (
                 <div className="text-center py-20 border-2 border-dashed rounded-xl bg-muted/30">
                     <h3 className="text-xl font-medium text-muted-foreground mb-4">No videos found</h3>
                     <p className="text-muted-foreground mb-8">

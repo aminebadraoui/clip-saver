@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Save } from "lucide-react";
 import YouTube from "react-youtube";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function ViewClipPage() {
     const { id } = useParams();
@@ -16,6 +17,7 @@ export function ViewClipPage() {
     const [clip, setClip] = useState<Clip | null>(null);
     const [folders, setFolders] = useState<Folder[]>([]);
     const [tags, setTags] = useState<Tag[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
     // Edit State
     const [notes, setNotes] = useState("");
@@ -24,16 +26,23 @@ export function ViewClipPage() {
 
     useEffect(() => {
         const init = async () => {
-            const allClips = await getClips();
-            const foundClip = allClips.find((c) => c.id === id);
-            if (foundClip) {
-                setClip(foundClip);
-                setNotes(foundClip.notes || "");
-                setAiPrompt(foundClip.aiPrompt || "");
-                setSelectedTagIds(foundClip.tagIds || []);
+            setIsLoading(true);
+            try {
+                const allClips = await getClips();
+                const foundClip = allClips.find((c) => c.id === id);
+                if (foundClip) {
+                    setClip(foundClip);
+                    setNotes(foundClip.notes || "");
+                    setAiPrompt(foundClip.aiPrompt || "");
+                    setSelectedTagIds(foundClip.tagIds || []);
+                }
+                setFolders(await getFolders());
+                setTags(await getTags());
+            } catch (e) {
+                console.error("Failed to load clip", e);
+            } finally {
+                setIsLoading(false);
             }
-            setFolders(await getFolders());
-            setTags(await getTags());
         };
         init();
     }, [id]);
@@ -58,6 +67,50 @@ export function ViewClipPage() {
             setSelectedTagIds([...selectedTagIds, tagId]);
         }
     };
+
+    if (isLoading) {
+        return (
+            <div className="container max-w-4xl mx-auto py-8 space-y-6">
+                <div className="flex items-center space-x-2 mb-4">
+                    <Skeleton className="h-4 w-4" />
+                    <Skeleton className="h-4 w-32" />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2 space-y-4">
+                        <Skeleton className="aspect-video w-full rounded-xl" />
+                        <div className="space-y-2">
+                            <Skeleton className="h-8 w-3/4" />
+                            <Skeleton className="h-6 w-24 rounded-md" />
+                        </div>
+                    </div>
+
+                    <div className="space-y-6 bg-card p-6 rounded-xl border">
+                        <div className="flex justify-between">
+                            <Skeleton className="h-6 w-24" />
+                            <Skeleton className="h-9 w-20" />
+                        </div>
+                        <div className="space-y-2">
+                            <Skeleton className="h-4 w-12" />
+                            <div className="flex gap-2 flex-wrap">
+                                <Skeleton className="h-6 w-16 rounded-full" />
+                                <Skeleton className="h-6 w-20 rounded-full" />
+                                <Skeleton className="h-6 w-14 rounded-full" />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Skeleton className="h-4 w-12" />
+                            <Skeleton className="h-[150px] w-full" />
+                        </div>
+                        <div className="space-y-2">
+                            <Skeleton className="h-4 w-16" />
+                            <Skeleton className="h-[100px] w-full" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (!clip) return <div className="p-8">Clip not found</div>;
 
