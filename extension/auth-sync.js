@@ -28,7 +28,7 @@ function syncToken() {
             throw new Error("Extension context invalidated");
         }
 
-        const token = localStorage.getItem('clipcoba_token') || localStorage.getItem('token');
+        const token = localStorage.getItem('clipcoba_token');
 
         if (token) {
             // WE found a token on this page, so WE take authority
@@ -74,7 +74,7 @@ syncToken();
 
 // Listen for storage changes (login/logout)
 window.addEventListener('storage', (e) => {
-    if (e.key === 'clipcoba_token' || e.key === 'token') {
+    if (e.key === 'clipcoba_token') {
         syncToken();
     }
 });
