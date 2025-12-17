@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 const API_BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
 
 const getHeaders = () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('clipcoba_token');
     return {
         'Content-Type': 'application/json',
         ...(token ? { 'Authorization': `Bearer ${token}` } : {})

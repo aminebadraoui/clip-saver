@@ -9,7 +9,7 @@ function syncToken() {
             throw new Error("Extension context invalidated");
         }
 
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('clipcoba_token');
         if (token) {
             chrome.storage.local.set({ 'authToken': token }, () => {
                 if (chrome.runtime.lastError) {
@@ -38,7 +38,7 @@ syncToken();
 
 // Listen for storage changes (login/logout)
 window.addEventListener('storage', (e) => {
-    if (e.key === 'token') {
+    if (e.key === 'clipcoba_token') {
         syncToken();
     }
 });
