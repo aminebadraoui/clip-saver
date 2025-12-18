@@ -11,6 +11,7 @@ import { saveClips, saveNote, deleteNote } from "@/utils/storage";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CinemaModeModalProps {
     isOpen: boolean;
@@ -300,13 +301,14 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
             start: clip.start ? Math.floor(clip.start) : undefined,
             end: clip.end ? Math.floor(clip.end) : undefined,
             origin: window.location.origin,
-            autoplay: 1,
+            autoplay: 0, // Disabled autoplay
         },
     };
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-[95vw] w-full h-[90vh] p-0 gap-0 bg-background/95 backdrop-blur-xl border-white/10">
+            {/* Added [&>button]:hidden to hide the default close button injected by DialogContent */}
+            <DialogContent className="max-w-[95vw] w-full h-[90vh] p-0 gap-0 bg-background/95 backdrop-blur-xl border-white/10 [&>button]:hidden">
                 <DialogHeader className="sr-only">
                     <DialogTitle>Cinema Mode</DialogTitle>
                     <DialogDescription>
@@ -314,24 +316,25 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex h-full overflow-hidden">
-                    {/* Video Player Section (LEFT) */}
-                    <div className="w-1/2 bg-black relative overflow-y-auto">
-                        {/* Close button for video area */}
-                        <div className="absolute top-4 left-4 z-50">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="rounded-full bg-black/50 hover:bg-black/70 text-white"
-                                onClick={() => onClose()}
-                            >
-                                <X className="w-5 h-5" />
-                            </Button>
-                        </div>
+                <div className="flex h-full overflow-hidden relative">
+                    {/* Close button - Fixed absolute relative to the dialog content, not scroll area */}
+                    <div className="absolute top-4 left-4 z-[100]">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-full bg-black/60 hover:bg-black/80 text-white border border-white/10 shadow-md transition-all"
+                            onClick={() => onClose()}
+                        >
+                            <X className="w-5 h-5" />
+                        </Button>
+                    </div>
 
-                        <div className="p-6 space-y-6">
+                    {/* Video Player Section (LEFT) */}
+                    <div className="w-1/2 bg-black relative overflow-y-auto group">
+                        {/* Added pt-16 to ensure video doesn't overlap with the top-left close button */}
+                        <div className="p-6 pt-16 space-y-6">
                             {/* Video Player - show for both videos and clips */}
-                            <div className="relative w-full bg-black aspect-video">
+                            <div className="relative w-full bg-black aspect-video rounded-lg overflow-hidden border border-white/5">
                                 {!isValidVideo ? (
                                     <div className="text-white flex items-center justify-center h-full">
                                         Invalid Video ID
@@ -347,6 +350,49 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
                                             onError={(e) => console.error("Video player error:", e)}
                                         />
                                     </div>
+                                )}
+                            </div>
+
+                            {/* Scores - Displayed below video player */}
+                            <div className="flex items-center gap-3 text-xs">
+                                {displayOriginalScore != null && (
+                                    <Tooltip>
+                                        <TooltipTrigger>
+                                            <div className="flex items-center gap-1.5 bg-primary/10 text-primary px-2 py-1 rounded-md cursor-help border border-primary/20">
+                                                <span className="font-medium">Score</span>
+                                                <span className="font-bold">{Number(displayOriginalScore).toFixed(1)}</span>
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Overall Engagement Score</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                )}
+                                {displayOriginalViralRatio != null && (
+                                    <Tooltip>
+                                        <TooltipTrigger>
+                                            <div className="flex items-center gap-1.5 bg-purple-500/10 text-purple-500 px-2 py-1 rounded-md cursor-help border border-purple-500/20">
+                                                <span className="font-medium">Viral</span>
+                                                <span className="font-bold">{Number(displayOriginalViralRatio).toFixed(2)}x</span>
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Viral Score: Views / Subscribers</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                )}
+                                {(originalVideo?.timeSinceUploadRatio != null || clip.timeSinceUploadRatio != null) && (
+                                    <Tooltip>
+                                        <TooltipTrigger>
+                                            <div className="flex items-center gap-1.5 bg-orange-500/10 text-orange-500 px-2 py-1 rounded-md cursor-help border border-orange-500/20">
+                                                <span className="font-medium">Velocity</span>
+                                                <span className="font-bold">{Number(originalVideo?.timeSinceUploadRatio ?? clip.timeSinceUploadRatio).toFixed(1)}</span>
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Velocity Score: Views / Days since upload</p>
+                                        </TooltipContent>
+                                    </Tooltip>
                                 )}
                             </div>
 
@@ -413,22 +459,7 @@ export function CinemaModeModal({ isOpen, onClose, clip, originalVideo, onUpdate
                                             </Button>
                                         )}
                                     </div>
-
-                                    {/* Metrics */}
-                                    <div className="flex items-center gap-3 text-xs">
-                                        {displayOriginalScore != null && (
-                                            <div className="flex items-center gap-1.5 bg-primary/10 text-primary px-2 py-1 rounded-md">
-                                                <span className="font-medium">Score</span>
-                                                <span className="font-bold">{Number(displayOriginalScore).toFixed(1)}</span>
-                                            </div>
-                                        )}
-                                        {displayOriginalViralRatio != null && (
-                                            <div className="flex items-center gap-1.5 bg-purple-500/10 text-purple-500 px-2 py-1 rounded-md">
-                                                <span className="font-medium">Viral</span>
-                                                <span className="font-bold">{Number(displayOriginalViralRatio).toFixed(2)}x</span>
-                                            </div>
-                                        )}
-                                    </div>
+                                    {/* Metrics removed from here as they are now common above */}
                                 </div>
                             )}
                         </div>

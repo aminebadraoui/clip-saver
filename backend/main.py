@@ -11,6 +11,9 @@ import shutil
 from googleapiclient.discovery import build
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+# Load environment variables first
+load_dotenv()
+
 import threading
 import time
 import json
@@ -21,8 +24,8 @@ from fastapi import Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 from routers import ideation as ideation_router
-# Load environment variables
-load_dotenv()
+from routers import billing as billing_router
+from routers import users as users_router
 
 # Valid base tags
 BASE_TAGS = {
@@ -88,8 +91,11 @@ app.add_middleware(
 )
 
 app.include_router(ideation_router.router)
+app.include_router(billing_router.router)
+app.include_router(users_router.router)
 
 # Ensure temp directory exists
+# forcing reload for env vars 2
 TEMP_DIR = Path(__file__).parent / "temp"
 TEMP_DIR.mkdir(exist_ok=True)
 

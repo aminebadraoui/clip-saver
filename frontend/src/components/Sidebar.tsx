@@ -28,15 +28,15 @@ export function Sidebar({
 }: SidebarProps) {
     const location = useLocation();
     const videoFolders = folders.filter(f => f.category === 'video' || !f.category);
-    const isHome = location.pathname === '/';
+
     const isIdeation = location.pathname.startsWith('/ideation');
 
     return (
         <div className="w-64 border-r bg-muted/10 h-full flex flex-col gap-6 p-4 overflow-y-auto">
             <div className="space-y-2">
-                <Link to="/">
+                <Link to="/dashboard">
                     <Button
-                        variant={isHome ? "secondary" : "ghost"}
+                        variant={location.pathname.startsWith('/dashboard') ? "secondary" : "ghost"}
                         className="w-full justify-start"
                         onClick={() => {
                             onSelectFilterType('video');

@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 interface User {
     id: string;
     email: string;
+    subscription_status?: string;
+    stripe_customer_id?: string;
 }
 
 interface AuthContextType {
@@ -12,6 +14,8 @@ interface AuthContextType {
     login: (token: string, user: User) => void;
     logout: () => void;
     isAuthenticated: boolean;
+    isSubscribed: boolean;
+    refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,9 +28,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         const storedToken = localStorage.getItem('clipcoba_token');
         const storedUser = localStorage.getItem('clipcoba_user');
-        if (storedToken && storedUser) {
+
+        if (storedToken) {
             setToken(storedToken);
-            setUser(JSON.parse(storedUser));
+            if (storedUser) {
+                setUser(JSON.parse(storedUser));
+            }
+
+            // Immediately fetch fresh data from backend to ensure subscription status is current
+            // This fixes the issue where a reload might show stale data from localStorage
+            refreshUser(storedToken);
         }
     }, []);
 
@@ -35,7 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('clipcoba_user', JSON.stringify(newUser));
         setToken(newToken);
         setUser(newUser);
-        navigate('/');
+        navigate('/dashboard');
     };
 
     const logout = () => {
@@ -46,8 +57,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         navigate('/');
     };
 
+    const refreshUser = async (overrideToken?: string) => {
+        const tokenToUse = overrideToken || token;
+        if (!tokenToUse) return;
+
+        try {
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+            const response = await fetch(`${API_URL}/users/me`, {
+                headers: {
+                    'Authorization': `Bearer ${tokenToUse}`
+                }
+            });
+
+            if (response.ok) {
+                const userData = await response.json();
+                setUser(userData);
+                localStorage.setItem('clipcoba_user', JSON.stringify(userData));
+            }
+        } catch (error) {
+            console.error('Failed to refresh user:', error);
+        }
+    };
+
+    const isSubscribed = user?.subscription_status === 'active' || user?.subscription_status === 'trialing';
+
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token }}>
+        <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, isSubscribed, refreshUser }}>
             {children}
         </AuthContext.Provider>
     );

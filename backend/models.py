@@ -9,6 +9,11 @@ class User(SQLModel, table=True):
     email: str = Field(index=True, unique=True)
     password_hash: str
     created_at: int = Field(sa_type=BigInteger)
+    
+    # Stripe Subscription
+    stripe_customer_id: Optional[str] = Field(default=None, index=True)
+    subscription_status: Optional[str] = Field(default="inactive")
+    subscription_id: Optional[str] = Field(default=None)
 
     clips: List["Clip"] = Relationship(back_populates="user")
     folders: List["Folder"] = Relationship(back_populates="user")
