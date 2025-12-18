@@ -100,29 +100,31 @@ export const SubscriptionPage = () => {
                     </div>
                 )}
                 {/* Debug Button for Local Development */}
-                <div className="mt-8 pt-8 border-t border-neutral-800 text-center">
-                    <p className="text-xs text-gray-500 mb-2">Dev Mode Only: Webhooks won't fire on localhost without CLI.</p>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
-                            if (!token) return;
-                            try {
-                                await fetch(`${API_URL}/billing/debug-activate`, {
-                                    method: 'POST',
-                                    headers: { 'Authorization': `Bearer ${token}` }
-                                });
-                                refreshUser();
-                                setMessage("Debug activation successful!");
-                            } catch (e) {
-                                console.error(e);
-                            }
-                        }}
-                        className="text-xs text-gray-400 hover:text-white border-neutral-700 hover:bg-neutral-800"
-                    >
-                        Force Unlock (Simulate Webhook)
-                    </Button>
-                </div>
+                {import.meta.env.DEV && (
+                    <div className="mt-8 pt-8 border-t border-neutral-800 text-center">
+                        <p className="text-xs text-gray-500 mb-2">Dev Mode Only: Webhooks won't fire on localhost without CLI.</p>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                                if (!token) return;
+                                try {
+                                    await fetch(`${API_URL}/billing/debug-activate`, {
+                                        method: 'POST',
+                                        headers: { 'Authorization': `Bearer ${token}` }
+                                    });
+                                    refreshUser();
+                                    setMessage("Debug activation successful!");
+                                } catch (e) {
+                                    console.error(e);
+                                }
+                            }}
+                            className="text-xs text-gray-400 hover:text-white border-neutral-700 hover:bg-neutral-800"
+                        >
+                            Force Unlock (Simulate Webhook)
+                        </Button>
+                    </div>
+                )}
             </div>
         </div>
     );
