@@ -51,7 +51,7 @@ async def create_checkout_session(
                     },
                 ],
                 mode='subscription',
-                success_url=f'{CLIENT_URL}/?session_id={{CHECKOUT_SESSION_ID}}',
+                success_url=f'{CLIENT_URL}/subscription?session_id={{CHECKOUT_SESSION_ID}}',
                 cancel_url=f'{CLIENT_URL}/subscription?canceled=true',
                 subscription_data={
                     "metadata": {"user_id": str(current_user.id)}
@@ -80,7 +80,7 @@ async def create_checkout_session(
                         },
                     ],
                     mode='subscription',
-                    success_url=f'{CLIENT_URL}/?session_id={{CHECKOUT_SESSION_ID}}',
+                    success_url=f'{CLIENT_URL}/subscription?session_id={{CHECKOUT_SESSION_ID}}',
                     cancel_url=f'{CLIENT_URL}/subscription?canceled=true',
                     subscription_data={
                         "metadata": {"user_id": str(current_user.id)}
@@ -107,13 +107,67 @@ async def create_portal_session(
         raise HTTPException(status_code=400, detail="User has no billing account associated.")
 
     try:
+        debug_info = f"CLIENT_URL Env: {os.getenv('CLIENT_URL')}\n"
+        debug_info += f"Constructed return_url: {CLIENT_URL}/settings\n"
+        
         portal_session = stripe.billing_portal.Session.create(
             customer=current_user.stripe_customer_id,
             return_url=f'{CLIENT_URL}/settings',
         )
+        debug_info += f"Generated Session URL: {portal_session.url}\n"
+        
+        with open("portal_debug.log", "w") as f:
+            f.write(debug_info)
+            
+        print(f"DEBUG: {debug_info}")
         return JSONResponse({"url": portal_session.url})
     except Exception as e:
         print(f"Error creating portal session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+@router.post("/sync")
+async def sync_subscription(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """Force sync subscription status from Stripe to DB"""
+    if not current_user.stripe_customer_id:
+         # No stripe ID, nothing to sync
+         return {"status": "no_customer_id"}
+
+    try:
+        # Fetch latest subscription from Stripe
+        subscriptions = stripe.Subscription.list(
+            customer=current_user.stripe_customer_id,
+            limit=1,
+            status='all', # Include canceled/past due
+            expand=['data.default_payment_method']
+        )
+        
+        if subscriptions.data:
+            sub = subscriptions.data[0]
+            # Update user
+            stripe_cancel_at = sub.get("cancel_at")
+            stripe_cancel_at_period_end = sub.get("cancel_at_period_end", False)
+            stripe_period_end = sub.get("current_period_end")
+
+            if stripe_cancel_at:
+                current_user.cancel_at_period_end = True
+                current_user.current_period_end = stripe_cancel_at
+            else:
+                current_user.cancel_at_period_end = stripe_cancel_at_period_end
+                current_user.current_period_end = stripe_period_end
+            
+            session.add(current_user)
+            session.commit()
+            session.refresh(current_user)
+            print(f"Synced subscription for {current_user.email}: {sub.status}")
+            return {"status": "synced", "user": current_user}
+        else:
+             print(f"No subscriptions found for {current_user.email}")
+             return {"status": "no_subscription_found"}
+
+    except Exception as e:
+        print(f"Error syncing subscription: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/debug-activate")
@@ -162,8 +216,16 @@ async def handle_subscription_change(subscription):
     customer_id = subscription['customer']
     status = subscription['status']
     subscription_id = subscription['id']
-    cancel_at_period_end = subscription.get('cancel_at_period_end', False)
-    current_period_end = subscription.get('current_period_end')
+    stripe_cancel_at = subscription.get("cancel_at")
+    stripe_cancel_at_period_end = subscription.get("cancel_at_period_end", False)
+    stripe_period_end = subscription.get("current_period_end")
+
+    if stripe_cancel_at:
+        cancel_at_period_end = True
+        current_period_end = stripe_cancel_at
+    else:
+        cancel_at_period_end = stripe_cancel_at_period_end
+        current_period_end = stripe_period_end
     
     print(f"Handling change: Customer {customer_id}, Status {status}, CancelAtEnd {cancel_at_period_end}")
 

@@ -1,11 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 
 export const SettingsPage = () => {
-    const { user, token, logout } = useAuth();
+    const { user, token, logout, refreshUser } = useAuth();
     const [loading, setLoading] = useState(false);
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+
+
+    useEffect(() => {
+        const syncAndRefresh = async () => {
+            try {
+                if (token) {
+                    await fetch(`${API_URL}/billing/sync`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    await refreshUser();
+                }
+            } catch (e) {
+                console.error("Sync failed", e);
+            }
+        };
+        syncAndRefresh();
+    }, [token]);
 
     const handleManageSubscription = async () => {
         setLoading(true);
