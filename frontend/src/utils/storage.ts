@@ -6,11 +6,13 @@ import type { Note } from "@/types/clip";
 
 const API_BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
 
-const getHeaders = () => {
+export const getHeaders = () => {
     const token = localStorage.getItem('clipcoba_token');
+    const spaceId = localStorage.getItem('clipcoba_space_id');
     return {
         'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        ...(spaceId ? { 'X-Space-Id': spaceId } : {})
     };
 };
 

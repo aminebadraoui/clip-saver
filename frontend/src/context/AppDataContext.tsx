@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useAuth } from "@/context/AuthContext";
 import type { Clip } from "@/types/clip";
 import type { Tag } from "@/types/tag";
 import {
@@ -38,6 +39,7 @@ interface AppDataContextType {
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
 
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
+    const { currentSpace } = useAuth();
     const [clips, setClips] = useState<Clip[]>([]);
 
     const [tags, setTags] = useState<Tag[]>([]);
@@ -73,7 +75,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
             setFilterType('clip');
             // Clean up URL handled by consumer or just leave it, but we set state here.
         }
-    }, [refreshData]);
+    }, [refreshData, currentSpace]);
 
 
 

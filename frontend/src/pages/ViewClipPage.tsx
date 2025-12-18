@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { useParams, useNavigate } from "react-router-dom";
 import { getClips, updateClip, getTags } from "@/utils/storage";
 import type { Clip } from "@/types/clip";
@@ -11,6 +12,7 @@ import YouTube from "react-youtube";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function ViewClipPage() {
+    const { currentSpace } = useAuth();
     const { id } = useParams();
     const navigate = useNavigate();
     const [clip, setClip] = useState<Clip | null>(null);
@@ -43,7 +45,7 @@ export function ViewClipPage() {
             }
         };
         init();
-    }, [id]);
+    }, [id, currentSpace]);
 
     const handleSave = async () => {
         if (!clip) return;
