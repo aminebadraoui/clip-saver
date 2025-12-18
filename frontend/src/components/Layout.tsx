@@ -27,26 +27,18 @@ function LogoutButton() {
 // LayoutContent component that uses the context
 function LayoutContent({ children }: { children: React.ReactNode }) {
     const {
-        folders, tags, selectedFolderId, selectedTagIds, filterType,
-        handleSelectFolder, handleSelectTag, setFilterType,
-        handleCreateFolder, handleDeleteFolder, handleRenameFolder,
+        tags, selectedTagIds,
+        handleSelectTag, setFilterType,
     } = useAppData();
     const location = useLocation();
     const { isSubscribed } = useAuth();
-    const showRightSidebar = location.pathname === '/' && isSubscribed;
+    const showRightSidebar = (location.pathname === '/' || location.pathname === '/dashboard') && isSubscribed;
 
     return (
         <div className="flex h-[calc(100vh-4rem)] -m-6">
             <Sidebar
-                folders={folders}
-                selectedFolderId={selectedFolderId}
-                filterType={filterType}
-                onSelectFolder={handleSelectFolder}
                 onSelectTag={handleSelectTag}
                 onSelectFilterType={setFilterType}
-                onCreateFolder={handleCreateFolder}
-                onDeleteFolder={handleDeleteFolder}
-                onRenameFolder={handleRenameFolder}
             />
 
             <div className="flex-1 p-6 overflow-y-auto">
@@ -89,7 +81,7 @@ export function Layout({ children }: LayoutProps) {
                                         if (e.key === 'Enter') {
                                             const target = e.target as HTMLInputElement;
                                             if (target.value.trim()) {
-                                                window.location.href = `/?addVideo=${encodeURIComponent(target.value.trim())}`;
+                                                window.location.href = `/dashboard?addVideo=${encodeURIComponent(target.value.trim())}`;
                                                 target.value = '';
                                             }
                                         }
