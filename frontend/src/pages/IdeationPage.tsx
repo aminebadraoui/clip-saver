@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Plus, ChevronLeft, Save, Loader2, ArrowRight, Trash2 } from "lucide-react";
 import { MainIdeaSection } from "@/components/ideation/MainIdeaSection";
@@ -49,9 +49,80 @@ export const IdeationPage = () => {
 
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+    const saveProject = async (silent: boolean = false, projectToSave: IdeationProject | null = currentProject) => {
+        if (!projectToSave || !token) return;
+        setIsSaving(true);
+        try {
+            const res = await fetch(`${API_URL}/api/ideation/${projectToSave.id}`, {
+                method: 'PUT',
+                headers: getHeaders(),
+                body: JSON.stringify({
+                    projectName: projectToSave.projectName,
+                    mainIdea: projectToSave.mainIdea,
+                    whyViewerCare: projectToSave.whyViewerCare,
+                    commonAssumptions: projectToSave.commonAssumptions,
+                    breakingAssumptions: projectToSave.breakingAssumptions,
+                    viewerFeeling: projectToSave.viewerFeeling,
+                    brainstormedTitles: projectToSave.brainstormedTitles,
+                    brainstormedThumbnails: projectToSave.brainstormedThumbnails,
+                    scriptOutline: projectToSave.scriptOutline,
+                    scriptContent: projectToSave.scriptContent
+                })
+            });
+            if (res.ok) {
+                if (!silent) toast.success("Saved successfully");
+
+                // Update refs and local list
+                lastSavedProjectRef.current = JSON.parse(JSON.stringify(projectToSave));
+
+                // Update the project in the list locally to avoid full refetch
+                setProjects(prev => prev.map(p => p.id === projectToSave.id ? { ...p, ...projectToSave, updatedAt: Date.now() } : p));
+            } else {
+                throw new Error("Save failed");
+            }
+        } catch (e) {
+            if (!silent) toast.error("Failed to save");
+            console.error("Auto-save error:", e);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // Refs for auto-save comparison
+    const currentProjectRef = useRef<IdeationProject | null>(null);
+    const lastSavedProjectRef = useRef<IdeationProject | null>(null);
+
+    // Update refs when state changes
+    useEffect(() => {
+        currentProjectRef.current = currentProject;
+    }, [currentProject]);
+
+    // Keep latest saveProject function in ref to avoid stale closures in interval
+    const saveProjectRef = useRef(saveProject);
+    useEffect(() => {
+        saveProjectRef.current = saveProject;
+    });
+
     useEffect(() => {
         fetchProjects();
     }, [token, currentSpace]);
+
+    // Auto-save effect
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (
+                currentProjectRef.current &&
+                lastSavedProjectRef.current &&
+                JSON.stringify(currentProjectRef.current) !== JSON.stringify(lastSavedProjectRef.current)
+            ) {
+                // Determine if we should save
+                // We need to pass the current project from ref to saveProject
+                saveProjectRef.current(true, currentProjectRef.current);
+            }
+        }, 10000); // 10 seconds
+
+        return () => clearInterval(interval);
+    }, []);
 
     const fetchProjects = async () => {
         if (!token) return;
@@ -70,7 +141,6 @@ export const IdeationPage = () => {
             setIsLoading(false);
         }
     };
-
     const handleCreateProject = async () => {
         if (!token) return;
         setIsLoading(true);
@@ -84,7 +154,9 @@ export const IdeationPage = () => {
                 const newProject = await res.json();
                 setProjects([newProject, ...projects]);
                 setSelectedProjectId(newProject.id);
-                setCurrentProject(parseProject(newProject));
+                const parsed = parseProject(newProject);
+                setCurrentProject(parsed);
+                lastSavedProjectRef.current = JSON.parse(JSON.stringify(parsed)); // Deep copy for ref
                 toast.success("Project created!");
             }
         } catch (e) {
@@ -98,13 +170,18 @@ export const IdeationPage = () => {
         setIsLoading(true);
         setSelectedProjectId(id); // Switch to detail view immediately to show skeleton
         setCurrentProject(null); // Clear current project to ensure skeleton renders
+        currentProjectRef.current = null;
+        lastSavedProjectRef.current = null;
+
         try {
             const res = await fetch(`${API_URL}/api/ideation/${id}`, {
                 headers: getHeaders()
             });
             if (res.ok) {
                 const project = await res.json();
-                setCurrentProject(parseProject(project));
+                const parsed = parseProject(project);
+                setCurrentProject(parsed);
+                lastSavedProjectRef.current = JSON.parse(JSON.stringify(parsed)); // Deep copy
             }
         } catch (e) {
             toast.error("Failed to load project");
@@ -161,39 +238,9 @@ export const IdeationPage = () => {
         };
     };
 
-    const handleSave = async () => {
-        if (!currentProject || !token) return;
-        setIsSaving(true);
-        try {
-            const res = await fetch(`${API_URL}/api/ideation/${currentProject.id}`, {
-                method: 'PUT',
-                headers: getHeaders(),
-                body: JSON.stringify({
-                    projectName: currentProject.projectName,
-                    mainIdea: currentProject.mainIdea,
-                    whyViewerCare: currentProject.whyViewerCare,
-                    commonAssumptions: currentProject.commonAssumptions,
-                    breakingAssumptions: currentProject.breakingAssumptions,
-                    viewerFeeling: currentProject.viewerFeeling,
-                    brainstormedTitles: currentProject.brainstormedTitles,
-                    brainstormedThumbnails: currentProject.brainstormedThumbnails,
-                    scriptOutline: currentProject.scriptOutline,
-                    scriptContent: currentProject.scriptContent
-                })
-            });
-            if (res.ok) {
-                toast.success("Saved successfully");
-                // Update the project in the list locally to avoid full refetch
-                setProjects(prev => prev.map(p => p.id === currentProject.id ? { ...p, ...currentProject, updatedAt: Date.now() } : p));
-            } else {
-                throw new Error("Save failed");
-            }
-        } catch (e) {
-            toast.error("Failed to save");
-        } finally {
-            setIsSaving(false);
-        }
-    };
+
+
+    const handleSave = () => saveProject(false);
 
     if (!selectedProjectId) {
         return (
@@ -342,6 +389,7 @@ export const IdeationPage = () => {
                         <TitleBrainstorming
                             titles={currentProject.brainstormedTitles as any[]}
                             onUpdate={(titles) => setCurrentProject(prev => prev ? ({ ...prev, brainstormedTitles: titles }) : null)}
+                            conceptData={currentProject}
                         />
                     </section>
                     <section id="thumbnails">
@@ -356,6 +404,7 @@ export const IdeationPage = () => {
                     <ScriptOutlineSection
                         outline={currentProject.scriptOutline}
                         onUpdate={(val) => setCurrentProject(prev => prev ? ({ ...prev, scriptOutline: val }) : null)}
+                        conceptData={currentProject}
                     />
                 </section>
 
@@ -363,6 +412,9 @@ export const IdeationPage = () => {
                     <ScriptWritingSection
                         content={currentProject.scriptContent}
                         onUpdate={(val) => setCurrentProject(prev => prev ? ({ ...prev, scriptContent: val }) : null)}
+                        conceptData={currentProject}
+                        outline={currentProject.scriptOutline}
+                        titles={currentProject.brainstormedTitles as any[]}
                     />
                 </section>
             </div>

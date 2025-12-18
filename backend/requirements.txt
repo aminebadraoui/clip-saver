@@ -13,3 +13,7 @@ python-jose[cryptography]
 python-multipart
 bcrypt==4.0.1
 stripe
+langchain
+langchain-community
+langgraph
+langchain-openai

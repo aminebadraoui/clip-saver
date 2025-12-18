@@ -10,6 +10,7 @@ from database import get_session
 from models import VideoIdeation, User, Clip, Space
 from auth import get_current_user
 from dependencies import get_current_space
+from ai_agent import fetch_transcript, generate_video_outline, generate_title_ideas, readapt_script_outline, generate_viral_script
 
 router = APIRouter(prefix="/api/ideation", tags=["ideation"])
 
@@ -120,21 +121,79 @@ async def generate_outline(
     if not clip:
         raise HTTPException(status_code=404, detail="Clip not found")
     
-    # STUB: AI Generation
-    # Real impl: Fetch transcript -> Send to LLM -> Parse Structure
+    # Caching Logic: Check if outline already exists
+    if clip.scriptOutline:
+        return {"outline": clip.scriptOutline}
+
+    # Fetch transcript
+    transcript = fetch_transcript(clip.videoId)
+    if not transcript:
+        # Fallback if transcript fails (e.g. no captions)
+        raise HTTPException(status_code=400, detail="Could not fetch transcript for this video. Use manual creation.")
+
+    # Generate Outline via AI
+    outline = generate_video_outline(transcript, clip.title)
     
-    stub_outline = f"""# Outline for {clip.title}
-
-## Hook (0:00 - 0:30)
-- Grab attention with strong statement about...
-
-## Core Argument
-- Point 1
-- Point 2
-
-## Conclusion
-- Summary
-- Call to action
-"""
+    # Save to DB (Cache)
+    clip.scriptOutline = outline
+    session.add(clip)
+    session.commit()
+    session.refresh(clip)
     
-    return {"outline": stub_outline}
+    return {"outline": outline}
+
+@router.post("/generate-titles")
+async def generate_titles_endpoint(
+    concept_data: Dict[str, Any], 
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """
+    Generate new title ideas based on concept and inspiration.
+    """
+    # Extract inspiration titles from the format the frontend sends
+    inspiration = concept_data.get("inspirationTitles", [])
+    
+    # Generate
+    new_titles = generate_title_ideas(inspiration, concept_data)
+    
+    return {"titles": new_titles}
+
+@router.post("/readapt-outline")
+async def readapt_outline_endpoint(
+    payload: Dict[str, Any],
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """
+    Readapt existing outline to main concept.
+    """
+    current_outline = payload.get("outline", "")
+    concept_data = payload.get("conceptData", {})
+    
+    if not current_outline:
+        raise HTTPException(status_code=400, detail="No outline provided")
+        
+    new_outline = readapt_script_outline(current_outline, concept_data)
+    
+    return {"outline": new_outline}
+
+@router.post("/generate-script")
+async def generate_script_endpoint(
+    payload: Dict[str, Any],
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """
+    Generate full script from outline, titles, and concept.
+    """
+    outline = payload.get("outline", "")
+    titles = payload.get("titles", []) # List of title objects or strings
+    concept_data = payload.get("conceptData", {})
+    
+    if not outline:
+        raise HTTPException(status_code=400, detail="No outline provided")
+        
+    script = generate_viral_script(outline, titles, concept_data)
+    
+    return {"script": script}
