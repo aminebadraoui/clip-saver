@@ -7,8 +7,9 @@ import uuid
 import json
 
 from database import get_session
-from models import VideoIdeation, User, Clip
+from models import VideoIdeation, User, Clip, Space
 from auth import get_current_user
+from dependencies import get_current_space
 
 router = APIRouter(prefix="/api/ideation", tags=["ideation"])
 
@@ -31,13 +32,15 @@ class IdeationUpdate(BaseModel):
 async def create_ideation(
     ideation_data: IdeationCreate,
     user: User = Depends(get_current_user),
+    current_space: Space = Depends(get_current_space),
     session: Session = Depends(get_session)
 ):
     new_ideation = VideoIdeation(
         projectName=ideation_data.projectName,
         createdAt=int(time.time() * 1000),
         updatedAt=int(time.time() * 1000),
-        user_id=user.id
+        user_id=user.id,
+        space_id=current_space.id
     )
     session.add(new_ideation)
     session.commit()
@@ -47,9 +50,10 @@ async def create_ideation(
 @router.get("/", response_model=List[VideoIdeation])
 async def list_ideations(
     user: User = Depends(get_current_user),
+    current_space: Space = Depends(get_current_space),
     session: Session = Depends(get_session)
 ):
-    return session.exec(select(VideoIdeation).where(VideoIdeation.user_id == user.id)).all()
+    return session.exec(select(VideoIdeation).where(VideoIdeation.user_id == user.id, VideoIdeation.space_id == current_space.id)).all()
 
 @router.get("/{ideation_id}", response_model=VideoIdeation)
 async def get_ideation(

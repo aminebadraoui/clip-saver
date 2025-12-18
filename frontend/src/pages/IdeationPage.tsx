@@ -7,6 +7,7 @@ import { ThumbnailBrainstorming } from "@/components/ideation/ThumbnailBrainstor
 import { ScriptOutlineSection } from "@/components/ideation/ScriptOutlineSection";
 import { ScriptWritingSection } from "@/components/ideation/ScriptWritingSection";
 import { useAuth } from "@/context/AuthContext";
+import { getHeaders } from "@/utils/storage";
 import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,7 +39,7 @@ interface IdeationProject {
 }
 
 export const IdeationPage = () => {
-    const { token } = useAuth();
+    const { token, currentSpace } = useAuth();
     const [projects, setProjects] = useState<IdeationProject[]>([]);
     const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
     const [currentProject, setCurrentProject] = useState<IdeationProject | null>(null);
@@ -50,14 +51,14 @@ export const IdeationPage = () => {
 
     useEffect(() => {
         fetchProjects();
-    }, [token]);
+    }, [token, currentSpace]);
 
     const fetchProjects = async () => {
         if (!token) return;
         setIsLoading(true);
         try {
             const res = await fetch(`${API_URL}/api/ideation`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: getHeaders()
             });
             if (res.ok) {
                 const data = await res.json();
@@ -76,10 +77,7 @@ export const IdeationPage = () => {
         try {
             const res = await fetch(`${API_URL}/api/ideation`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
+                headers: getHeaders(),
                 body: JSON.stringify({ projectName: `New Project ${new Date().toLocaleDateString()}` })
             });
             if (res.ok) {
@@ -102,7 +100,7 @@ export const IdeationPage = () => {
         setCurrentProject(null); // Clear current project to ensure skeleton renders
         try {
             const res = await fetch(`${API_URL}/api/ideation/${id}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: getHeaders()
             });
             if (res.ok) {
                 const project = await res.json();
@@ -127,7 +125,7 @@ export const IdeationPage = () => {
         try {
             const res = await fetch(`${API_URL}/api/ideation/${projectToDelete}`, {
                 method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: getHeaders()
             });
 
             if (res.ok) {
@@ -169,10 +167,7 @@ export const IdeationPage = () => {
         try {
             const res = await fetch(`${API_URL}/api/ideation/${currentProject.id}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
+                headers: getHeaders(),
                 body: JSON.stringify({
                     projectName: currentProject.projectName,
                     mainIdea: currentProject.mainIdea,

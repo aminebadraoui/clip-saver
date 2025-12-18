@@ -26,6 +26,9 @@ from auth import get_password_hash, verify_password, create_access_token, get_cu
 from routers import ideation as ideation_router
 from routers import billing as billing_router
 from routers import users as users_router
+from routers import spaces
+from dependencies import get_current_space
+from models import Space
 
 # Valid base tags
 BASE_TAGS = {
@@ -95,6 +98,7 @@ app.add_middleware(
 app.include_router(ideation_router.router)
 app.include_router(billing_router.router)
 app.include_router(users_router.router)
+app.include_router(spaces.router)
 
 # Ensure temp directory exists
 # forcing reload for env vars 2
@@ -813,23 +817,30 @@ class TagCreate(BaseModel):
     category: str = "video"
 
 @app.get("/api/tags")
-def read_tags(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    # Return both user tags and global tags
-    # We use distinct to avoid duplicates if a user somehow has a tag with same name as global (should prevent that on creation ideally)
-    
-    # Or just fetch both:
-    user_tags = session.exec(select(Tag).where(Tag.user_id == current_user.id)).all()
+def read_tags(
+    session: Session = Depends(get_session), 
+    current_user: User = Depends(get_current_user),
+    current_space: Space = Depends(get_current_space)
+):
+    # Return user tags for this space and global tags
+    user_tags = session.exec(select(Tag).where(Tag.user_id == current_user.id, Tag.space_id == current_space.id)).all()
     global_tags = session.exec(select(Tag).where(Tag.user_id == None)).all()
     
     return user_tags + global_tags
 
 @app.post("/api/tags")
-def create_tag(tag_data: TagCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    # Check for existing tag with same name and category for this user
+def create_tag(
+    tag_data: TagCreate, 
+    session: Session = Depends(get_session), 
+    current_user: User = Depends(get_current_user),
+    current_space: Space = Depends(get_current_space)
+):
+    # Check for existing tag with same name and category for this user in this space
     existing_tag = session.exec(select(Tag).where(
         Tag.name == tag_data.name, 
         Tag.user_id == current_user.id,
-        Tag.category == tag_data.category
+        Tag.category == tag_data.category,
+        Tag.space_id == current_space.id
     )).first()
     if existing_tag:
         return existing_tag
@@ -847,7 +858,8 @@ def create_tag(tag_data: TagCreate, session: Session = Depends(get_session), cur
         name=tag_data.name,
         color=tag_data.color,
         createdAt=int(time.time() * 1000),
-        user_id=current_user.id
+        user_id=current_user.id,
+        space_id=current_space.id
     )
     session.add(tag)
     session.commit()
@@ -855,8 +867,12 @@ def create_tag(tag_data: TagCreate, session: Session = Depends(get_session), cur
     return tag
 
 @app.get("/api/clips")
-def read_clips(session: Session = Depends(get_session), current_user: User = Depends(get_active_subscriber)):
-    clips = session.exec(select(Clip).where(Clip.user_id == current_user.id)).all()
+def read_clips(
+    session: Session = Depends(get_session), 
+    current_user: User = Depends(get_active_subscriber),
+    current_space: Space = Depends(get_current_space)
+):
+    clips = session.exec(select(Clip).where(Clip.user_id == current_user.id, Clip.space_id == current_space.id)).all()
     # Convert to frontend format (include tagIds and notes)
     result = []
     for clip in clips:
@@ -897,14 +913,23 @@ class ClipCreate(BaseModel):
     engagementScore: Optional[float] = None
 
 @app.post("/api/clips")
-def create_clip(clip_data: ClipCreate, session: Session = Depends(get_session), current_user: User = Depends(get_active_subscriber)):
-    # Check if clip exists for this user
+def create_clip(
+    clip_data: ClipCreate, 
+    session: Session = Depends(get_session), 
+    current_user: User = Depends(get_active_subscriber),
+    current_space: Space = Depends(get_current_space)
+):
+    # Check if clip exists for this user in this space (or globally for this user? Clips are unique by ID but usually tied to space)
+    # If we allow same video in different spaces, ID must be different or we need check.
+    # Clip ID is UUID default, but here it seems passed from frontend?
+    # ClipCreate has `id: str`. If frontend generates UUID, it's fine.
+    
     existing_clip = session.exec(select(Clip).where(Clip.id == clip_data.id, Clip.user_id == current_user.id)).first()
     if existing_clip:
         # Update existing
-        return update_clip(clip_data.id, clip_data, session, current_user)
+        return update_clip(clip_data.id, clip_data, session, current_user, current_space)
 
-    clip = Clip.model_validate(clip_data, update={"tags": [], "user_id": current_user.id})
+    clip = Clip.model_validate(clip_data, update={"tags": [], "user_id": current_user.id, "space_id": current_space.id})
     
     # Handle tags (ensure they belong to user or are global)
     if clip_data.tagIds:
@@ -948,7 +973,14 @@ def create_clip(clip_data: ClipCreate, session: Session = Depends(get_session), 
     return clip
 
 @app.put("/api/clips/{clip_id}")
-def update_clip(clip_id: str, clip_data: ClipCreate, session: Session = Depends(get_session), current_user: User = Depends(get_active_subscriber)):
+def update_clip(
+    clip_id: str, 
+    clip_data: ClipCreate, 
+    session: Session = Depends(get_session), 
+    current_user: User = Depends(get_active_subscriber),
+    current_space: Space = Depends(get_current_space)
+):
+    # Ensure clip belongs to user and space (optional: move clip between spaces? For now restrict to space)
     clip = session.exec(select(Clip).where(Clip.id == clip_id, Clip.user_id == current_user.id)).first()
     if not clip:
         raise HTTPException(status_code=404, detail="Clip not found")

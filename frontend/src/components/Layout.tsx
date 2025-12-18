@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Settings } from "lucide-react";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
+import { SpaceSwitcher } from "@/components/SpaceSwitcher";
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -70,6 +71,10 @@ export function Layout({ children }: LayoutProps) {
                             <Logo className="h-12 w-auto text-primary" />
                             <h1 className="text-2xl font-bold tracking-tight">ClipCoba</h1>
                         </Link>
+
+                        <div className="hidden md:flex ml-4 border-l border-white/10 pl-4 h-8 items-center">
+                            <SpaceSwitcher />
+                        </div>
 
                         {/* Search/Add Input */}
                         <div className="flex-1 max-w-xl mx-auto">

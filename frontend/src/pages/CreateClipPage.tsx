@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getYouTubeId } from "@/utils/getYouTubeId";
 import { SegmentBuilder } from "@/components/SegmentBuilder";
@@ -14,6 +15,7 @@ import type { Tag } from "@/types/tag";
 import { toast } from "sonner";
 
 export function CreateClipPage() {
+    const { currentSpace } = useAuth();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const [url, setUrl] = useState(searchParams.get("url") || "");
@@ -36,7 +38,7 @@ export function CreateClipPage() {
             setTags(await getTags());
         };
         init();
-    }, []);
+    }, [currentSpace]);
 
     // Auto-fetch if URL is provided in query params or source ID
     useEffect(() => {

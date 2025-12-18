@@ -20,6 +20,20 @@ class User(SQLModel, table=True):
     clips: List["Clip"] = Relationship(back_populates="user")
     tags: List["Tag"] = Relationship(back_populates="user")
     ideations: List["VideoIdeation"] = Relationship(back_populates="user")
+    spaces: List["Space"] = Relationship(back_populates="user")
+
+class Space(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    name: str = Field(default="My Space")
+    createdAt: int = Field(sa_type=BigInteger)
+    
+    user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
+    user: Optional[User] = Relationship(back_populates="spaces")
+
+    clips: List["Clip"] = Relationship(back_populates="space")
+    tags: List["Tag"] = Relationship(back_populates="space")
+    ideations: List["VideoIdeation"] = Relationship(back_populates="space")
+
 
 class ClipTagLink(SQLModel, table=True):
     clip_id: Optional[uuid.UUID] = Field(default=None, foreign_key="clip.id", primary_key=True)
@@ -34,6 +48,9 @@ class Tag(SQLModel, table=True):
 
     user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
     user: Optional[User] = Relationship(back_populates="tags")
+
+    space_id: Optional[uuid.UUID] = Field(default=None, foreign_key="space.id")
+    space: Optional["Space"] = Relationship(back_populates="tags")
 
     clips: List["Clip"] = Relationship(back_populates="tags", link_model=ClipTagLink)
 
@@ -67,6 +84,9 @@ class Clip(SQLModel, table=True):
     user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
     user: Optional["User"] = Relationship(back_populates="clips")
 
+    space_id: Optional[uuid.UUID] = Field(default=None, foreign_key="space.id")
+    space: Optional["Space"] = Relationship(back_populates="clips")
+
     # folder relationship removed
     tags: List[Tag] = Relationship(back_populates="clips", link_model=ClipTagLink)
     notes_list: List["Note"] = Relationship(back_populates="clip", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
@@ -81,6 +101,8 @@ class Note(SQLModel, table=True):
     clip: Optional[Clip] = Relationship(back_populates="notes_list")
     
     user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
+
+    space_id: Optional[uuid.UUID] = Field(default=None, foreign_key="space.id")
 
 class VideoIdeation(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -105,3 +127,6 @@ class VideoIdeation(SQLModel, table=True):
     
     user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
     user: Optional[User] = Relationship(back_populates="ideations")
+
+    space_id: Optional[uuid.UUID] = Field(default=None, foreign_key="space.id")
+    space: Optional["Space"] = Relationship(back_populates="ideations")
