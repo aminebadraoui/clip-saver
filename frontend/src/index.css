@@ -4,72 +4,72 @@
 
 @layer base {
   :root {
-    /* Softer Gray Theme (Zinc-based) */
+    /* YouTube Red Dark Theme */
 
-    /* Background: Soft Dark Gray (Zinc 900/950 hybrid) */
-    --background: 240 5% 10%;
-    --foreground: 240 5% 90%;
+    /* Background: #0f0f0f (Almost Black) */
+    --background: 0 0% 6%;
+    --foreground: 0 0% 95%;
 
-    /* Card: Slightly lighter gray */
-    --card: 240 4% 12%;
-    --card-foreground: 240 5% 90%;
+    /* Card: #272727 (Dark Gray) */
+    --card: 0 0% 15%;
+    --card-foreground: 0 0% 95%;
 
-    --popover: 240 4% 12%;
-    --popover-foreground: 240 5% 90%;
+    --popover: 0 0% 15%;
+    --popover-foreground: 0 0% 95%;
 
-    /* Primary: Muted Blue/Slate */
-    --primary: 210 100% 60%;
+    /* Primary: #FF0000 (YouTube Red) */
+    --primary: 0 100% 50%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary: Muted Gray */
-    --secondary: 240 4% 16%;
-    --secondary-foreground: 240 5% 90%;
+    /* Secondary: #3F3F3F (Lighter Gray for secondary buttons/elements) */
+    --secondary: 0 0% 25%;
+    --secondary-foreground: 0 0% 95%;
 
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%;
+    /* Muted: Subtler text */
+    --muted: 0 0% 25%;
+    --muted-foreground: 0 0% 67%;
 
-    --accent: 240 4% 16%;
-    --accent-foreground: 240 5% 90%;
+    --accent: 0 0% 20%;
+    --accent-foreground: 0 0% 95%;
 
-    --destructive: 0 60% 50%;
+    --destructive: 0 100% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 4% 20%;
-    --input: 240 4% 20%;
-    --ring: 210 100% 60%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 100% 50%;
 
     --radius: 0.5rem;
   }
 
   .dark {
-    /* Explicit Dark Mode Overrides (same as root for consistency if dark-only app) */
-    --background: 240 5% 10%;
-    --foreground: 240 5% 90%;
+    --background: 0 0% 6%;
+    --foreground: 0 0% 95%;
 
-    --card: 240 4% 12%;
-    --card-foreground: 240 5% 90%;
+    --card: 0 0% 15%;
+    --card-foreground: 0 0% 95%;
 
-    --popover: 240 4% 12%;
-    --popover-foreground: 240 5% 90%;
+    --popover: 0 0% 15%;
+    --popover-foreground: 0 0% 95%;
 
-    --primary: 210 100% 60%;
+    --primary: 0 100% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 4% 16%;
-    --secondary-foreground: 240 5% 90%;
+    --secondary: 0 0% 25%;
+    --secondary-foreground: 0 0% 95%;
 
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%;
+    --muted: 0 0% 25%;
+    --muted-foreground: 0 0% 67%;
 
-    --accent: 240 4% 18%;
-    --accent-foreground: 240 5% 90%;
+    --accent: 0 0% 20%;
+    --accent-foreground: 0 0% 95%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 240 5% 90%;
+    --destructive: 0 100% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 240 4% 20%;
-    --input: 240 4% 20%;
-    --ring: 210 100% 60%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 100% 50%;
   }
 }
 

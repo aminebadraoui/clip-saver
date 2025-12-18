@@ -1,24 +1,28 @@
-// Popup is now just informational
 document.addEventListener('DOMContentLoaded', () => {
-    // Optional: Check auth status and show in popup
+    const statusContainer = document.getElementById('auth-status-container');
+    const statusText = document.getElementById('auth-status-text');
+    const statusSubtext = document.getElementById('auth-subtext');
+
     chrome.storage.local.get(['authToken', 'tokenSource'], (result) => {
-        const statusP = document.createElement('p');
-        statusP.style.fontSize = '10px';
-        statusP.style.marginTop = '10px';
+        // Reset classes
+        statusContainer.className = '';
 
         if (result.authToken) {
-            statusP.style.color = 'green';
+            statusContainer.classList.add('status-success');
+
             if (result.tokenSource) {
-                statusP.textContent = `✓ Token synced (${result.tokenSource})`;
+                statusText.textContent = 'Connected';
+                statusSubtext.textContent = 'Ready to save clips.';
             } else {
-                statusP.style.color = 'orange';
-                statusP.textContent = '✓ Token found (Legacy). Log In on App to update.';
+                statusContainer.className = ''; // remove success, user warning style
+                statusContainer.classList.add('status-warning');
+                statusText.textContent = 'Legacy Token';
+                statusSubtext.textContent = 'Please log in to the web app to update.';
             }
         } else {
-            statusP.style.color = 'red';
-            statusP.textContent = '⚠ No token found. Log in to Web App.';
+            statusContainer.classList.add('status-error');
+            statusText.textContent = 'Disconnected';
+            statusSubtext.textContent = 'Log in to Clip Coba to start snapping.';
         }
-
-        document.body.appendChild(statusP);
     });
 });

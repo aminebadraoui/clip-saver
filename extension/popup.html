@@ -2,26 +2,35 @@
 <html>
 
 <head>
-    <style>
-        body {
-            font-family: sans-serif;
-            min-width: 250px;
-            padding: 10px;
-        }
-
-        .content {
-            padding: 10px;
-            text-align: center;
-        }
-    </style>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="popup.css">
 </head>
 
 <body>
-    <h2>Clip Coba</h2>
-    <div class="content">
-        <p>Clip Coba is active!</p>
-        <p style="color: #aaa; margin-top: 10px;">The <b>SNAP</b> buttons are now embedded directly on YouTube.</p>
-        <p style="color: #666; font-size: 11px; margin-top: 20px;">Look for red buttons on video thumbnails.</p>
+    <div class="container">
+        <header>
+            <img src="icons/icon-32.png" width="24" height="24" alt="Logo">
+            <h1>ClipCoba</h1>
+            <span class="active-badge">Active</span>
+        </header>
+
+        <section class="card">
+            <div class="card-title">Status</div>
+            <div id="auth-status-container">
+                <span class="status-icon"></span>
+                <span id="auth-status-text" class="status-text">Checking...</span>
+            </div>
+            <p id="auth-subtext" class="sub-text"></p>
+        </section>
+
+        <section class="card">
+            <div class="card-title">How to Use</div>
+            <p class="info-text">Look for red <b>SNAP</b> buttons on YouTube video thumbnails and player.</p>
+        </section>
+
+        <div class="footer">
+            <a href="https://clipcoba.com" target="_blank" class="btn">Open Web App</a>
+        </div>
     </div>
     <script src="popup.js"></script>
 </body>

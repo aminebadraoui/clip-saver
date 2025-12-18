@@ -2,7 +2,8 @@
 
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Play, Shield, Zap, Layout as LayoutIcon } from 'lucide-react';
+import { Logo } from '@/components/Logo';
+import { Shield, Zap, Layout as LayoutIcon } from 'lucide-react';
 
 export const LandingPage = () => {
     const navigate = useNavigate();
@@ -13,9 +14,7 @@ export const LandingPage = () => {
             <header className="border-b">
                 <div className="container mx-auto px-4 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                            <Play className="w-5 h-5 text-primary-foreground fill-current" />
-                        </div>
+                        <Logo className="h-12 w-auto text-primary" />
                         <span className="font-bold text-xl">ClipCoba</span>
                     </div>
                     <div className="flex items-center gap-4">

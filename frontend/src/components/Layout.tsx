@@ -1,8 +1,9 @@
 import { Link, useLocation } from "react-router-dom";
+import { Logo } from "@/components/Logo";
 import { AppDataProvider, useAppData } from "@/context/AppDataContext";
 import { Sidebar } from "@/components/Sidebar";
 import { RightSidebar } from "@/components/RightSidebar";
-import { Scissors, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,7 +73,7 @@ export function Layout({ children }: LayoutProps) {
                     <div className="flex items-center justify-between gap-4">
                         {/* Logo/Title */}
                         <Link to="/" className="flex items-center gap-2 min-w-fit hover:opacity-80 transition-opacity">
-                            <Scissors className="w-6 h-6 text-primary" />
+                            <Logo className="h-12 w-auto text-primary" />
                             <h1 className="text-2xl font-bold tracking-tight">ClipCoba</h1>
                         </Link>
 
