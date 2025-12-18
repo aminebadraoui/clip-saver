@@ -51,3 +51,11 @@ async def get_current_user(token: str = Depends(oauth2_scheme), session: Session
     if user is None:
         raise credentials_exception
     return user
+
+async def get_active_subscriber(current_user: User = Depends(get_current_user)):
+    if current_user.subscription_status not in ['active', 'trialing']:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Active subscription required",
+        )
+    return current_user

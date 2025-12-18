@@ -162,8 +162,10 @@ async def handle_subscription_change(subscription):
     customer_id = subscription['customer']
     status = subscription['status']
     subscription_id = subscription['id']
+    cancel_at_period_end = subscription.get('cancel_at_period_end', False)
+    current_period_end = subscription.get('current_period_end')
     
-    print(f"Handling change: Customer {customer_id}, Status {status}")
+    print(f"Handling change: Customer {customer_id}, Status {status}, CancelAtEnd {cancel_at_period_end}")
 
     # We need a fresh session here since this is called from webhook (no dep injection)
     with Session(engine) as session:
@@ -172,6 +174,8 @@ async def handle_subscription_change(subscription):
         if user:
             user.subscription_status = status
             user.subscription_id = subscription_id
+            user.cancel_at_period_end = cancel_at_period_end
+            user.current_period_end = current_period_end
             session.add(user)
             session.commit()
             print(f"Updated subscription for user {user.email} to {status}")

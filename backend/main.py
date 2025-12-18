@@ -22,7 +22,7 @@ from database import get_session, engine, create_db_and_tables
 from models import Clip, Folder, Tag, ClipTagLink, User, Note
 from fastapi import Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
-from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
+from auth import get_password_hash, verify_password, create_access_token, get_current_user, get_active_subscriber, ACCESS_TOKEN_EXPIRE_MINUTES
 from routers import ideation as ideation_router
 from routers import billing as billing_router
 from routers import users as users_router
@@ -853,7 +853,7 @@ def create_tag(tag_data: TagCreate, session: Session = Depends(get_session), cur
     return tag
 
 @app.get("/api/clips")
-def read_clips(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def read_clips(session: Session = Depends(get_session), current_user: User = Depends(get_active_subscriber)):
     clips = session.exec(select(Clip).where(Clip.user_id == current_user.id)).all()
     # Convert to frontend format (include tagIds and notes)
     result = []
@@ -895,7 +895,7 @@ class ClipCreate(BaseModel):
     engagementScore: Optional[float] = None
 
 @app.post("/api/clips")
-def create_clip(clip_data: ClipCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def create_clip(clip_data: ClipCreate, session: Session = Depends(get_session), current_user: User = Depends(get_active_subscriber)):
     # Check if clip exists for this user
     existing_clip = session.exec(select(Clip).where(Clip.id == clip_data.id, Clip.user_id == current_user.id)).first()
     if existing_clip:
@@ -946,7 +946,7 @@ def create_clip(clip_data: ClipCreate, session: Session = Depends(get_session), 
     return clip
 
 @app.put("/api/clips/{clip_id}")
-def update_clip(clip_id: str, clip_data: ClipCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def update_clip(clip_id: str, clip_data: ClipCreate, session: Session = Depends(get_session), current_user: User = Depends(get_active_subscriber)):
     clip = session.exec(select(Clip).where(Clip.id == clip_id, Clip.user_id == current_user.id)).first()
     if not clip:
         raise HTTPException(status_code=404, detail="Clip not found")
@@ -970,7 +970,7 @@ def update_clip(clip_id: str, clip_data: ClipCreate, session: Session = Depends(
     return clip
 
 @app.delete("/api/clips/{clip_id}")
-def delete_clip(clip_id: str, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def delete_clip(clip_id: str, session: Session = Depends(get_session), current_user: User = Depends(get_active_subscriber)):
     clip = session.exec(select(Clip).where(Clip.id == clip_id, Clip.user_id == current_user.id)).first()
     if not clip:
         raise HTTPException(status_code=404, detail="Clip not found")
@@ -979,7 +979,7 @@ def delete_clip(clip_id: str, session: Session = Depends(get_session), current_u
     return {"ok": True}
 
 @app.get("/api/folders")
-def read_folders(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def read_folders(session: Session = Depends(get_session), current_user: User = Depends(get_active_subscriber)):
     return session.exec(select(Folder).where(Folder.user_id == current_user.id)).all()
 
 class FolderCreate(BaseModel):
@@ -990,7 +990,7 @@ class FolderCreate(BaseModel):
     createdAt: int
 
 @app.post("/api/folders")
-def create_folder(folder_data: FolderCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def create_folder(folder_data: FolderCreate, session: Session = Depends(get_session), current_user: User = Depends(get_active_subscriber)):
     existing = session.exec(select(Folder).where(Folder.id == folder_data.id, Folder.user_id == current_user.id)).first()
     if existing:
         for key, value in folder_data.model_dump().items():
@@ -1007,7 +1007,7 @@ def create_folder(folder_data: FolderCreate, session: Session = Depends(get_sess
     return folder
 
 @app.put("/api/folders/{folder_id}")
-def update_folder(folder_id: str, folder_data: FolderCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def update_folder(folder_id: str, folder_data: FolderCreate, session: Session = Depends(get_session), current_user: User = Depends(get_active_subscriber)):
     folder = session.exec(select(Folder).where(Folder.id == folder_id, Folder.user_id == current_user.id)).first()
     if not folder:
         raise HTTPException(status_code=404, detail="Folder not found")
@@ -1021,7 +1021,7 @@ def update_folder(folder_id: str, folder_data: FolderCreate, session: Session = 
     return folder
 
 @app.delete("/api/folders/{folder_id}")
-def delete_folder(folder_id: str, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def delete_folder(folder_id: str, session: Session = Depends(get_session), current_user: User = Depends(get_active_subscriber)):
     folder = session.exec(select(Folder).where(Folder.id == folder_id, Folder.user_id == current_user.id)).first()
     if not folder:
         raise HTTPException(status_code=404, detail="Folder not found")

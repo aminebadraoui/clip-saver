@@ -14,6 +14,8 @@ class User(SQLModel, table=True):
     stripe_customer_id: Optional[str] = Field(default=None, index=True)
     subscription_status: Optional[str] = Field(default="inactive")
     subscription_id: Optional[str] = Field(default=None)
+    cancel_at_period_end: bool = Field(default=False)
+    current_period_end: Optional[int] = Field(default=None, sa_type=BigInteger)
 
     clips: List["Clip"] = Relationship(back_populates="user")
     folders: List["Folder"] = Relationship(back_populates="user")
