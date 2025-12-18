@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Settings } from "lucide-react";
+import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -109,6 +110,8 @@ export function Layout({ children }: LayoutProps) {
                         <LogoutButton />
                     </div>
                 </div>
+                {/* Subscription Banner */}
+                <SubscriptionBanner />
             </header>
 
             {/* Main Content with Sidebars */}

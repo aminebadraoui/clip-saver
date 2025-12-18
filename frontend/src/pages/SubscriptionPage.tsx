@@ -17,14 +17,36 @@ export const SubscriptionPage = () => {
         const canceled = searchParams.get('canceled');
 
         if (sessionId) {
-            setMessage('Subscription successful! You now have access.');
+            setMessage('Subscription successful! Redirecting to dashboard...');
             if (token && user) {
-                refreshUser();
+                const checkAndRedirect = async () => {
+                    await refreshUser();
+                    // We rely on the AuthContext state update or a subsequent effect to redirect
+                    // But to be safe, we can manually check or just wait
+                    // Actually, simpler: refreshUser updates user. 
+                    // We can have another effect watch 'user' and sessionId.
+                };
+                checkAndRedirect();
             }
         } else if (canceled) {
             setMessage('Order canceled -- continue to shop around and checkout when you\'re ready.');
         }
     }, [searchParams]);
+
+    // Redirect when subscribed
+    useEffect(() => {
+        const sessionId = searchParams.get('session_id');
+        if (sessionId && user?.subscription_status === 'active') {
+            // Add a small delay to let the user see the success message
+            const timer = setTimeout(() => {
+                window.location.href = '/dashboard'; // Hard reload to ensure fresh state or navigate
+                // navigate('/dashboard'); // Soft nav is better, but let's use what we have available. 
+                // navigate is not imported in the logic snippet I saw, need to check imports.
+                // Actually I'll use window.location.href to be 100% sure of a clean slate if needed, or better, import navigate.
+            }, 1500);
+            return () => clearTimeout(timer);
+        }
+    }, [user, searchParams]);
 
     const handleSubscribe = async () => {
         setLoading(true);
