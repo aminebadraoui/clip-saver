@@ -6,6 +6,8 @@ interface User {
     email: string;
     subscription_status?: string;
     stripe_customer_id?: string;
+    cancel_at_period_end?: boolean;
+    current_period_end?: number;
 }
 
 interface AuthContextType {
@@ -16,6 +18,7 @@ interface AuthContextType {
     isAuthenticated: boolean;
     isSubscribed: boolean;
     refreshUser: () => Promise<void>;
+    isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,21 +27,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(localStorage.getItem('clipcoba_token'));
     const navigate = useNavigate();
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const storedToken = localStorage.getItem('clipcoba_token');
-        const storedUser = localStorage.getItem('clipcoba_user');
+        const initAuth = async () => {
+            const storedToken = localStorage.getItem('clipcoba_token');
+            const storedUser = localStorage.getItem('clipcoba_user');
 
-        if (storedToken) {
-            setToken(storedToken);
-            if (storedUser) {
-                setUser(JSON.parse(storedUser));
+            if (storedToken) {
+                setToken(storedToken);
+                if (storedUser) {
+                    setUser(JSON.parse(storedUser));
+                }
+                // Fetch fresh data
+                await refreshUser(storedToken);
             }
+            setIsLoading(false);
+        };
 
-            // Immediately fetch fresh data from backend to ensure subscription status is current
-            // This fixes the issue where a reload might show stale data from localStorage
-            refreshUser(storedToken);
-        }
+        initAuth();
     }, []);
 
     const login = (newToken: string, newUser: User) => {
@@ -82,7 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const isSubscribed = user?.subscription_status === 'active' || user?.subscription_status === 'trialing';
 
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, isSubscribed, refreshUser }}>
+        <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, isSubscribed, refreshUser, isLoading }}>
             {children}
         </AuthContext.Provider>
     );

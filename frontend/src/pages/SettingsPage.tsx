@@ -48,7 +48,19 @@ export const SettingsPage = () => {
                         <label className="text-gray-400 text-sm">Subscription Status</label>
                         <div className="flex items-center gap-2">
                             <span className={`inline-block w-2 h-2 rounded-full ${user?.subscription_status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                            <span className="capitalize">{user?.subscription_status || 'Inactive'}</span>
+                            <div className="flex flex-col">
+                                <span className="font-medium capitalize">{user?.subscription_status || 'Free'}</span>
+                                {user?.cancel_at_period_end && user?.current_period_end && (
+                                    <span className="text-xs text-muted-foreground">
+                                        Ends on {new Date(user.current_period_end * 1000).toLocaleDateString()}
+                                    </span>
+                                )}
+                                {!user?.cancel_at_period_end && user?.subscription_status === 'active' && user?.current_period_end && (
+                                    <span className="text-xs text-muted-foreground">
+                                        Renews on {new Date(user.current_period_end * 1000).toLocaleDateString()}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
 

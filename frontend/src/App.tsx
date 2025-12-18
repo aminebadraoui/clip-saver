@@ -20,7 +20,16 @@ import { SettingsPage } from "@/pages/SettingsPage";
 
 // Guard for routes that require active subscription
 const SubscriptionGuard = () => {
-  const { isSubscribed } = useAuth();
+  const { isSubscribed, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-background text-foreground">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   if (!isSubscribed) return <Layout><SubscriptionPage /></Layout>;
   return <Outlet />;
 }
