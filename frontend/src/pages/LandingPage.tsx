@@ -4,9 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { Shield, Zap, Layout as LayoutIcon } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 export const LandingPage = () => {
     const navigate = useNavigate();
+    const { isAuthenticated } = useAuth();
 
     return (
         <div className="min-h-screen bg-background flex flex-col">
@@ -18,12 +20,20 @@ export const LandingPage = () => {
                         <span className="font-bold text-xl">ClipCoba</span>
                     </div>
                     <div className="flex items-center gap-4">
-                        <Button variant="ghost" onClick={() => navigate('/login')}>
-                            Log in
-                        </Button>
-                        <Button onClick={() => navigate('/register')}>
-                            Sign up
-                        </Button>
+                        {isAuthenticated ? (
+                            <Button onClick={() => navigate('/dashboard')}>
+                                Go to Dashboard
+                            </Button>
+                        ) : (
+                            <>
+                                <Button variant="ghost" onClick={() => navigate('/login')}>
+                                    Log in
+                                </Button>
+                                <Button onClick={() => navigate('/register')}>
+                                    Sign up
+                                </Button>
+                            </>
+                        )}
                     </div>
                 </div>
             </header>

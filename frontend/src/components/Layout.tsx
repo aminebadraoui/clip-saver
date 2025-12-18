@@ -7,7 +7,7 @@ import { LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -31,7 +31,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         handleCreateFolder, handleDeleteFolder, handleRenameFolder,
     } = useAppData();
     const location = useLocation();
-    const showRightSidebar = location.pathname === '/';
+    const { isSubscribed } = useAuth();
+    const showRightSidebar = location.pathname === '/' && isSubscribed;
 
     return (
         <div className="flex h-[calc(100vh-4rem)] -m-6">
@@ -99,6 +100,12 @@ export function Layout({ children }: LayoutProps) {
                             </div>
                         </div>
 
+                        <Link to="/settings">
+                            <Button variant="ghost" size="sm" className="gap-2">
+                                <Settings className="w-4 h-4" />
+                                Settings
+                            </Button>
+                        </Link>
                         <LogoutButton />
                     </div>
                 </div>

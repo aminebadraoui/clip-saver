@@ -16,6 +16,7 @@ import {
     DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ClipCardProps {
     clip: Clip;
@@ -81,10 +82,17 @@ export function ClipCard({ clip, originalVideo, folders = [], tags = [], onDelet
                 {/* Engagement Score Badge */}
                 {displayEngagementScore != null && (
                     <div className="absolute top-2 left-2 z-20">
-                        <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md text-white px-2 py-1 rounded-md border border-white/10 shadow-lg">
-                            <span className="text-xs font-medium text-purple-400">Score</span>
-                            <span className="text-sm font-bold">{Number(displayEngagementScore).toFixed(1)}</span>
-                        </div>
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md text-white px-2 py-1 rounded-md border border-white/10 shadow-lg cursor-help">
+                                    <span className="text-xs font-medium text-purple-400">Score</span>
+                                    <span className="text-sm font-bold">{Number(displayEngagementScore).toFixed(1)}</span>
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Overall Engagement Score</p>
+                            </TooltipContent>
+                        </Tooltip>
                     </div>
                 )}
 
@@ -175,21 +183,43 @@ export function ClipCard({ clip, originalVideo, folders = [], tags = [], onDelet
                     </div>
                 </div>
 
-                {/* Viral Ratio Pill */}
-                {displayViralRatio != null && (
-                    <div className="flex">
-                        <div className={`
-                            inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm border border-white/10
-                            ${displayViralRatio >= 1.0 ? "bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-pink-500 border-pink-500/20" :
-                                displayViralRatio >= 0.5 ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-purple-500 border-purple-500/20" :
-                                    displayViralRatio >= 0.1 ? "bg-gradient-to-r from-green-500/20 to-blue-500/20 text-blue-500 border-blue-500/20" :
-                                        "bg-gray-500/10 text-gray-500 border-gray-500/20"
-                            }
-                        `}>
-                            Viral Ratio: {Number(displayViralRatio).toFixed(2)}x
-                        </div>
-                    </div>
-                )}
+                {/* Scores Row */}
+                <div className="flex flex-wrap gap-2">
+                    {/* Viral Ratio Pill */}
+                    {displayViralRatio != null && (
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <div className={`
+                                    inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm border border-white/10
+                                    ${displayViralRatio >= 1.0 ? "bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-pink-500 border-pink-500/20" :
+                                        displayViralRatio >= 0.5 ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-purple-500 border-purple-500/20" :
+                                            displayViralRatio >= 0.1 ? "bg-gradient-to-r from-green-500/20 to-blue-500/20 text-blue-500 border-blue-500/20" :
+                                                "bg-gray-500/10 text-gray-500 border-gray-500/20"
+                                    }
+                                `}>
+                                    Viral: {Number(displayViralRatio).toFixed(2)}x
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Viral Score: Views / Subscribers</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    )}
+
+                    {/* Velocity Score Pill (Time Ratio) */}
+                    {(originalVideo?.timeSinceUploadRatio != null || clip.timeSinceUploadRatio != null) && (
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <div className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm border border-orange-500/20 bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-500">
+                                    Vel: {Number(originalVideo?.timeSinceUploadRatio ?? clip.timeSinceUploadRatio).toFixed(1)}
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Velocity Score: Views / Days since upload</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    )}
+                </div>
 
                 {/* Original Video Info for Clips (Subtitle) */}
                 {clip.type === 'clip' && originalTitle && (
