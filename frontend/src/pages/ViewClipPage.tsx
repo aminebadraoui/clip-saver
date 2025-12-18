@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getClips, updateClip, getFolders, getTags } from "@/utils/storage";
+import { getClips, updateClip, getTags } from "@/utils/storage";
 import type { Clip } from "@/types/clip";
-import type { Folder } from "@/types/folder";
 import type { Tag } from "@/types/tag";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,7 +14,6 @@ export function ViewClipPage() {
     const { id } = useParams();
     const navigate = useNavigate();
     const [clip, setClip] = useState<Clip | null>(null);
-    const [folders, setFolders] = useState<Folder[]>([]);
     const [tags, setTags] = useState<Tag[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -36,7 +34,7 @@ export function ViewClipPage() {
                     setAiPrompt(foundClip.aiPrompt || "");
                     setSelectedTagIds(foundClip.tagIds || []);
                 }
-                setFolders(await getFolders());
+
                 setTags(await getTags());
             } catch (e) {
                 console.error("Failed to load clip", e);
@@ -114,7 +112,7 @@ export function ViewClipPage() {
 
     if (!clip) return <div className="p-8">Clip not found</div>;
 
-    const folder = folders.find(f => f.id === clip.folderId);
+
 
     return (
         <div className="container max-w-4xl mx-auto py-8 space-y-6">
@@ -140,11 +138,7 @@ export function ViewClipPage() {
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold">{clip.title}</h1>
-                        {folder && (
-                            <span className="inline-block px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded-md mt-2">
-                                {folder.name}
-                            </span>
-                        )}
+
                     </div>
                 </div>
 

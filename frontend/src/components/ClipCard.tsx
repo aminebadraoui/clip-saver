@@ -1,10 +1,10 @@
 import type { Clip } from "@/types/clip";
-import type { Folder } from "@/types/folder";
+
 import type { Tag } from "@/types/tag";
 import { formatTime } from "@/utils/formatTime";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Trash2, MoreVertical, FolderInput, Tag as TagIcon, Eye, Clock, Film } from "lucide-react";
+import { Play, Trash2, MoreVertical, Tag as TagIcon, Eye, Clock, Film } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -21,19 +21,15 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 interface ClipCardProps {
     clip: Clip;
     originalVideo?: Clip | null;
-    folders?: Folder[];
+
     tags?: Tag[];
     onDelete: (id: string) => void;
     onUpdate?: (clip: Clip) => void;
     onCinemaMode?: (clip: Clip) => void;
 }
 
-export function ClipCard({ clip, originalVideo, folders = [], tags = [], onDelete, onUpdate, onCinemaMode }: ClipCardProps) {
-    const handleMoveToFolder = (folderId: string | null) => {
-        if (onUpdate) {
-            onUpdate({ ...clip, folderId });
-        }
-    };
+export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, onCinemaMode }: ClipCardProps) {
+
 
     const handleToggleTag = (tagId: string) => {
         if (onUpdate) {
@@ -105,22 +101,7 @@ export function ClipCard({ clip, originalVideo, folders = [], tags = [], onDelet
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuSub>
-                                <DropdownMenuSubTrigger>
-                                    <FolderInput className="w-4 h-4 mr-2" />
-                                    Move to Folder
-                                </DropdownMenuSubTrigger>
-                                <DropdownMenuSubContent className="w-48 max-h-64 overflow-y-auto">
-                                    <DropdownMenuItem onClick={() => handleMoveToFolder(null)}>
-                                        <span className={!clip.folderId ? "font-bold" : ""}>Root (None)</span>
-                                    </DropdownMenuItem>
-                                    {folders.map(folder => (
-                                        <DropdownMenuItem key={folder.id} onClick={() => handleMoveToFolder(folder.id)}>
-                                            <span className={clip.folderId === folder.id ? "font-bold" : ""}>{folder.name}</span>
-                                        </DropdownMenuItem>
-                                    ))}
-                                </DropdownMenuSubContent>
-                            </DropdownMenuSub>
+
 
                             <DropdownMenuSub>
                                 <DropdownMenuSubTrigger>

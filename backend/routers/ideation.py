@@ -90,6 +90,22 @@ async def update_ideation(
     session.refresh(ideation)
     return ideation
 
+    return ideation
+
+@router.delete("/{ideation_id}")
+async def delete_ideation(
+    ideation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    ideation = session.exec(select(VideoIdeation).where(VideoIdeation.id == ideation_id, VideoIdeation.user_id == user.id)).first()
+    if not ideation:
+        raise HTTPException(status_code=404, detail="Ideation project not found")
+    
+    session.delete(ideation)
+    session.commit()
+    return {"ok": True}
+
 @router.post("/clips/{clip_id}/outline")
 async def generate_outline(
     clip_id: uuid.UUID,

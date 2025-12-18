@@ -7,13 +7,14 @@ import {
 } from "@/utils/storage";
 import type { Clip } from "@/types/clip";
 import { ClipCard } from "@/components/ClipCard";
-import { AddVideoSheet } from "@/components/AddVideoSheet";
+
 import { CinemaModeModal } from "@/components/CinemaModeModal";
 import { Button } from "@/components/ui/button";
 import { LayoutGrid, List, ArrowUpDown, TrendingUp } from "lucide-react";
 import { ClipListRow } from "@/components/ClipListRow";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
+import { fetchVideoDetails } from "@/utils/videoUtils";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -25,16 +26,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function ClipsPage() {
     const {
-        clips, folders, tags,
-        selectedFolderId, selectedTagIds, filterType,
+        clips, tags,
+        selectedTagIds, filterType,
         isLoading,
         refreshData,
-        handleCreateFolder,
         handleCreateTag
     } = useAppData();
-
-    const [isAddVideoModalOpen, setIsAddVideoModalOpen] = useState(false);
-    const [quickAddUrl, setQuickAddUrl] = useState("");
 
     // New UX State
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -43,15 +40,66 @@ export function ClipsPage() {
 
     // Check for addVideo query param
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const addVideoUrl = params.get('addVideo');
-        if (addVideoUrl) {
-            setQuickAddUrl(addVideoUrl);
-            setIsAddVideoModalOpen(true);
-            // Clean up URL
-            window.history.replaceState({}, '', '/');
-        }
-    }, []);
+        const handleAutoAdd = async () => {
+            const params = new URLSearchParams(window.location.search);
+            const addVideoUrl = params.get('addVideo');
+            if (addVideoUrl) {
+                // Clean up URL immediately
+                window.history.replaceState({}, '', '/dashboard');
+
+                const toastId = toast.loading("Fetching video details...");
+
+                // Fetch details
+                const videoDetails = await fetchVideoDetails(addVideoUrl);
+
+                if (videoDetails) {
+                    toast.loading("Saving video...", { id: toastId });
+
+                    // Check for duplicate
+                    const isDuplicate = clips.some(c => c.videoId === videoDetails.videoId && c.type === 'video');
+                    if (isDuplicate) {
+                        toast.error("Video already exists", { id: toastId });
+                        // Optionally open it?
+                        const existing = clips.find(c => c.videoId === videoDetails.videoId && c.type === 'video');
+                        if (existing) setSelectedClipForCinema(existing);
+                        return;
+                    }
+
+                    // Create and Save
+                    const newVideo: Clip = {
+                        id: uuidv4(),
+                        type: 'video',
+                        createdAt: Date.now(),
+                        videoId: videoDetails.videoId,
+                        title: videoDetails.title,
+                        thumbnail: videoDetails.thumbnail,
+                        tagIds: [],
+                        notes: "",
+                        originalVideoUrl: addVideoUrl,
+                        viewCount: videoDetails.viewCount,
+                        subscriberCount: videoDetails.subscriberCount,
+                        uploadDate: videoDetails.uploadDate,
+                        viralRatio: videoDetails.viralRatio,
+                        timeSinceUploadRatio: videoDetails.timeRatio,
+                        engagementScore: videoDetails.engagementScore,
+                    };
+
+                    try {
+                        await saveClip(newVideo);
+                        await refreshData();
+                        toast.success("Video added!", { id: toastId });
+                        setSelectedClipForCinema(newVideo);
+                    } catch (e) {
+                        toast.error("Failed to save video", { id: toastId });
+                    }
+                } else {
+                    toast.dismiss(toastId);
+                }
+            }
+        };
+
+        handleAutoAdd();
+    }, [clips]); // Add clips dependency to check for duplicates correctly
 
     const handleDeleteClip = async (id: string) => {
         await deleteClip(id);
@@ -63,25 +111,9 @@ export function ClipsPage() {
         await refreshData();
     };
 
-    // Video/Clip handlers
-    const handleSaveVideo = async (videoData: any) => {
-        const newVideo: Clip = {
-            id: uuidv4(),
-            type: 'video',
-            createdAt: Date.now(),
-            ...videoData
-        };
-        await saveClip(newVideo);
-        setQuickAddUrl(""); // Clear input
-        await refreshData();
-    };
-
-
     // Filtering
     const filteredClips = clips.filter(clip => {
-        if (selectedFolderId) {
-            return clip.folderId === selectedFolderId;
-        }
+
 
         if (selectedTagIds.length > 0) {
             if (!clip.tagIds) return false;
@@ -106,10 +138,7 @@ export function ClipsPage() {
             }
         }
 
-        if (selectedFolderId) {
-            // Folders are for videos
-            return type === 'video';
-        }
+
 
         // If no selection, strictly follow filterType
         if (filterType === 'all') return true;
@@ -128,11 +157,9 @@ export function ClipsPage() {
         <>
             <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-bold tracking-tight">
-                    {selectedFolderId
-                        ? folders.find(f => f.id === selectedFolderId)?.name
-                        : selectedTagIds.length > 0
-                            ? `Tags: ${selectedTagIds.map(id => tags.find(t => t.id === id)?.name).filter(Boolean).join(", ")}`
-                            : filterType === 'video' ? "All Videos" : "All Clips"}
+                    {selectedTagIds.length > 0
+                        ? `Tags: ${selectedTagIds.map(id => tags.find(t => t.id === id)?.name).filter(Boolean).join(", ")}`
+                        : filterType === 'video' ? "All Videos" : "All Clips"}
                 </h1>
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
@@ -218,8 +245,8 @@ export function ClipsPage() {
                 <div className="text-center py-20 border-2 border-dashed rounded-xl bg-muted/30">
                     <h3 className="text-xl font-medium text-muted-foreground mb-4">No videos found</h3>
                     <p className="text-muted-foreground mb-8">
-                        {selectedFolderId || selectedTagIds.length > 0
-                            ? "This folder/tag filter is empty."
+                        {selectedTagIds.length > 0
+                            ? "This tag filter is empty."
                             : "Get started by adding your first video."}
                     </p>
                 </div>
@@ -234,7 +261,6 @@ export function ClipsPage() {
                                 key={clip.id}
                                 clip={clip}
                                 originalVideo={clip.sourceVideoId ? clips.find(c => c.id === clip.sourceVideoId) : null}
-                                folders={folders}
                                 tags={tags}
                                 onDelete={handleDeleteClip}
                                 onUpdate={handleUpdateClip}
@@ -244,7 +270,6 @@ export function ClipsPage() {
                             <ClipListRow
                                 key={clip.id}
                                 clip={clip}
-                                folders={folders}
                                 tags={tags}
                                 onDelete={handleDeleteClip}
                                 onCinemaMode={setSelectedClipForCinema}
@@ -255,15 +280,7 @@ export function ClipsPage() {
             )}
 
 
-            <AddVideoSheet
-                isOpen={isAddVideoModalOpen}
-                onClose={() => setIsAddVideoModalOpen(false)}
-                onSave={handleSaveVideo}
-                folders={folders}
-                initialUrl={quickAddUrl}
-                onCreateFolder={handleCreateFolder}
-                clips={clips}
-            />
+
 
             <CinemaModeModal
                 isOpen={!!selectedClipForCinema}

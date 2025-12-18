@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Plus, ChevronLeft, Save, Loader2, ArrowRight } from "lucide-react";
+import { Plus, ChevronLeft, Save, Loader2, ArrowRight, Trash2 } from "lucide-react";
 import { MainIdeaSection } from "@/components/ideation/MainIdeaSection";
 import { TitleBrainstorming } from "@/components/ideation/TitleBrainstorming";
 import { ThumbnailBrainstorming } from "@/components/ideation/ThumbnailBrainstorming";
@@ -11,6 +11,14 @@ import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 
 interface IdeationProject {
@@ -36,6 +44,7 @@ export const IdeationPage = () => {
     const [currentProject, setCurrentProject] = useState<IdeationProject | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
 
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -104,6 +113,33 @@ export const IdeationPage = () => {
             setSelectedProjectId(null); // Go back to list on error
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleDeleteProject = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        setProjectToDelete(id);
+    };
+
+    const confirmDelete = async () => {
+        if (!token || !projectToDelete) return;
+
+        try {
+            const res = await fetch(`${API_URL}/api/ideation/${projectToDelete}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (res.ok) {
+                setProjects(prev => prev.filter(p => p.id !== projectToDelete));
+                toast.success("Project deleted");
+            } else {
+                toast.error("Failed to delete project");
+            }
+        } catch (e) {
+            toast.error("Failed to delete project");
+        } finally {
+            setProjectToDelete(null);
         }
     };
 
@@ -189,9 +225,19 @@ export const IdeationPage = () => {
                         projects.map(p => (
                             <Card key={p.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleLoadProject(p.id)}>
                                 <CardHeader>
-                                    <CardTitle className="flex justify-between items-center">
-                                        {p.projectName}
-                                        <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                                    <CardTitle className="flex justify-between items-center gap-2">
+                                        <span className="truncate">{p.projectName}</span>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 hover:text-destructive"
+                                                onClick={(e) => handleDeleteProject(e, p.id)}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                            <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                                        </div>
                                     </CardTitle>
                                     <CardDescription>
                                         Updated {new Date(p.updatedAt).toLocaleDateString()}
@@ -207,6 +253,21 @@ export const IdeationPage = () => {
                         </div>
                     )}
                 </div>
+
+                <Dialog open={!!projectToDelete} onOpenChange={(open) => !open && setProjectToDelete(null)}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Delete Project</DialogTitle>
+                            <DialogDescription>
+                                Are you sure you want to delete this project? This action cannot be undone.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setProjectToDelete(null)}>Cancel</Button>
+                            <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
         );
     }
@@ -251,7 +312,7 @@ export const IdeationPage = () => {
 
     return (
         <div className="container mx-auto py-4">
-            <div className="flex items-center justify-between mb-6 sticky top-0 bg-background/95 backdrop-blur z-10 py-2 border-b">
+            <div className="flex items-center justify-between mb-6 py-2 border-b">
                 <div className="flex items-center gap-4 flex-1 mr-4">
                     <Button variant="ghost" size="icon" onClick={() => setSelectedProjectId(null)}>
                         <ChevronLeft className="w-5 h-5" />

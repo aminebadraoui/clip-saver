@@ -19,7 +19,7 @@ import time
 import json
 from sqlmodel import Session, select
 from database import get_session, engine, create_db_and_tables
-from models import Clip, Folder, Tag, ClipTagLink, User, Note
+from models import Clip, Tag, ClipTagLink, User, Note
 from fastapi import Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, get_active_subscriber, ACCESS_TOKEN_EXPIRE_MINUTES
@@ -980,61 +980,7 @@ def delete_clip(clip_id: str, session: Session = Depends(get_session), current_u
     session.commit()
     return {"ok": True}
 
-@app.get("/api/folders")
-def read_folders(session: Session = Depends(get_session), current_user: User = Depends(get_active_subscriber)):
-    return session.exec(select(Folder).where(Folder.user_id == current_user.id)).all()
 
-class FolderCreate(BaseModel):
-    id: str
-    name: str
-    parentId: Optional[str] = None
-    category: str
-    createdAt: int
-
-@app.post("/api/folders")
-def create_folder(folder_data: FolderCreate, session: Session = Depends(get_session), current_user: User = Depends(get_active_subscriber)):
-    existing = session.exec(select(Folder).where(Folder.id == folder_data.id, Folder.user_id == current_user.id)).first()
-    if existing:
-        for key, value in folder_data.model_dump().items():
-            setattr(existing, key, value)
-        session.add(existing)
-        session.commit()
-        session.refresh(existing)
-        return existing
-
-    folder = Folder.model_validate(folder_data, update={"user_id": current_user.id})
-    session.add(folder)
-    session.commit()
-    session.refresh(folder)
-    return folder
-
-@app.put("/api/folders/{folder_id}")
-def update_folder(folder_id: str, folder_data: FolderCreate, session: Session = Depends(get_session), current_user: User = Depends(get_active_subscriber)):
-    folder = session.exec(select(Folder).where(Folder.id == folder_id, Folder.user_id == current_user.id)).first()
-    if not folder:
-        raise HTTPException(status_code=404, detail="Folder not found")
-    
-    for key, value in folder_data.model_dump().items():
-        setattr(folder, key, value)
-        
-    session.add(folder)
-    session.commit()
-    session.refresh(folder)
-    return folder
-
-@app.delete("/api/folders/{folder_id}")
-def delete_folder(folder_id: str, session: Session = Depends(get_session), current_user: User = Depends(get_active_subscriber)):
-    folder = session.exec(select(Folder).where(Folder.id == folder_id, Folder.user_id == current_user.id)).first()
-    if not folder:
-        raise HTTPException(status_code=404, detail="Folder not found")
-    
-    # Logic to handle subfolders/clips? 
-    # For now just delete the folder. 
-    # Frontend logic handles recursive deletion of IDs, but backend should ideally handle it too.
-    # But let's keep it simple as requested.
-    session.delete(folder)
-    session.commit()
-    return {"ok": True}
 
 # --- Note Endpoints ---
 

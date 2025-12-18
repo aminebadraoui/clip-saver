@@ -7,7 +7,7 @@ export interface Clip {
     title: string;
     thumbnail: string;
     createdAt: number;
-    folderId?: string | null;
+
     tagIds?: string[];
     notes?: string;
     aiPrompt?: string;

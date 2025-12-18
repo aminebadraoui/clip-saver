@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { getFolders, getTags, saveClip, saveTag } from "@/utils/storage";
-import type { Folder } from "@/types/folder";
+import { getTags, saveClip, saveTag } from "@/utils/storage";
+
 import type { Tag } from "@/types/tag";
 import type { Clip } from "@/types/clip";
 import { Save, Plus } from "lucide-react";
@@ -19,7 +19,6 @@ interface SaveAssetFormProps {
 }
 
 export function SaveAssetForm({ initialAssets, initialUrl, onSave, onCancel }: SaveAssetFormProps) {
-    const [folders, setFolders] = useState<Folder[]>([]);
     const [tags, setTags] = useState<Tag[]>([]);
 
     // Normalize input to an array of clips
@@ -37,7 +36,7 @@ export function SaveAssetForm({ initialAssets, initialUrl, onSave, onCancel }: S
     // Form State (Common for all assets for now)
     const [title, setTitle] = useState(""); // Only used if single asset
     const [url, setUrl] = useState(initialUrl || ""); // Initialize with prop
-    const [selectedFolderId, setSelectedFolderId] = useState<string>("");
+
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
     const [notes, setNotes] = useState("");
     const [aiPrompt, setAiPrompt] = useState("");
@@ -58,7 +57,7 @@ export function SaveAssetForm({ initialAssets, initialUrl, onSave, onCancel }: S
     // Load initial data
     useEffect(() => {
         const init = async () => {
-            setFolders(await getFolders());
+
             setTags(await getTags());
         };
         init();
@@ -100,7 +99,7 @@ export function SaveAssetForm({ initialAssets, initialUrl, onSave, onCancel }: S
                 title: assetTitle || "Untitled",
                 thumbnail: thumbnail || "",
                 createdAt: Date.now(),
-                folderId: selectedFolderId || null,
+
                 tagIds: selectedTagIds,
                 notes,
                 aiPrompt,
@@ -136,9 +135,7 @@ export function SaveAssetForm({ initialAssets, initialUrl, onSave, onCancel }: S
         }
     };
 
-    // Group folders by category
-    const videoFolders = folders.filter(f => f.category === 'video' || !f.category);
-    const imageFolders = folders.filter(f => f.category === 'image');
+
 
     return (
         <div className="grid gap-6">
@@ -184,34 +181,11 @@ export function SaveAssetForm({ initialAssets, initialUrl, onSave, onCancel }: S
 
             {assets.length > 1 && (
                 <div className="text-sm text-muted-foreground">
-                    Saving {assets.length} clips to the selected folder.
+                    Saving {assets.length} clips.
                 </div>
             )}
 
-            <div className="space-y-2">
-                <Label>Folder</Label>
-                <select
-                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={selectedFolderId}
-                    onChange={(e) => setSelectedFolderId(e.target.value)}
-                >
-                    <option value="" disabled>Select a folder...</option>
-                    {videoFolders.length > 0 && (
-                        <optgroup label="Video Folders">
-                            {videoFolders.map(f => (
-                                <option key={f.id} value={f.id}>{f.name}</option>
-                            ))}
-                        </optgroup>
-                    )}
-                    {imageFolders.length > 0 && (
-                        <optgroup label="Image Folders">
-                            {imageFolders.map(f => (
-                                <option key={f.id} value={f.id}>{f.name}</option>
-                            ))}
-                        </optgroup>
-                    )}
-                </select>
-            </div>
+
 
             <div className="space-y-2">
                 <Label>Tags</Label>

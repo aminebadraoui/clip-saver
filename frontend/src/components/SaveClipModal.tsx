@@ -38,7 +38,7 @@ export function SaveClipModal({ isOpen, onClose, onSave, tags, clips }: SaveClip
 
     const handleSave = () => {
         onSave({
-            folderId: null,
+            // folderId: null, // Removed
             tagIds: selectedTagIds,
             notes,
             aiPrompt: prompt,

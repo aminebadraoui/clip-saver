@@ -1,5 +1,5 @@
 import type { Clip } from "@/types/clip";
-import type { Folder } from "@/types/folder";
+
 import type { Tag } from "@/types/tag";
 import { Button } from "@/components/ui/button";
 import { Trash2, ExternalLink } from "lucide-react";
@@ -7,14 +7,13 @@ import { Badge } from "@/components/ui/badge";
 
 interface ClipListRowProps {
     clip: Clip;
-    folders: Folder[];
     tags: Tag[];
     onDelete: (id: string) => void;
     onCinemaMode?: (clip: Clip) => void;
 }
 
-export function ClipListRow({ clip, folders, tags, onDelete, onCinemaMode }: ClipListRowProps) {
-    const folder = folders.find(f => f.id === clip.folderId);
+export function ClipListRow({ clip, tags, onDelete, onCinemaMode }: ClipListRowProps) {
+    // folder find removed
     const clipTags = tags.filter(t => clip.tagIds?.includes(t.id));
 
     return (
@@ -41,11 +40,7 @@ export function ClipListRow({ clip, folders, tags, onDelete, onCinemaMode }: Cli
             <div className="flex-1 min-w-0">
                 <h3 className="font-medium truncate" title={clip.title}>{clip.title}</h3>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                    {folder && (
-                        <span className="flex items-center gap-1">
-                            📁 {folder.name}
-                        </span>
-                    )}
+
                     {clip.viralRatio && (
                         <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
                             Viral: {clip.viralRatio.toFixed(2)}x
