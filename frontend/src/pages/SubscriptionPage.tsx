@@ -17,21 +17,34 @@ export const SubscriptionPage = () => {
         const canceled = searchParams.get('canceled');
 
         if (sessionId) {
-            setMessage('Subscription successful! Redirecting to dashboard...');
+            setMessage('Subscription successful! Verifying status...');
             if (token && user) {
-                const checkAndRedirect = async () => {
-                    await refreshUser();
-                    // We rely on the AuthContext state update or a subsequent effect to redirect
-                    // But to be safe, we can manually check or just wait
-                    // Actually, simpler: refreshUser updates user. 
-                    // We can have another effect watch 'user' and sessionId.
+                const syncAndRedirect = async () => {
+                    try {
+                        // Force sync with Stripe
+                        await fetch(`${API_URL}/billing/sync`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
+                        // Then refresh user state
+                        await refreshUser();
+                        setMessage('Subscription verfied! Redirecting to dashboard...');
+                        setTimeout(() => {
+                            window.location.href = '/dashboard';
+                        }, 1000);
+                    } catch (e) {
+                        console.error("Sync failed:", e);
+                        setMessage("Subscription successful but sync failed. Please contact support if you are still locked.");
+                    }
                 };
-                checkAndRedirect();
+                syncAndRedirect();
             }
         } else if (canceled) {
             setMessage('Order canceled -- continue to shop around and checkout when you\'re ready.');
         }
-    }, [searchParams]);
+    }, [searchParams, token, user]); // Added dependencies for safety
 
     // Redirect when subscribed
     useEffect(() => {
