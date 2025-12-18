@@ -51,6 +51,7 @@ async def create_checkout_session(
                     },
                 ],
                 mode='subscription',
+                allow_promotion_codes=True,
                 success_url=f'{CLIENT_URL}/subscription?session_id={{CHECKOUT_SESSION_ID}}',
                 cancel_url=f'{CLIENT_URL}/subscription?canceled=true',
                 subscription_data={
@@ -80,6 +81,7 @@ async def create_checkout_session(
                         },
                     ],
                     mode='subscription',
+                    allow_promotion_codes=True,
                     success_url=f'{CLIENT_URL}/subscription?session_id={{CHECKOUT_SESSION_ID}}',
                     cancel_url=f'{CLIENT_URL}/subscription?canceled=true',
                     subscription_data={
