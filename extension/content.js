@@ -61,7 +61,7 @@ function createDropdown(x, y, videoData, anchorElement) {
 }
 
 // --- Observer & Injection ---
-console.log("Clip Coba: Content script initialized. Observing mutations...");
+// console.log("Clip Coba: Content script initialized. Observing mutations...");
 
 function injectAll() {
     // 1. Home/Channel Grid: Target #meta within ytd-rich-item-renderer

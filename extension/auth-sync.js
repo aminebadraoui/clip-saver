@@ -1,24 +1,11 @@
-const SOURCES = {
-    'localhost': 'Local',
-    '127.0.0.1': 'Local',
-    'dev.clipcoba.com': 'Dev',
-    'www.clipcoba.com': 'Prod',
-    'clipcoba.com': 'Prod'
-};
-
+// Clip Coba Auth Sync
 const currentHost = window.location.hostname;
-// Use precise matching preventing substring issues (e.g. dev.clipcoba.com including clipcoba.com)
 let currentSource = 'Unknown';
-if (currentHost.includes('localhost') || currentHost.includes('127.0.0.1')) {
-    currentSource = 'Local';
-} else if (currentHost === 'dev.clipcoba.com') {
-    currentSource = 'Dev';
-} else if (currentHost === 'clipcoba.com' || currentHost === 'www.clipcoba.com') {
+if (currentHost === 'clipcoba.com' || currentHost === 'www.clipcoba.com') {
     currentSource = 'Prod';
 }
 
-
-console.log(`Clip Coba: Auth Sync Script Loaded for ${currentSource} (${currentHost})`);
+// console.log(`Clip Coba: Auth Sync Script Loaded for ${currentSource} (${currentHost})`);
 
 let syncInterval;
 
