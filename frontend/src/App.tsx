@@ -15,6 +15,7 @@ import { useAuth } from "@/context/AuthContext";
 import { LandingPage } from "@/pages/LandingPage";
 import { SubscriptionPage } from "@/pages/SubscriptionPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { PrivacyPolicyPage } from "@/pages/PrivacyPolicyPage";
 
 
 
@@ -40,6 +41,7 @@ function App() {
       <Routes>
         {/* Public Landing Page */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
 
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />

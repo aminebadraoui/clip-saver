@@ -149,6 +149,9 @@ export function RegisterPage() {
                         <p className="text-sm text-muted-foreground text-center">
                             Already have an account? <Link to="/login" className="text-primary hover:underline">Login</Link>
                         </p>
+                        <p className="text-xs text-muted-foreground text-center mt-2">
+                            By registering, you agree to our <Link to="/privacy-policy" className="text-primary hover:underline">Privacy Policy</Link>
+                        </p>
                     </CardFooter>
                 </form>
             </Card>
