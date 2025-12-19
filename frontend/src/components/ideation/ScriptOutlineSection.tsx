@@ -134,7 +134,7 @@ export const ScriptOutlineSection = ({ outline, onUpdate, conceptData }: ScriptO
                     ) : (
                         <div
                             onClick={() => setViewMode('edit')}
-                            className="min-h-[300px] max-h-[500px] overflow-y-auto p-4 border rounded-md bg-transparent prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap prose-headings:text-white prose-p:text-gray-300 prose-li:text-gray-300 prose-strong:text-white [&_*]:!my-0 [&_*]:!mt-0 [&_*]:!mb-0 [&_li]:!leading-snug leading-tight cursor-text hover:bg-muted/10 transition-colors"
+                            className="min-h-[300px] max-h-[500px] overflow-y-auto p-4 border rounded-md bg-background prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap prose-headings:text-white prose-p:text-gray-300 prose-li:text-gray-300 prose-strong:text-white [&_*]:!my-0 [&_*]:!mt-0 [&_*]:!mb-0 [&_li]:!leading-snug leading-tight cursor-text hover:bg-muted/10 transition-colors"
                             title="Click to edit"
                         >
                             {outline ? (
