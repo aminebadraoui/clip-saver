@@ -103,8 +103,13 @@ export const LandingPage = () => {
 
             {/* Footer */}
             <footer className="border-t py-8">
-                <div className="container mx-auto px-4 text-center text-muted-foreground text-sm">
+                <div className="container mx-auto px-4 text-center text-muted-foreground text-sm flex flex-col md:flex-row items-center justify-between gap-4">
                     <p>&copy; {new Date().getFullYear()} ClipCoba. All rights reserved.</p>
+                    <div className="flex items-center gap-6">
+                        <button onClick={() => navigate('/privacy-policy')} className="hover:text-primary transition-colors">
+                            Privacy Policy
+                        </button>
+                    </div>
                 </div>
             </footer>
         </div>

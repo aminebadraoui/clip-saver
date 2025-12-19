@@ -12,6 +12,9 @@ export default {
                 md: 'calc(var(--radius) - 2px)',
                 sm: 'calc(var(--radius) - 4px)'
             },
+            fontFamily: {
+                sans: ['Montserrat', 'sans-serif'],
+            },
             colors: {
                 background: 'hsl(var(--background) / <alpha-value>)',
                 foreground: 'hsl(var(--foreground) / <alpha-value>)',
