@@ -781,7 +781,19 @@ def register(user_data: UserCreate, session: Session = Depends(get_session)):
     session.add(user)
     session.commit()
     session.refresh(user)
-    return {"id": user.id, "email": user.email}
+
+    # Generate access token for auto-login
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    
+    return {
+        "id": user.id, 
+        "email": user.email,
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 @app.post("/auth/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
