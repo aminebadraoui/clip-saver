@@ -17,3 +17,4 @@ langchain
 langchain-community
 langgraph
 langchain-openai
+youtube-transcript-api
