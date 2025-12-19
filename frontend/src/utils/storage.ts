@@ -7,7 +7,14 @@ import type { Note } from "@/types/clip";
 import { API_URL } from "@/config";
 
 
-const API_BASE_URL = `${API_URL}/api`;
+const getBaseUrl = () => {
+    if (typeof window !== 'undefined' && window.location.hostname.includes('clipcoba.com')) {
+        return 'https://api.clipcoba.com/api';
+    }
+    return `${API_URL}/api`;
+};
+
+const API_BASE_URL = getBaseUrl();
 
 export const getHeaders = () => {
     const token = localStorage.getItem('clipcoba_token');
