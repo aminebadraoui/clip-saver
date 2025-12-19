@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Lightbulb, Trash2, ChevronDown, ChevronUp, Loader2, Wand2 } from "lucide-react";
 import { InspirationSidebar } from "./InspirationSidebar";
 import { useAuth } from "@/context/AuthContext";
+import { API_URL } from "@/config";
+
 
 interface TitleBrainstormingProps {
     titles: { id: string; text: string; score?: number; type?: 'inspiration' | 'generated' | 'manual' }[];
@@ -19,7 +21,8 @@ export const TitleBrainstorming = ({ titles, onUpdate, conceptData }: TitleBrain
 
     const [isGenerating, setIsGenerating] = useState(false);
     const { token } = useAuth(); // Need auth context
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 
     const handleGenerate = async () => {
         // Collect inspiration titles

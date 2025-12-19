@@ -8,6 +8,8 @@ import remarkGfm from 'remark-gfm';
 import { InspirationSidebar } from "./InspirationSidebar";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import { API_URL } from "@/config";
+
 
 interface ScriptOutlineSectionProps {
     outline: string;
@@ -23,7 +25,8 @@ export const ScriptOutlineSection = ({ outline, onUpdate, conceptData }: ScriptO
     const [isExpanded, setIsExpanded] = useState(true);
     const [viewMode, setViewMode] = useState<'edit' | 'preview'>('preview');
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 
     const handleGenerate = async (clip: any) => {
         setIsSidebarOpen(false);

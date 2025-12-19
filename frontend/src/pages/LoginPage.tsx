@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { Loader2 } from "lucide-react";
+import { API_URL } from "@/config";
+
 
 export function LoginPage() {
     const [email, setEmail] = useState("");
@@ -24,7 +26,7 @@ export function LoginPage() {
             formData.append("username", email);
             formData.append("password", password);
 
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
+            const response = await fetch(`${API_URL}/auth/login`, {
                 method: "POST",
                 body: formData,
             });

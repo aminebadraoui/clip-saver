@@ -4,7 +4,10 @@ import type { Tag } from "@/types/tag";
 import type { Note } from "@/types/clip";
 
 
-const API_BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
+import { API_URL } from "@/config";
+
+
+const API_BASE_URL = `${API_URL}/api`;
 
 export const getHeaders = () => {
     const token = localStorage.getItem('clipcoba_token');
