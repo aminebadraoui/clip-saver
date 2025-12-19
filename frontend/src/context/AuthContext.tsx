@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_URL } from '@/config';
 
 interface User {
     id: string;
@@ -60,7 +61,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!tokenToUse) return;
 
         try {
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
             const response = await fetch(`${API_URL}/users/me`, {
                 headers: {
                     'Authorization': `Bearer ${tokenToUse}`
@@ -82,7 +82,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!tokenToUse) return;
 
         try {
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
             const response = await fetch(`${API_URL}/spaces/`, {
                 headers: {
                     'Authorization': `Bearer ${tokenToUse}`
@@ -156,7 +155,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const createSpace = async (name: string): Promise<Space> => {
         if (!token) throw new Error("No token");
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
         const response = await fetch(`${API_URL}/spaces/?name=${encodeURIComponent(name)}`, {
             method: 'POST',
             headers: {
@@ -172,7 +170,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const deleteSpace = async (spaceId: string) => {
         if (!token) throw new Error("No token");
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
         const response = await fetch(`${API_URL}/spaces/${spaceId}`, {
             method: 'DELETE',
             headers: {

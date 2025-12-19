@@ -1,6 +1,7 @@
 import type { ViralVideo, TimeFilter, ViralVideosResponse } from "@/types/youtube";
+import { API_URL } from "@/config";
 
-const API_BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
+const API_BASE_URL = `${API_URL}/api`;
 
 export async function fetchViralVideos(
     timeFilter: TimeFilter,

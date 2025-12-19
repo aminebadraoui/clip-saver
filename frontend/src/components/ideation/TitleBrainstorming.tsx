@@ -21,7 +21,7 @@ export const TitleBrainstorming = ({ titles, onUpdate, conceptData }: TitleBrain
 
     const [isGenerating, setIsGenerating] = useState(false);
     const { token } = useAuth(); // Need auth context
-    // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 
 
     const handleGenerate = async () => {

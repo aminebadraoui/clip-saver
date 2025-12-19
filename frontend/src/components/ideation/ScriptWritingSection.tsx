@@ -25,7 +25,7 @@ export const ScriptWritingSection = ({ content, onUpdate, conceptData, outline, 
     const [isGenerating, setIsGenerating] = useState(false);
     const [viewMode, setViewMode] = useState<'edit' | 'preview'>('preview');
 
-    // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 
 
     const handleGenerate = async () => {
