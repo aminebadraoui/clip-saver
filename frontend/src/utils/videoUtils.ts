@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { API_URL } from "@/config";
 
 export interface VideoDetails {
     title: string;
@@ -26,7 +27,7 @@ export const fetchVideoDetails = async (url: string): Promise<VideoDetails | nul
     }
 
     try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/info?videoId=${id}`);
+        const response = await fetch(`${API_URL}/api/info?videoId=${id}`);
         if (!response.ok) throw new Error("Failed to fetch video info");
 
         const data = await response.json();

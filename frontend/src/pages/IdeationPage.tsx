@@ -49,7 +49,7 @@ export const IdeationPage = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
 
-    // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 
 
     const saveProject = async (silent: boolean = false, projectToSave: IdeationProject | null = currentProject) => {

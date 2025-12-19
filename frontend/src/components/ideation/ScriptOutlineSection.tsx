@@ -25,7 +25,7 @@ export const ScriptOutlineSection = ({ outline, onUpdate, conceptData }: ScriptO
     const [isExpanded, setIsExpanded] = useState(true);
     const [viewMode, setViewMode] = useState<'edit' | 'preview'>('preview');
 
-    // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 
 
     const handleGenerate = async (clip: any) => {
