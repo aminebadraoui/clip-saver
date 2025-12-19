@@ -76,6 +76,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# Trust proxy headers (Traefik/Coolify) to ensure https redirects
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
