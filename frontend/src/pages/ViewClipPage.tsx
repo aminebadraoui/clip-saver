@@ -47,13 +47,7 @@ export function ViewClipPage() {
         init();
     }, [id, currentSpace]);
 
-    const fetchTags = async () => {
-        try {
-            setTags(await getTags());
-        } catch (e) {
-            console.error("Failed to load tags", e);
-        }
-    };
+
 
     const handleSave = async () => {
         if (!clip) return;
