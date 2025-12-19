@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { API_URL } from "@/config";
+
 
 export const SubscriptionPage = () => {
     const { user, token, refreshUser } = useAuth();
@@ -9,7 +11,8 @@ export const SubscriptionPage = () => {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 
     useEffect(() => {
         // Check if coming back from success

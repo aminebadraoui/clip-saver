@@ -8,6 +8,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from 'remark-gfm';
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import { API_URL } from "@/config";
+
 
 interface ScriptWritingSectionProps {
     content: string;
@@ -23,7 +25,8 @@ export const ScriptWritingSection = ({ content, onUpdate, conceptData, outline, 
     const [isGenerating, setIsGenerating] = useState(false);
     const [viewMode, setViewMode] = useState<'edit' | 'preview'>('preview');
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 
     const handleGenerate = async () => {
         if (!outline || !conceptData) {
