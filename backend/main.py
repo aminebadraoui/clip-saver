@@ -808,63 +808,15 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
 
 # --- Database Endpoints ---
 
-# --- Tag Endpoints ---
+from routers import tags as tags_router
 
+# ... (imports)
 
-class TagCreate(BaseModel):
-    name: str
-    color: str
-    category: str = "video"
-
-@app.get("/api/tags")
-def read_tags(
-    session: Session = Depends(get_session), 
-    current_user: User = Depends(get_current_user),
-    current_space: Space = Depends(get_current_space)
-):
-    # Return user tags for this space and global tags
-    user_tags = session.exec(select(Tag).where(Tag.user_id == current_user.id, Tag.space_id == current_space.id)).all()
-    global_tags = session.exec(select(Tag).where(Tag.user_id == None)).all()
-    
-    return user_tags + global_tags
-
-@app.post("/api/tags")
-def create_tag(
-    tag_data: TagCreate, 
-    session: Session = Depends(get_session), 
-    current_user: User = Depends(get_current_user),
-    current_space: Space = Depends(get_current_space)
-):
-    # Check for existing tag with same name and category for this user in this space
-    existing_tag = session.exec(select(Tag).where(
-        Tag.name == tag_data.name, 
-        Tag.user_id == current_user.id,
-        Tag.category == tag_data.category,
-        Tag.space_id == current_space.id
-    )).first()
-    if existing_tag:
-        return existing_tag
-    
-    # Check if a global tag exists with this name and category
-    global_tag = session.exec(select(Tag).where(
-        Tag.name == tag_data.name, 
-        Tag.user_id == None,
-        Tag.category == tag_data.category
-    )).first()
-    if global_tag:
-        return global_tag
-    
-    tag = Tag(
-        name=tag_data.name,
-        color=tag_data.color,
-        createdAt=int(time.time() * 1000),
-        user_id=current_user.id,
-        space_id=current_space.id
-    )
-    session.add(tag)
-    session.commit()
-    session.refresh(tag)
-    return tag
+app.include_router(ideation_router.router)
+app.include_router(billing_router.router)
+app.include_router(users_router.router)
+app.include_router(spaces.router)
+app.include_router(tags_router.router)
 
 @app.get("/api/clips")
 def read_clips(

@@ -30,6 +30,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     const {
         tags, selectedTagIds,
         handleSelectTag, setFilterType,
+        refreshData
     } = useAppData();
     const location = useLocation();
     const { isSubscribed } = useAuth();
@@ -53,6 +54,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                     tags={tags}
                     selectedTagIds={selectedTagIds}
                     onSelectTag={handleSelectTag}
+                    onRefetchTags={refreshData}
                 />
             )}
         </div>
