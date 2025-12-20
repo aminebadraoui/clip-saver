@@ -954,6 +954,8 @@ class ClipCreate(BaseModel):
     viralRatio: Optional[float] = None
     timeSinceUploadRatio: Optional[float] = None
     engagementScore: Optional[float] = None
+    outlierScore: Optional[float] = None
+    channelAverageViews: Optional[int] = None
 
 @app.post("/api/clips")
 def create_clip(
