@@ -70,8 +70,8 @@ export function Layout({ children }: LayoutProps) {
                     <div className="flex items-center justify-between gap-4">
                         {/* Logo/Title */}
                         <Link to="/" className="flex items-center gap-2 min-w-fit hover:opacity-80 transition-opacity">
-                            <Logo className="h-12 w-auto text-primary" />
-                            <h1 className="text-2xl font-bold tracking-tight">ClipCoba</h1>
+                            <Logo className="h-8 w-auto text-primary" />
+                            <h1 className="text-lg font-bold tracking-tight">ClipCoba</h1>
                         </Link>
 
                         <div className="hidden md:flex ml-4 border-l border-white/10 pl-4 h-8 items-center">
