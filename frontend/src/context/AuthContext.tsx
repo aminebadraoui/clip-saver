@@ -133,12 +133,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const login = async (newToken: string, newUser: User) => {
         localStorage.setItem('clipcoba_token', newToken);
-        localStorage.setItem('clipcoba_user', JSON.stringify(newUser));
         setToken(newToken);
+
+        // We set the initial partial user, but immediately fetch the full profile
+        // to ensure we have subscription status etc.
         setUser(newUser);
 
-        // Load spaces immediately after login
-        await refreshSpaces(newToken);
+        // Load full user profile (including subscription) and spaces
+        await Promise.all([
+            refreshUser(newToken),
+            refreshSpaces(newToken)
+        ]);
 
         navigate('/dashboard');
     };
