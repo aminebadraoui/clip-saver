@@ -89,8 +89,14 @@ function createDropdown(x, y, videoData, anchorElement) {
     const dropdown = document.createElement('div'); dropdown.className = 'clip-saver-dropdown'; dropdown.style.left = `${x}px`; dropdown.style.top = `${y}px`; let selectedTagIds = [];
 
     // 1. Construct Inner HTML (Original Layout + Space Selector)
+    let scoreHtml = '';
+    if (videoData.outlierScore) {
+        scoreHtml = `<div style="padding: 0 12px 8px 12px; font-size: 11px; color: #eab308; font-weight: bold;">Outlier Score: ${videoData.outlierScore}x</div>`;
+    }
+
     dropdown.innerHTML = `
         <div class="clip-saver-header"><span class="clip-saver-title">Snap to Clip Coba</span><span class="clip-saver-close">&times;</span></div>
+        ${scoreHtml}
         <div id="cs-space-container" style="padding: 0 12px;"></div>
         <div class="clip-saver-tags-list" id="cs-tags"></div>
         <div class="clip-saver-new-tag">
@@ -294,7 +300,13 @@ async function handleSnapClick(e, btn, dataContainer) {
     let videoData = null;
 
     // 1. Player Case
-    if (dataContainer.id === 'movie_player') { videoData = scrapeCurrentPage(); }
+    if (dataContainer.id === 'movie_player') {
+        videoData = scrapeCurrentPage();
+        if (videoData && videoData.videoId) {
+            const enriched = await fetchVideoInfo(videoData.videoId);
+            if (enriched) videoData = { ...videoData, ...enriched };
+        }
+    }
     // 2. Thumbnail Case (dataContainer is renderer or lockup)
     else {
         const link = dataContainer.querySelector('a#thumbnail, a.yt-lockup-view-model__content-image');

@@ -17,6 +17,7 @@ load_dotenv()
 import threading
 import time
 import json
+import statistics
 from sqlmodel import Session, select
 from database import get_session, engine, create_db_and_tables
 from models import Clip, Tag, ClipTagLink, User, Note
@@ -161,6 +162,54 @@ def progress_hook(d, task_id):
             "message": "Processing video..."
         }
 
+def calculate_outlier_score(video_view_count: int, channel_id: str):
+    """
+    Calculates the outlier score by comparing the video's views to the median views
+    of the channel's most recent 30 videos.
+    Returns: (score, median_views)
+    """
+    if not video_view_count or not channel_id:
+        return None, None
+        
+    try:
+        # Construct channel videos URL
+        channel_url = f"https://www.youtube.com/channel/{channel_id}/videos"
+        
+        ydl_opts = {
+            'extract_flat': True, # Only get metadata, don't download
+            'playlistend': 30,    # Last 30 videos
+            'quiet': True,
+            'no_warnings': True,
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(channel_url, download=False)
+            
+            if 'entries' not in info:
+                return None, None
+                
+            views = []
+            for entry in info['entries']:
+                # entry is a dict with video metadata
+                if entry.get('view_count'):
+                    views.append(entry['view_count'])
+            
+            if not views:
+                return None, None
+                
+            # Calculate median (robust to outliers)
+            median_views = statistics.median(views)
+            
+            if median_views == 0:
+                return None, 0
+                
+            score = round(video_view_count / median_views, 2)
+            return score, int(median_views)
+            
+    except Exception as e:
+        print(f"Error calculating outlier score: {e}")
+        return None, None
+
 def run_download(video_id, task_id, output_template):
     video_url = f"https://www.youtube.com/watch?v={video_id}"
     
@@ -232,6 +281,13 @@ async def get_video_info(videoId: str):
                 if channel_response.get("items"):
                     subscriber_count = int(channel_response["items"][0]["statistics"].get("subscriberCount", 0))
                 
+                # Calculate Outlier Score
+                loop = asyncio.get_event_loop()
+                outlier_score, channel_avg_views = await loop.run_in_executor(
+                    None, 
+                    lambda: calculate_outlier_score(int(statistics.get("viewCount", 0)), channel_id)
+                )
+
                 return JSONResponse({
                     "title": snippet["title"],
                     "thumbnail": snippet["thumbnails"]["high"]["url"],
@@ -239,7 +295,9 @@ async def get_video_info(videoId: str):
                     "uploadDate": snippet["publishedAt"].split("T")[0].replace("-", ""), # Format YYYYMMDD
                     "uploader": snippet["channelTitle"],
                     "viewCount": int(statistics.get("viewCount", 0)),
-                    "subscriberCount": subscriber_count
+                    "subscriberCount": subscriber_count,
+                    "outlierScore": outlier_score,
+                    "channelAverageViews": channel_avg_views
                 })
         except Exception as e:
             print(f"YouTube API failed, falling back to yt-dlp: {e}")
@@ -257,7 +315,22 @@ async def get_video_info(videoId: str):
         # Run in executor to avoid blocking the event loop
         loop = asyncio.get_event_loop()
         info = await loop.run_in_executor(None, lambda: yt_dlp.YoutubeDL(ydl_opts).extract_info(video_url, download=False))
+
+
+        # Calculate Outlier Score
+        channel_id = info.get('channel_id')
+        view_count = info.get('view_count')
         
+        # We are already in an executor here (sort of, info was fetched in one), 
+        # but let's run this separately or part of the same flow.
+        # Since we are already async, let's just call it.
+        # Wait, calculate_outlier_score is blocking IO (yt-dlp). We should run it in executor.
+        
+        outlier_score, channel_avg_views = await loop.run_in_executor(
+            None, 
+            lambda: calculate_outlier_score(view_count, channel_id)
+        )
+
         return JSONResponse({
             "title": info.get('title'),
             "thumbnail": info.get('thumbnail'),
@@ -265,7 +338,9 @@ async def get_video_info(videoId: str):
             "uploadDate": info.get('upload_date'),
             "uploader": info.get('uploader'),
             "viewCount": info.get('view_count'),
-            "subscriberCount": info.get('channel_follower_count') or info.get('subscriber_count')
+            "subscriberCount": info.get('channel_follower_count') or info.get('subscriber_count'),
+            "outlierScore": outlier_score,
+            "channelAverageViews": channel_avg_views
         })
     except Exception as e:
         print(f"Error fetching video info: {str(e)}")
