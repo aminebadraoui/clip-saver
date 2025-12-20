@@ -80,6 +80,8 @@ class Clip(SQLModel, table=True):
     viralRatio: Optional[float] = None
     timeSinceUploadRatio: Optional[float] = None
     engagementScore: Optional[float] = None
+    outlierScore: Optional[float] = None
+    channelAverageViews: Optional[int] = None
 
     user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
     user: Optional["User"] = Relationship(back_populates="clips")
