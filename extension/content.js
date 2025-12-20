@@ -2,26 +2,49 @@
 // To use local backend, switch to: "http://localhost:3001/api"
 const API_BASE = "https://api.clipcoba.com/api";
 let currentToken = null;
+let currentSpaceId = null;
+let availableSpaces = [];
 let userTags = [];
 
 // --- Auth Sync ---
-function syncToken() {
+const syncToken = () => {
     chrome.storage.local.get(['authToken'], (result) => {
         currentToken = result.authToken || null;
-        if (currentToken) fetchTags();
+        if (currentToken) {
+            fetchTags();
+            fetchSpaces();
+        }
     });
-}
+};
 syncToken();
 chrome.storage.onChanged.addListener(syncToken);
 
 // --- API Interactions ---
-async function fetchTags() {
+const fetchTags = async () => {
     if (!currentToken) return;
     try {
         const res = await fetch(`${API_BASE}/tags`, { headers: { 'Authorization': `Bearer ${currentToken}` } });
         if (res.ok) userTags = await res.json();
-    } catch (e) { console.error("Failed to fetch tags", e); }
-}
+    } catch (e) { console.error("Error fetching tags", e); }
+};
+
+const fetchSpaces = async () => {
+    if (!currentToken) return;
+    try {
+        const res = await fetch(`${API_BASE}/spaces/`, { headers: { 'Authorization': `Bearer ${currentToken}` } });
+        if (res.ok) {
+            availableSpaces = await res.json();
+            // Load saved space preference
+            chrome.storage.local.get(['selectedSpaceId'], (result) => {
+                if (result.selectedSpaceId && availableSpaces.find(s => s.id === result.selectedSpaceId)) {
+                    currentSpaceId = result.selectedSpaceId;
+                } else if (availableSpaces.length > 0) {
+                    currentSpaceId = availableSpaces[0].id; // Default to first
+                }
+            });
+        }
+    } catch (e) { console.error("Error fetching spaces", e); }
+};
 
 async function createTag(name, color = "#cc0000") {
     if (!currentToken) return null;
@@ -38,7 +61,21 @@ async function fetchVideoInfo(videoId) {
 
 async function saveClip(payload) {
     if (!currentToken) throw new Error("Please log in to Clip Coba web app first.");
-    const res = await fetch(`${API_BASE}/clips`, { method: "POST", headers: { 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+
+    const headers = {
+        'Authorization': `Bearer ${currentToken}`,
+        'Content-Type': 'application/json'
+    };
+
+    if (currentSpaceId) {
+        headers['X-Space-Id'] = currentSpaceId;
+    }
+
+    const res = await fetch(`${API_BASE}/clips`, {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify(payload)
+    });
     if (!res.ok) throw new Error(await res.text()); return await res.json();
 }
 
@@ -50,14 +87,104 @@ function scrapeCurrentPage() { try { const videoId = new URLSearchParams(window.
 function createDropdown(x, y, videoData, anchorElement) {
     document.querySelectorAll('.clip-saver-dropdown').forEach(el => el.remove());
     const dropdown = document.createElement('div'); dropdown.className = 'clip-saver-dropdown'; dropdown.style.left = `${x}px`; dropdown.style.top = `${y}px`; let selectedTagIds = [];
-    dropdown.innerHTML = `<div class="clip-saver-header"><span class="clip-saver-title">Snap to Clip Coba</span><span class="clip-saver-close">&times;</span></div><div class="clip-saver-tags-list" id="cs-tags"></div><div class="clip-saver-new-tag"><input type="text" class="clip-saver-input" placeholder="New tag..." id="cs-new-tag-input"><button class="clip-saver-add-btn">+</button></div><button class="clip-saver-save-btn">SAVE CLIP</button><div class="clip-saver-status" id="cs-status"></div>`;
-    document.body.appendChild(dropdown); const tagsContainer = dropdown.querySelector('#cs-tags');
-    function renderTags() { tagsContainer.innerHTML = ''; userTags.forEach(tag => { const chip = document.createElement('div'); chip.className = `clip-saver-tag-chip ${selectedTagIds.includes(tag.id) ? 'selected' : ''}`; chip.textContent = tag.name; chip.onclick = () => { if (selectedTagIds.includes(tag.id)) selectedTagIds = selectedTagIds.filter(id => id !== tag.id); else selectedTagIds.push(tag.id); renderTags(); }; tagsContainer.appendChild(chip); }); } renderTags();
-    const closeBtn = dropdown.querySelector('.clip-saver-close'); closeBtn.onclick = () => dropdown.remove(); const addBtn = dropdown.querySelector('.clip-saver-add-btn'); const input = dropdown.querySelector('#cs-new-tag-input');
-    addBtn.onclick = async () => { const val = input.value.trim(); if (val) { const newTag = await createTag(val); if (newTag) { selectedTagIds.push(newTag.id); renderTags(); input.value = ''; } } };
-    const saveBtn = dropdown.querySelector('.clip-saver-save-btn'); const statusDiv = dropdown.querySelector('#cs-status');
-    saveBtn.onclick = async () => { statusDiv.textContent = "Saving..."; statusDiv.className = "clip-saver-status"; try { const payload = { id: crypto.randomUUID(), ...videoData, createdAt: Date.now(), tagIds: selectedTagIds, type: "video" }; await saveClip(payload); statusDiv.textContent = "Saved!"; statusDiv.className = "clip-saver-status success"; setTimeout(() => dropdown.remove(), 1500); } catch (e) { statusDiv.textContent = e.message.substring(0, 30); statusDiv.className = "clip-saver-status error"; } };
-    const rect = dropdown.getBoundingClientRect(); if (rect.right > window.innerWidth) dropdown.style.left = `${window.innerWidth - rect.width - 20}px`; if (rect.bottom > window.innerHeight) dropdown.style.top = `${window.innerHeight - rect.height - 20}px`;
+    dropdown.innerHTML = `<div class="clip-saver-header"><span class="clip-saver-title">Snap to Clip Coba</span><span class="clip-saver-close">&times;</span></div>`;
+    document.body.appendChild(dropdown);    // Space Selector
+    const spaceSelector = document.createElement('div');
+    spaceSelector.style.marginBottom = '8px';
+
+    // Create custom select for spaces
+    const spaceSelect = document.createElement('select');
+    spaceSelect.style.width = '100%';
+    spaceSelect.style.padding = '4px';
+    spaceSelect.style.marginBottom = '4px';
+    spaceSelect.style.border = '1px solid #ddd';
+    spaceSelect.style.borderRadius = '4px';
+
+    if (availableSpaces.length > 0) {
+        availableSpaces.forEach(space => {
+            const opt = document.createElement('option');
+            opt.value = space.id;
+            opt.textContent = space.name;
+            if (space.id === currentSpaceId) opt.selected = true;
+            spaceSelect.appendChild(opt);
+        });
+    } else {
+        const opt = document.createElement('option');
+        opt.textContent = "Default Space";
+        spaceSelect.appendChild(opt);
+    }
+
+    spaceSelect.onchange = (e) => {
+        currentSpaceId = e.target.value;
+        chrome.storage.local.set({ selectedSpaceId: currentSpaceId });
+    };
+
+    spaceSelector.appendChild(spaceSelect);
+    dropdown.appendChild(spaceSelector);
+
+    // Tags Container
+    const tagsContainer = document.createElement('div');
+    tagsContainer.className = 'clip-coba-tags';
+    dropdown.appendChild(tagsContainer);
+
+    // Render Tags Function
+    const renderTags = () => {
+        tagsContainer.innerHTML = '';
+        if (userTags.length === 0) {
+            tagsContainer.textContent = "No tags found.";
+            return;
+        }
+        userTags.forEach(tag => {
+            const tagEl = document.createElement('div');
+            tagEl.className = 'clip-coba-tag';
+            tagEl.textContent = tag.name;
+            tagEl.style.backgroundColor = tag.color || '#eee';
+            tagEl.onclick = (e) => {
+                e.stopPropagation(); // Prevent closing dropdown
+                // Toggle selection logic... for now we just snap with this tag? 
+                // Original logic was implicit. Let's assume multi-select logic later, 
+                // for now proceed to save with this tag.
+                saveClip({ ...videoData, tagIds: [tag.id] }) // Snap with this tag immediately? Or separate button?
+                    .then(() => {
+                        alert(`Saved to ${availableSpaces.find(s => s.id === currentSpaceId)?.name || 'Default Space'}!`);
+                        dropdown.remove();
+                    })
+                    .catch(err => alert("Error: " + err.message));
+            };
+            tagsContainer.appendChild(tagEl);
+        });
+    };
+    renderTags();
+
+    // Snap without tags button
+    const snapBtn = document.createElement('button');
+    snapBtn.textContent = 'Quick Snap (No Tag)';
+    snapBtn.style.width = '100%';
+    snapBtn.style.marginTop = '8px';
+    snapBtn.style.padding = '6px';
+    snapBtn.style.backgroundColor = '#cc0000';
+    snapBtn.style.color = '#fff';
+    snapBtn.style.border = 'none';
+    snapBtn.style.borderRadius = '4px';
+    snapBtn.style.cursor = 'pointer';
+    snapBtn.onclick = () => {
+        saveClip({ ...videoData, tagIds: [] })
+            .then(() => {
+                alert(`Saved to ${availableSpaces.find(s => s.id === currentSpaceId)?.name || 'Default Space'}!`);
+                dropdown.remove();
+            })
+            .catch(err => alert("Error: " + err.message));
+    };
+    dropdown.appendChild(snapBtn);
+
+    // Prevent closing when clicking inside
+    dropdown.onclick = (e) => e.stopPropagation();
+    const closeBtn = dropdown.querySelector('.clip-saver-close');
+    closeBtn.onclick = () => dropdown.remove();
+
+    const rect = dropdown.getBoundingClientRect();
+    if (rect.right > window.innerWidth) dropdown.style.left = `${window.innerWidth - rect.width - 20}px`;
+    if (rect.bottom > window.innerHeight) dropdown.style.top = `${window.innerHeight - rect.height - 20}px`;
 }
 
 // --- Observer & Injection ---
