@@ -7,7 +7,7 @@ from models import Space, User
 from database import get_session
 from auth import get_current_user
 
-router = APIRouter(prefix="/spaces", tags=["spaces"])
+router = APIRouter(prefix="/api/spaces", tags=["spaces"])
 
 @router.get("/", response_model=List[Space])
 def get_user_spaces(
