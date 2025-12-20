@@ -50,7 +50,7 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
 
     const displayViewCount = originalVideo?.viewCount ?? clip.viewCount;
     const displayViralRatio = originalVideo?.viralRatio ?? clip.viralRatio;
-    const displayEngagementScore = originalVideo?.engagementScore ?? clip.engagementScore;
+
 
     return (
         <Card className="group overflow-hidden flex flex-col h-full border-border/50 bg-card/50 backdrop-blur-sm hover:shadow-xl hover:border-primary/20 transition-all duration-300">
@@ -75,18 +75,18 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
                     </div>
                 )}
 
-                {/* Engagement Score Badge */}
-                {displayEngagementScore != null && (
+                {/* Outlier Score Badge */}
+                {clip.outlierScore != null && (
                     <div className="absolute top-2 left-2 z-20">
                         <Tooltip>
                             <TooltipTrigger>
                                 <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md text-white px-2 py-1 rounded-md border border-white/10 shadow-lg cursor-help">
-                                    <span className="text-xs font-medium text-purple-400">Score</span>
-                                    <span className="text-sm font-bold">{Number(displayEngagementScore).toFixed(1)}</span>
+                                    <span className="text-xs font-medium text-yellow-400">Score</span>
+                                    <span className="text-sm font-bold">{Number(clip.outlierScore).toFixed(1)}x</span>
                                 </div>
                             </TooltipTrigger>
                             <TooltipContent>
-                                <p>Overall Engagement Score</p>
+                                <p>Outlier Score: Views / Channel Avg</p>
                             </TooltipContent>
                         </Tooltip>
                     </div>
@@ -201,19 +201,7 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
                         </Tooltip>
                     )}
 
-                    {/* Outlier Score Pill */}
-                    {(clip.outlierScore != null) && (
-                        <Tooltip>
-                            <TooltipTrigger>
-                                <div className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm border border-yellow-500/20 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-500">
-                                    Outlier: {Number(clip.outlierScore).toFixed(1)}x
-                                </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Outlier Score: Views / Channel Avg</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    )}
+
                 </div>
 
                 {/* Original Video Info for Clips (Subtitle) */}

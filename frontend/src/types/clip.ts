@@ -19,7 +19,7 @@ export interface Clip {
     uploadDate?: string;
     viralRatio?: number;
     timeSinceUploadRatio?: number;
-    engagementScore?: number;
+
     outlierScore?: number;
     channelAverageViews?: number;
     notesList?: Note[];
