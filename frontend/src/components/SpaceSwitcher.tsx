@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, ALL_SPACES } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,7 +19,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { ChevronsUpDown, Check, Plus, Folder, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ChevronsUpDown, Check, Plus, Folder, MoreHorizontal, Pencil, Trash2, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -120,6 +120,20 @@ export function SpaceSwitcher() {
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-[240px]">
+                    <DropdownMenuItem
+                        onSelect={() => setCurrentSpace(ALL_SPACES)}
+                        className="gap-2 cursor-pointer"
+                    >
+                        <div className={cn(
+                            "flex items-center justify-center w-4 h-4 mr-2",
+                            currentSpace?.id === 'all' ? "opacity-100" : "opacity-0"
+                        )}>
+                            <Check className="h-4 w-4" />
+                        </div>
+                        <Layers className="h-4 w-4 opacity-50" />
+                        All Spaces
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
                     <DropdownMenuLabel>My Spaces</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuGroup className="max-h-[300px] overflow-y-auto">

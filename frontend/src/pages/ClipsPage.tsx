@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAppData } from "@/context/AppDataContext";
+import { useAuth } from "@/context/AuthContext";
 import {
     saveClip,
     deleteClip,
@@ -32,6 +33,7 @@ export function ClipsPage() {
         refreshData,
         handleCreateTag
     } = useAppData();
+    const { currentSpace } = useAuth();
 
     // New UX State
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -159,7 +161,7 @@ export function ClipsPage() {
                 <h1 className="text-3xl font-bold tracking-tight">
                     {selectedTagIds.length > 0
                         ? `Tags: ${selectedTagIds.map(id => tags.find(t => t.id === id)?.name).filter(Boolean).join(", ")}`
-                        : filterType === 'video' ? "All Videos" : "All Clips"}
+                        : filterType === 'video' ? (currentSpace?.name || "All Videos") : "All Clips"}
                 </h1>
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
@@ -218,7 +220,7 @@ export function ClipsPage() {
 
             {isLoading ? (
                 <div className={viewMode === 'grid'
-                    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+                    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
                     : "flex flex-col gap-4"
                 }>
                     {Array.from({ length: 6 }).map((_, i) => (
@@ -252,7 +254,7 @@ export function ClipsPage() {
                 </div>
             ) : (
                 <div className={viewMode === 'grid'
-                    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+                    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
                     : "flex flex-col gap-4"
                 }>
                     {sortedClips.map((clip) => (

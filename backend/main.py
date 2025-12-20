@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from typing import Optional
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -909,13 +910,19 @@ app.include_router(users_router.router)
 app.include_router(spaces.router)
 app.include_router(tags_router.router)
 
+from dependencies import get_current_space, get_current_space_optional
+
 @app.get("/api/clips")
 def read_clips(
     session: Session = Depends(get_session), 
     current_user: User = Depends(get_active_subscriber),
-    current_space: Space = Depends(get_current_space)
+    current_space: Optional[Space] = Depends(get_current_space_optional)
 ):
-    clips = session.exec(select(Clip).where(Clip.user_id == current_user.id, Clip.space_id == current_space.id)).all()
+    query = select(Clip).where(Clip.user_id == current_user.id)
+    if current_space:
+        query = query.where(Clip.space_id == current_space.id)
+    
+    clips = session.exec(query).all()
     # Convert to frontend format (include tagIds and notes)
     result = []
     for clip in clips:

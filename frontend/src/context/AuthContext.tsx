@@ -17,6 +17,12 @@ export interface Space {
     createdAt: number;
 }
 
+export const ALL_SPACES: Space = {
+    id: 'all',
+    name: 'All Spaces',
+    createdAt: 0
+};
+
 interface AuthContextType {
     user: User | null;
     token: string | null;
@@ -95,14 +101,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                 // Determine current space
                 const storedSpaceId = localStorage.getItem('clipcoba_space_id');
-                let selectedSpace = spacesData.find(s => s.id === storedSpaceId);
 
-                if (!selectedSpace && spacesData.length > 0) {
-                    // Default to first space if none selected or invalid
-                    selectedSpace = spacesData[0];
+                if (storedSpaceId === 'all') {
+                    setCurrentSpaceState(ALL_SPACES);
+                } else {
+                    let selectedSpace = spacesData.find(s => s.id === storedSpaceId);
+
+                    if (!selectedSpace && spacesData.length > 0) {
+                        // Default to first space if none selected or invalid
+                        selectedSpace = spacesData[0];
+                    }
+                    // Only override if we found a valid space, otherwise null (or keep previous logic)
+                    setCurrentSpaceState(selectedSpace || null);
                 }
-
-                setCurrentSpace(selectedSpace || null);
             }
         } catch (error) {
             console.error('Failed to refresh spaces:', error);
