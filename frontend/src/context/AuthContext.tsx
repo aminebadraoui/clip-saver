@@ -83,7 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!tokenToUse) return;
 
         try {
-            const response = await fetch(`${API_URL}/spaces/`, {
+            const response = await fetch(`${API_URL}/api/spaces/`, {
                 headers: {
                     'Authorization': `Bearer ${tokenToUse}`
                 }
@@ -156,7 +156,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const createSpace = async (name: string): Promise<Space> => {
         if (!token) throw new Error("No token");
-        const response = await fetch(`${API_URL}/spaces/?name=${encodeURIComponent(name)}`, {
+        const response = await fetch(`${API_URL}/api/spaces/?name=${encodeURIComponent(name)}`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -171,7 +171,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const renameSpace = async (spaceId: string, name: string): Promise<Space> => {
         if (!token) throw new Error("No token");
-        const response = await fetch(`${API_URL}/spaces/${spaceId}?name=${encodeURIComponent(name)}`, {
+        const response = await fetch(`${API_URL}/api/spaces/${spaceId}?name=${encodeURIComponent(name)}`, {
             method: 'PUT',
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -196,7 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const deleteSpace = async (spaceId: string) => {
         if (!token) throw new Error("No token");
-        const response = await fetch(`${API_URL}/spaces/${spaceId}`, {
+        const response = await fetch(`${API_URL}/api/spaces/${spaceId}`, {
             method: 'DELETE',
             headers: {
                 'Authorization': `Bearer ${token}`
