@@ -21,6 +21,7 @@ export interface Clip {
     timeSinceUploadRatio?: number;
 
     outlierScore?: number;
+    engagementScore?: number;
     channelAverageViews?: number;
     notesList?: Note[];
 }
