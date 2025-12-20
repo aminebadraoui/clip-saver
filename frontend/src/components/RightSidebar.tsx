@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Plus, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { saveTag, deleteTag } from "@/utils/storage";
 
 interface RightSidebarProps {
@@ -11,9 +12,10 @@ interface RightSidebarProps {
     selectedTagIds: string[];
     onSelectTag: (id: string | null) => void;
     onRefetchTags?: () => void;
+    isLoading?: boolean;
 }
 
-export function RightSidebar({ tags, selectedTagIds, onSelectTag, onRefetchTags }: RightSidebarProps) {
+export function RightSidebar({ tags, selectedTagIds, onSelectTag, onRefetchTags, isLoading = false }: RightSidebarProps) {
     const videoTags = tags.filter(t => t.category === 'video' || !t.category);
     const titleTags = tags.filter(t => t.category === 'title');
     const thumbnailTags = tags.filter(t => t.category === 'thumbnail');
@@ -62,6 +64,7 @@ export function RightSidebar({ tags, selectedTagIds, onSelectTag, onRefetchTags 
                     size="icon"
                     className="h-6 w-6 opacity-0 group-hover/section:opacity-100 transition-opacity"
                     onClick={() => setIsAdding(categoryKey)}
+                    disabled={isLoading}
                 >
                     <Plus className="h-4 w-4" />
                 </Button>
@@ -88,8 +91,19 @@ export function RightSidebar({ tags, selectedTagIds, onSelectTag, onRefetchTags 
                 </div>
             )}
 
-            <div className="p-2 overflow-y-auto flex-1">
-                {sectionTags.length === 0 ? (
+            <div className="p-2 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+                {isLoading ? (
+                    <div className="space-y-2 p-1">
+                        {[1, 2, 3].map((i) => (
+                            <div key={i} className="flex items-center justify-between px-3 py-2">
+                                <div className="flex items-center gap-2 w-full">
+                                    <Skeleton className="w-2.5 h-2.5 rounded-full flex-shrink-0" />
+                                    <Skeleton className="h-4 w-2/3" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : sectionTags.length === 0 ? (
                     <div className="text-xs text-muted-foreground p-2 italic text-center">No tags</div>
                 ) : (
                     <div className="space-y-1">

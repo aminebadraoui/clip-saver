@@ -8,6 +8,7 @@ from database import get_session
 from models import Tag, User, Space
 from auth import get_current_user
 from dependencies import get_current_space
+from dependencies import get_current_space, get_current_space_optional
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/tags", tags=["tags"])
@@ -19,15 +20,20 @@ class TagCreate(BaseModel):
 
 @router.get("/", response_model=List[Tag])
 def read_tags(
-    session: Session = Depends(get_session), 
+    session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
-    current_space: Space = Depends(get_current_space)
+    current_space: Optional[Space] = Depends(get_current_space_optional)
 ):
-    # Return user tags for this space and global tags
+    # Return user tags for this space (or all) and global tags
     # Assuming global tags have user_id=None
-    user_tags = session.exec(select(Tag).where(Tag.user_id == current_user.id, Tag.space_id == current_space.id)).all()
+
+    query = select(Tag).where(Tag.user_id == current_user.id)
+    if current_space:
+        query = query.where(Tag.space_id == current_space.id)
+
+    user_tags = session.exec(query).all()
     global_tags = session.exec(select(Tag).where(Tag.user_id == None)).all()
-    
+
     return user_tags + global_tags
 
 @router.post("/", response_model=Tag)

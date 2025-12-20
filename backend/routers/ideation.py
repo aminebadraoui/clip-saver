@@ -9,7 +9,7 @@ import json
 from database import get_session
 from models import VideoIdeation, User, Clip, Space
 from auth import get_current_user
-from dependencies import get_current_space
+from dependencies import get_current_space, get_current_space_optional
 from ai_agent import fetch_transcript, generate_video_outline, generate_title_ideas, readapt_script_outline, generate_viral_script
 
 router = APIRouter(prefix="/api/ideation", tags=["ideation"])
@@ -51,10 +51,14 @@ async def create_ideation(
 @router.get("/", response_model=List[VideoIdeation])
 async def list_ideations(
     user: User = Depends(get_current_user),
-    current_space: Space = Depends(get_current_space),
+    current_space: Optional[Space] = Depends(get_current_space_optional),
     session: Session = Depends(get_session)
 ):
-    return session.exec(select(VideoIdeation).where(VideoIdeation.user_id == user.id, VideoIdeation.space_id == current_space.id)).all()
+    query = select(VideoIdeation).where(VideoIdeation.user_id == user.id)
+    if current_space:
+        query = query.where(VideoIdeation.space_id == current_space.id)
+        
+    return session.exec(query).all()
 
 @router.get("/{ideation_id}", response_model=VideoIdeation)
 async def get_ideation(

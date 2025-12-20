@@ -53,10 +53,12 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
 
 
     return (
-        <Card className="group overflow-hidden flex flex-col h-full border-border/50 bg-card/50 backdrop-blur-sm hover:shadow-xl hover:border-primary/20 transition-all duration-300">
+        <Card
+            className="group overflow-hidden flex flex-col h-full border-border/50 bg-card/50 backdrop-blur-sm hover:shadow-xl hover:border-primary/20 transition-all duration-300 cursor-pointer"
+            onClick={() => onCinemaMode?.(clip)}
+        >
             <div
-                className="relative aspect-video overflow-hidden cursor-pointer"
-                onClick={() => onCinemaMode?.(clip)}
+                className="relative aspect-video overflow-hidden"
             >
                 <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors z-10" />
                 <img
@@ -77,7 +79,7 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
 
                 {/* Outlier Score Badge */}
                 {clip.outlierScore != null && (
-                    <div className="absolute top-2 left-2 z-20">
+                    <div className="absolute top-2 left-2 z-20" onClick={(e) => e.stopPropagation()}>
                         <Tooltip>
                             <TooltipTrigger>
                                 <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md text-white px-2 py-1 rounded-md border border-white/10 shadow-lg cursor-help">
@@ -165,7 +167,7 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
                 </div>
 
                 {/* Scores Row */}
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
                     {/* Viral Ratio Pill */}
                     {displayViralRatio != null && (
                         <Tooltip>
@@ -240,7 +242,10 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
                     variant="default"
                     size="sm"
                     className="w-full bg-primary/90 hover:bg-primary shadow-sm hover:shadow transition-all"
-                    onClick={() => onCinemaMode?.(clip)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onCinemaMode?.(clip);
+                    }}
                 >
                     {clip.type === 'video' ? (
                         <>
