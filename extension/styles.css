@@ -165,3 +165,11 @@
 .clip-saver-status.error {
     color: #f44336;
 }
+
+/* PLAYER METADATA SPECIFIC WRAPPER */
+.clip-saver-wrapper-player-metadata {
+    margin-top: 8px;
+    /* Space from subscriber count */
+    display: block;
+    /* Force new line */
+}

@@ -235,12 +235,14 @@ function injectAll() {
         if (parentLockup) injectButton(container, parentLockup, 'lockup');
     });
 
-    // 4. Main Player
-    const player = document.querySelector('#movie_player');
-    if (player) {
-        if (!player.querySelector('.clip-saver-wrapper')) {
-            injectButton(player, player, 'player');
-        }
+    // 4. Main Player - Metadata Section (Below Sub Count)
+    const ownerMetadata = document.querySelector('ytd-watch-metadata ytd-video-owner-renderer #upload-info');
+    // Fallback to scrape from #movie_player for data, but inject into metadata
+    const playerForData = document.querySelector('#movie_player');
+
+    if (ownerMetadata && playerForData) {
+        // Pass 'player-metadata' context
+        injectButton(ownerMetadata, playerForData, 'player-metadata');
     }
 }
 
@@ -254,7 +256,8 @@ function injectButton(container, videoDataContainer, context = 'default') {
     // Add context-specific class to wrapper
     if (context === 'search') wrapper.classList.add('clip-saver-wrapper-search');
     if (context === 'lockup') wrapper.classList.add('clip-saver-wrapper-lockup');
-    if (context === 'player') wrapper.classList.add('clip-saver-wrapper-player');
+    if (context === 'player') wrapper.classList.add('clip-saver-wrapper-player'); // Legacy/Fallback
+    if (context === 'player-metadata') wrapper.classList.add('clip-saver-wrapper-player-metadata');
 
     const btn = document.createElement('button');
     btn.className = 'clip-saver-btn';
@@ -266,12 +269,17 @@ function injectButton(container, videoDataContainer, context = 'default') {
 
     // Context specific injection logic
     if (context === 'player') {
+        // Keeping this logic just in case, though we are moving away from it for the main player
         wrapper.style.position = 'absolute';
         wrapper.style.top = '10px';
         wrapper.style.right = '10px';
         wrapper.style.zIndex = '2000';
-    } else {
+    }
+    // 'player-metadata' does NOT need absolute positioning, it should flow in the document
+    else {
         // For other contexts, ensure the container is relative for proper positioning of the wrapper
+        // BUT for 'player-metadata' we might NOT want position relative on the parent if it messes up flex layouts, 
+        // usually it's fine though.
         const computedStyle = window.getComputedStyle(container);
         if (computedStyle.position === 'static') {
             container.style.position = 'relative';
