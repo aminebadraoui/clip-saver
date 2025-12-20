@@ -33,6 +33,7 @@ interface AuthContextType {
     setCurrentSpace: (space: Space | null) => void;
     refreshSpaces: () => Promise<void>;
     createSpace: (name: string) => Promise<Space>;
+    renameSpace: (spaceId: string, name: string) => Promise<Space>;
     deleteSpace: (spaceId: string) => Promise<void>;
 }
 
@@ -168,6 +169,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return newSpace;
     };
 
+    const renameSpace = async (spaceId: string, name: string): Promise<Space> => {
+        if (!token) throw new Error("No token");
+        const response = await fetch(`${API_URL}/spaces/${spaceId}?name=${encodeURIComponent(name)}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || "Failed to rename space");
+        }
+
+        const updatedSpace = await response.json();
+        setSpaces(prev => prev.map(s => s.id === spaceId ? updatedSpace : s));
+
+        // Update current space if it was the one renamed
+        if (currentSpace?.id === spaceId) {
+            setCurrentSpace(updatedSpace);
+        }
+
+        return updatedSpace;
+    };
+
     const deleteSpace = async (spaceId: string) => {
         if (!token) throw new Error("No token");
         const response = await fetch(`${API_URL}/spaces/${spaceId}`, {
@@ -195,7 +221,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return (
         <AuthContext.Provider value={{
             user, token, login, logout, isAuthenticated: !!token, isSubscribed, refreshUser, isLoading,
-            spaces, currentSpace, setCurrentSpace, refreshSpaces, createSpace, deleteSpace
+            spaces, currentSpace, setCurrentSpace, refreshSpaces, createSpace, renameSpace, deleteSpace
         }}>
             {children}
         </AuthContext.Provider>

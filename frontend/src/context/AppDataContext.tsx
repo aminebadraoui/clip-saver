@@ -75,6 +75,15 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
             setFilterType('clip');
             // Clean up URL handled by consumer or just leave it, but we set state here.
         }
+        // Auto-refresh when window gains focus
+        const handleFocus = () => {
+            refreshData();
+        };
+        window.addEventListener('focus', handleFocus);
+
+        return () => {
+            window.removeEventListener('focus', handleFocus);
+        };
     }, [refreshData, currentSpace]);
 
 
