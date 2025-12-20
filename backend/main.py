@@ -1008,6 +1008,7 @@ def create_clip(
             # Engagement Score (Average of Normalized Ratios)
             if clip.viralRatio is not None and clip.timeSinceUploadRatio is not None:
                 clip.engagementScore = (viral_ratio_norm + clip.timeSinceUploadRatio) / 2
+            
                 
         except ValueError:
             pass

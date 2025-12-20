@@ -84,9 +84,37 @@ function parseCount(str) { if (!str) return 0; str = str.replace(/[^0-9.KMB]/g, 
 function scrapeCurrentPage() { try { const videoId = new URLSearchParams(window.location.search).get('v'); if (!videoId) return null; const title = document.querySelector('h1.ytd-watch-metadata')?.innerText?.trim() || document.querySelector('meta[property="og:title"]')?.content || ""; const channelName = document.querySelector('ytd-channel-name a')?.innerText?.trim() || ""; const subCountEl = document.querySelector('#owner-sub-count'); const subscriberCount = parseCount(subCountEl?.innerText?.trim()); const viewCountMeta = document.querySelector('meta[itemprop="interactionCount"]'); let viewCount = viewCountMeta ? parseInt(viewCountMeta.content) : 0; const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`; const uploadDate = document.querySelector('meta[itemprop="uploadDate"]')?.content || ""; return { videoId, title, channelName, subscriberCount, viewCount, thumbnail, uploadDate, originalVideoUrl: window.location.href }; } catch (e) { return null; } }
 
 // --- UI Injection ---
+let activePopupCleanup = null;
+
 function createDropdown(x, y, videoData, anchorElement) {
+    // Cleanup previous if exists
+    if (activePopupCleanup) activePopupCleanup();
+
+    // Failsafe remove from DOM
     document.querySelectorAll('.clip-saver-dropdown').forEach(el => el.remove());
-    const dropdown = document.createElement('div'); dropdown.className = 'clip-saver-dropdown'; dropdown.style.left = `${x}px`; dropdown.style.top = `${y}px`; let selectedTagIds = [];
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'clip-saver-dropdown';
+    dropdown.style.left = `${x}px`;
+    dropdown.style.top = `${y}px`;
+    let selectedTagIds = [];
+
+    // Define cleanup first so we can use it in handlers
+    const cleanup = () => {
+        if (dropdown.isConnected) dropdown.remove();
+        window.removeEventListener('scroll', onScroll, { capture: true });
+        if (activePopupCleanup === cleanup) activePopupCleanup = null;
+    };
+
+    // Scroll handler: Close on scroll unless scrolling inside the dropdown
+    const onScroll = (e) => {
+        if (dropdown.contains(e.target)) return;
+        cleanup();
+    };
+
+    // Register cleanup & listeners
+    activePopupCleanup = cleanup;
+    window.addEventListener('scroll', onScroll, { passive: true, capture: true });
 
     // 1. Construct Inner HTML (Original Layout + Space Selector)
     let scoreHtml = '';
@@ -162,7 +190,7 @@ function createDropdown(x, y, videoData, anchorElement) {
 
     // 4. Event Handlers (Close, Add Tag, Save)
     const closeBtn = dropdown.querySelector('.clip-saver-close');
-    closeBtn.onclick = () => dropdown.remove();
+    closeBtn.onclick = cleanup;
 
     const addBtn = dropdown.querySelector('.clip-saver-add-btn');
     const input = dropdown.querySelector('#cs-new-tag-input');
@@ -194,7 +222,7 @@ function createDropdown(x, y, videoData, anchorElement) {
             await saveClip(payload);
             statusDiv.textContent = "Saved!";
             statusDiv.className = "clip-saver-status success";
-            setTimeout(() => dropdown.remove(), 1500);
+            setTimeout(cleanup, 1500);
         } catch (e) {
             statusDiv.textContent = e.message.substring(0, 30);
             statusDiv.className = "clip-saver-status error";

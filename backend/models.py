@@ -79,6 +79,7 @@ class Clip(SQLModel, table=True):
     uploadDate: Optional[str] = None
     viralRatio: Optional[float] = None
     timeSinceUploadRatio: Optional[float] = None
+    timeSinceUploadRatio: Optional[float] = None
     engagementScore: Optional[float] = None
     outlierScore: Optional[float] = None
     channelAverageViews: Optional[int] = None
