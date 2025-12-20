@@ -144,14 +144,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const logout = () => {
+        // Clear storage
         localStorage.removeItem('clipcoba_token');
         localStorage.removeItem('clipcoba_user');
         localStorage.removeItem('clipcoba_space_id');
-        setToken(null);
-        setUser(null);
-        setSpaces([]);
-        setCurrentSpace(null);
-        navigate('/');
+
+        // Force full page reload to landing page
+        // This avoids any ProtectedRoute race conditions and ensures a clean state
+        window.location.href = '/';
     };
 
     const createSpace = async (name: string): Promise<Space> => {

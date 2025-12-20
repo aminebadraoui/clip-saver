@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Link } from "react-router-dom";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { API_URL } from "@/config";
+import { Logo } from "@/components/Logo";
 
 
 export function LoginPage() {
@@ -52,8 +53,21 @@ export function LoginPage() {
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-background">
-            <Card className="w-[350px]">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-background relative overflow-hidden">
+            {/* Background Gradients */}
+            <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-primary/20 blur-[120px] rounded-full opacity-50 mix-blend-screen" />
+                <div className="absolute bottom-0 right-0 w-[800px] h-[600px] bg-purple-500/10 blur-[100px] rounded-full opacity-30" />
+            </div>
+
+            <header className="absolute top-0 w-full p-6 flex justify-between items-center z-10">
+                <Link to="/" className="flex items-center gap-2">
+                    <Logo className="h-8 w-auto text-primary" />
+                    <span className="font-bold text-lg tracking-tight">ClipCoba</span>
+                </Link>
+            </header>
+
+            <Card className="w-[350px] border-white/10 bg-black/40 backdrop-blur-md shadow-2xl relative z-10">
                 <CardHeader>
                     <CardTitle>Login</CardTitle>
                     <CardDescription>Enter your email below to login to your account</CardDescription>

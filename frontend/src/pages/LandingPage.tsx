@@ -51,18 +51,29 @@ export const LandingPage = () => {
                         {/* Hero Text */}
                         <div className="space-y-8 text-center lg:text-left">
                             <h1 className="text-5xl lg:text-7xl font-bold tracking-tight leading-[1.1]">
-                                The All-in-One <br className="hidden lg:block" />
-                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-500">Video Workspace</span>
+                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-500">
+                                    Turn inspiration into viral scripts with AI.
+                                </span>
                             </h1>
-                            <p className="text-xl text-muted-foreground leading-relaxed max-w-xl mx-auto lg:mx-0">
-                                Snap videos, organize with tags, and turn inspiration into viral scripts with AI.
-                            </p>
+
+                            <ul className="text-xl text-muted-foreground leading-relaxed max-w-xl mx-auto lg:mx-0 space-y-2 list-none">
+                                <li className="flex items-center gap-2 justify-center lg:justify-start">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
+                                    Snap videos instantly
+                                </li>
+                                <li className="flex items-center gap-2 justify-center lg:justify-start">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
+                                    Organize with smart tags
+                                </li>
+                                <li className="flex items-center gap-2 justify-center lg:justify-start">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
+                                    Write viral scripts effortlessly
+                                </li>
+                            </ul>
+
                             <div className="flex items-center justify-center lg:justify-start gap-4">
                                 <Button size="lg" className="h-12 px-8 text-base rounded-full shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:scale-105" onClick={() => navigate('/register')}>
                                     Start Creating
-                                </Button>
-                                <Button size="lg" variant="outline" className="h-12 px-8 text-base rounded-full backdrop-blur-sm bg-background/50 hover:bg-background/80" onClick={() => navigate('/login')}>
-                                    Login
                                 </Button>
                             </div>
                         </div>
