@@ -70,7 +70,7 @@ export function Layout({ children }: LayoutProps) {
                 <div className="container max-w-[1920px] mx-auto px-6 py-4">
                     <div className="flex items-center justify-between gap-4">
                         {/* Logo/Title */}
-                        <Link to="/" className="flex items-center gap-2 min-w-fit hover:opacity-80 transition-opacity">
+                        <Link to="/dashboard" className="flex items-center gap-2 min-w-fit hover:opacity-80 transition-opacity">
                             <Logo className="h-8 w-auto text-primary" />
                             <h1 className="text-lg font-bold tracking-tight">ClipCoba</h1>
                         </Link>
