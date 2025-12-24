@@ -43,14 +43,15 @@ export const SettingsPage = () => {
             });
 
             if (!response.ok) {
-                throw new Error('Failed to create portal session');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || 'Failed to create portal session');
             }
 
             const { url } = await response.json();
             window.location.href = url;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error:', error);
-            alert('Failed to open subscription management.');
+            alert(error.message || 'Failed to open subscription management.');
         } finally {
             setLoading(false);
         }

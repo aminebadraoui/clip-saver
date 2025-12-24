@@ -103,19 +103,64 @@ async def create_checkout_session(
 
 @router.post("/create-portal-session")
 async def create_portal_session(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
 ):
+    # Helper to resolve customer ID (Search by email first, then create)
+    def resolve_stripe_customer(user, db_session):
+        print(f"Resolving Stripe customer for {user.email}...")
+        existing_customers = stripe.Customer.list(email=user.email, limit=1)
+        
+        if existing_customers.data:
+            customer = existing_customers.data[0]
+            print(f"Found existing Stripe customer {customer.id} for {user.email}")
+        else:
+            print(f"No existing Stripe customer found. Creating new one for {user.email}")
+            customer = stripe.Customer.create(
+                email=user.email,
+                metadata={"user_id": str(user.id)}
+            )
+            
+        user.stripe_customer_id = customer.id
+        db_session.add(user)
+        db_session.commit()
+        db_session.refresh(user)
+        return customer.id
+
+    # 1. Ensure user has a potentially valid stripe_customer_id
     if not current_user.stripe_customer_id:
-        raise HTTPException(status_code=400, detail="User has no billing account associated.")
+        try:
+            resolve_stripe_customer(current_user, session)
+        except Exception as e:
+            print(f"Failed to resolve Stripe customer: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to resolve Stripe customer: {str(e)}")
 
     try:
         debug_info = f"CLIENT_URL Env: {os.getenv('CLIENT_URL')}\n"
-        debug_info += f"Constructed return_url: {CLIENT_URL}/settings\n"
+        return_url = f"{CLIENT_URL}/settings"
+        debug_info += f"Constructed return_url: {return_url}\n"
         
-        portal_session = stripe.billing_portal.Session.create(
-            customer=current_user.stripe_customer_id,
-            return_url=f'{CLIENT_URL}/settings',
-        )
+        try:
+            portal_session = stripe.billing_portal.Session.create(
+                customer=current_user.stripe_customer_id,
+                return_url=return_url,
+            )
+        except stripe.error.InvalidRequestError as e:
+            # Handle "No such customer" error (ID exists in DB but not in Stripe)
+            if "No such customer" in str(e):
+                print(f"Customer {current_user.stripe_customer_id} invalid/not found in Stripe. Re-resolving...")
+                try:
+                    resolve_stripe_customer(current_user, session)
+                    # Retry portal session creation with new ID
+                    portal_session = stripe.billing_portal.Session.create(
+                        customer=current_user.stripe_customer_id,
+                        return_url=return_url,
+                    )
+                except Exception as inner_e:
+                     raise HTTPException(status_code=500, detail=f"Failed to recover customer: {str(inner_e)}")
+            else:
+                raise e
+
         debug_info += f"Generated Session URL: {portal_session.url}\n"
         
         with open("portal_debug.log", "w") as f:
