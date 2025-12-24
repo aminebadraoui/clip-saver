@@ -123,7 +123,7 @@ function createDropdown(x, y, videoData, anchorElement) {
     }
 
     dropdown.innerHTML = `
-        <div class="clip-saver-header"><span class="clip-saver-title">Snap to Clip Coba</span><span class="clip-saver-close">&times;</span></div>
+        <div class="clip-saver-header"><span class="clip-saver-title">Bookmark to Clip Coba</span><span class="clip-saver-close">&times;</span></div>
         ${scoreHtml}
         <div id="cs-space-container" style="padding: 0 12px;"></div>
         <div class="clip-saver-tags-list" id="cs-tags"></div>
@@ -131,7 +131,7 @@ function createDropdown(x, y, videoData, anchorElement) {
             <input type="text" class="clip-saver-input" placeholder="New tag..." id="cs-new-tag-input">
             <button class="clip-saver-add-btn">+</button>
         </div>
-        <button class="clip-saver-save-btn">SAVE CLIP</button>
+        <button class="clip-saver-save-btn">SAVE BOOKMARK</button>
         <div class="clip-saver-status" id="cs-status"></div>
     `;
     document.body.appendChild(dropdown);
@@ -295,7 +295,7 @@ function injectButton(container, videoDataContainer, context = 'default') {
 
     const btn = document.createElement('button');
     btn.className = 'clip-saver-btn';
-    btn.textContent = 'SNAP';
+    btn.textContent = 'BOOKMARK';
 
     btn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); handleSnapClick(e, btn, videoDataContainer); };
 
@@ -357,7 +357,7 @@ async function handleSnapClick(e, btn, dataContainer) {
         const rect = btn.getBoundingClientRect();
         createDropdown(rect.left, rect.bottom + 5, videoData, btn);
     } else {
-        alert("Could not snap this video.");
+        alert("Could not bookmark this video.");
     }
 }
 

@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (result.tokenSource) {
                 statusText.textContent = 'Connected';
-                statusSubtext.textContent = 'Ready to save clips.';
+                statusSubtext.textContent = 'Ready to bookmark videos.';
             } else {
                 statusContainer.className = ''; // remove success, user warning style
                 statusContainer.classList.add('status-warning');
@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             statusContainer.classList.add('status-error');
             statusText.textContent = 'Disconnected';
-            statusSubtext.textContent = 'Log in to Clip Coba to start snapping.';
+            statusSubtext.textContent = 'Log in to Clip Coba to start bookmarking.';
         }
     });
 });
