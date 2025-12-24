@@ -9,6 +9,7 @@ import { RegisterPage } from "@/pages/RegisterPage";
 import { IdeationPage } from "@/pages/IdeationPage";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { PublicRoute } from "@/components/PublicRoute";
 import { Toaster } from "sonner";
 
 import { useAuth } from "@/context/AuthContext";
@@ -43,8 +44,11 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
 
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        {/* Public Auth Routes (Redirect to Dashboard if logged in) */}
+        <Route element={<PublicRoute />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Route>
 
         {/* Protected Routes (Require Login) */}
         <Route element={<ProtectedRoute />}>
