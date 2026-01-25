@@ -51,7 +51,7 @@ export function RegisterPage() {
 
             // Auto-login if token is present
             if (data.access_token) {
-                login(data.access_token, { id: data.id, email: data.email });
+                login(data.access_token, data.refresh_token, { id: data.id, email: data.email });
                 // login function already navigates to dashboard
             } else {
                 navigate("/login");

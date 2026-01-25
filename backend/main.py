@@ -22,10 +22,10 @@ import json
 import statistics
 from sqlmodel import Session, select
 from database import get_session, engine, create_db_and_tables
-from models import Clip, Tag, ClipTagLink, User, Note
-from fastapi import Depends, status
+from models import Clip, Tag, ClipTagLink, User, Note, RefreshToken
+from fastapi import Depends, status, Body
 from fastapi.security import OAuth2PasswordRequestForm
-from auth import get_password_hash, verify_password, create_access_token, get_current_user, get_active_subscriber, ACCESS_TOKEN_EXPIRE_MINUTES
+from auth import get_password_hash, verify_password, create_access_token, get_current_user, get_active_subscriber, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, hash_token, REFRESH_TOKEN_EXPIRE_DAYS
 from routers import ideation as ideation_router
 from routers import billing as billing_router
 from routers import users as users_router
@@ -885,11 +885,25 @@ def register(user_data: UserCreate, session: Session = Depends(get_session)):
         data={"sub": user.email}, expires_delta=access_token_expires
     )
     
+    # Generate Refresh Token
+    refresh_token_str = create_refresh_token()
+    refresh_token_hash = hash_token(refresh_token_str)
+    
+    refresh_token_db = RefreshToken(
+        token_hash=refresh_token_hash,
+        user_id=user.id,
+        expires_at=datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        created_at=datetime.utcnow()
+    )
+    session.add(refresh_token_db)
+    session.commit()
+    
     return {
         "id": user.id, 
         "email": user.email,
         "access_token": access_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "refresh_token": refresh_token_str
     }
 
 @app.post("/auth/login")
@@ -913,7 +927,59 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    
+    # Generate Refresh Token
+    refresh_token_str = create_refresh_token()
+    refresh_token_hash = hash_token(refresh_token_str)
+    
+    refresh_token_db = RefreshToken(
+        token_hash=refresh_token_hash,
+        user_id=user.id,
+        expires_at=datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        created_at=datetime.utcnow()
+    )
+    session.add(refresh_token_db)
+    session.commit()
+    
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "refresh_token": refresh_token_str
+    }
+
+@app.post("/auth/refresh")
+def refresh_token(refresh_token: str = Body(..., embed=True), session: Session = Depends(get_session)):
+    # Verify token
+    try:
+        token_hash = hash_token(refresh_token)
+        db_token = session.exec(select(RefreshToken).where(
+            RefreshToken.token_hash == token_hash,
+            RefreshToken.revoked == False,
+            RefreshToken.expires_at > datetime.utcnow()
+        )).first()
+        
+        if not db_token:
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+            
+        # Get user
+        user = session.exec(select(User).where(User.id == db_token.user_id)).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+            
+        # Generate new access token
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        new_access_token = create_access_token(
+            data={"sub": user.email}, expires_delta=access_token_expires
+        )
+        
+        return {
+            "access_token": new_access_token,
+            "token_type": "bearer"
+        }
+        
+    except Exception as e:
+        print(f"Refresh error: {e}")
+        raise HTTPException(status_code=401, detail="Could not refresh token")
 
 # --- Database Endpoints ---
 

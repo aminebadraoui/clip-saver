@@ -1,5 +1,6 @@
 import uuid
 from typing import List, Optional
+from datetime import datetime
 from sqlmodel import Field, Relationship, SQLModel
 from sqlalchemy import BigInteger, Text
 # from enum import Enum # Removed as it's no longer used
@@ -27,6 +28,16 @@ class User(SQLModel, table=True):
     workflows: List["AIWorkflow"] = Relationship(back_populates="user")
     workflow_executions: List["WorkflowExecution"] = Relationship(back_populates="user")
     credit_transactions: List["CreditTransaction"] = Relationship(back_populates="user")
+    refresh_tokens: List["RefreshToken"] = Relationship(back_populates="user")
+
+class RefreshToken(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    token_hash: str = Field(index=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    user: Optional[User] = Relationship(back_populates="refresh_tokens")
+    expires_at: datetime
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    revoked: bool = Field(default=False)
 
 class Space(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
