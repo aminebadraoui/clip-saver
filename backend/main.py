@@ -29,6 +29,10 @@ from routers import ideation as ideation_router
 from routers import billing as billing_router
 from routers import users as users_router
 from routers import spaces
+from routers import workflows
+from routers import workflow_executions
+from routers import credits
+from routers import replicate_models
 from dependencies import get_current_space
 from models import Space
 
@@ -71,9 +75,17 @@ def init_global_tags(session: Session):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
-    # Initialize global tags
+    # Initialize global tags and Replicate model cache
     with Session(engine) as session:
         init_global_tags(session)
+        # Initialize Replicate model cache
+        try:
+            from services.replicate_service import ReplicateService
+            replicate_service = ReplicateService()
+            replicate_service.initialize_model_cache(session)
+            print("Replicate model cache initialized")
+        except Exception as e:
+            print(f"Warning: Could not initialize Replicate model cache: {e}")
     yield
 
 app = FastAPI(lifespan=lifespan)
@@ -105,6 +117,10 @@ app.include_router(ideation_router.router)
 app.include_router(billing_router.router)
 app.include_router(users_router.router)
 app.include_router(spaces.router)
+app.include_router(workflows.router)
+app.include_router(workflow_executions.router)
+app.include_router(credits.router)
+app.include_router(replicate_models.router)
 
 # Ensure temp directory exists
 # forcing reload for env vars 2

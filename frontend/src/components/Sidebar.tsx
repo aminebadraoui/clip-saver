@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Home, Sparkles } from "lucide-react";
+import { Home, Sparkles, Wand2 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 
@@ -39,6 +39,16 @@ export function Sidebar({
                     >
                         <Sparkles className="w-4 h-4 mr-2" />
                         Video Ideation
+                    </Button>
+                </Link>
+
+                <Link to="/workflows">
+                    <Button
+                        variant={location.pathname.startsWith('/workflows') ? "secondary" : "ghost"}
+                        className="w-full justify-start"
+                    >
+                        <Wand2 className="w-4 h-4 mr-2" />
+                        AI Workflows
                     </Button>
                 </Link>
             </div>

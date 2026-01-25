@@ -17,10 +17,16 @@ class User(SQLModel, table=True):
     cancel_at_period_end: bool = Field(default=False)
     current_period_end: Optional[int] = Field(default=None, sa_type=BigInteger)
 
+    # Credit system
+    credit_balance: int = Field(default=100)  # Starting credits for new users
+
     clips: List["Clip"] = Relationship(back_populates="user")
     tags: List["Tag"] = Relationship(back_populates="user")
     ideations: List["VideoIdeation"] = Relationship(back_populates="user")
     spaces: List["Space"] = Relationship(back_populates="user")
+    workflows: List["AIWorkflow"] = Relationship(back_populates="user")
+    workflow_executions: List["WorkflowExecution"] = Relationship(back_populates="user")
+    credit_transactions: List["CreditTransaction"] = Relationship(back_populates="user")
 
 class Space(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -33,6 +39,8 @@ class Space(SQLModel, table=True):
     clips: List["Clip"] = Relationship(back_populates="space")
     tags: List["Tag"] = Relationship(back_populates="space")
     ideations: List["VideoIdeation"] = Relationship(back_populates="space")
+    workflows: List["AIWorkflow"] = Relationship(back_populates="space")
+
 
 
 class ClipTagLink(SQLModel, table=True):
@@ -133,3 +141,68 @@ class VideoIdeation(SQLModel, table=True):
 
     space_id: Optional[uuid.UUID] = Field(default=None, foreign_key="space.id")
     space: Optional["Space"] = Relationship(back_populates="ideations")
+
+class AIWorkflow(SQLModel, table=True):
+    """Represents a saved AI workflow/pipeline"""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    name: str
+    description: Optional[str] = None
+    thumbnail: Optional[str] = None  # Preview image URL
+    is_public: bool = Field(default=False)  # Shareable with other users
+    workflow_data: str = Field(sa_type=Text)  # JSON string of node graph
+    created_at: int = Field(sa_type=BigInteger)
+    updated_at: int = Field(sa_type=BigInteger)
+    
+    user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
+    user: Optional[User] = Relationship(back_populates="workflows")
+    
+    space_id: Optional[uuid.UUID] = Field(default=None, foreign_key="space.id")
+    space: Optional["Space"] = Relationship(back_populates="workflows")
+    
+    executions: List["WorkflowExecution"] = Relationship(back_populates="workflow")
+
+class WorkflowExecution(SQLModel, table=True):
+    """Tracks execution history and results"""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    workflow_id: uuid.UUID = Field(foreign_key="aiworkflow.id")
+    status: str = Field(default="pending")  # 'pending', 'running', 'completed', 'failed', 'cancelled'
+    input_data: str = Field(sa_type=Text)  # JSON of input parameters
+    output_data: Optional[str] = Field(default=None, sa_type=Text)  # JSON of results
+    error_message: Optional[str] = Field(default=None, sa_type=Text)
+    credits_used: int = Field(default=0)
+    execution_time_ms: Optional[int] = None
+    created_at: int = Field(sa_type=BigInteger)
+    completed_at: Optional[int] = Field(default=None, sa_type=BigInteger)
+    
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    user: Optional[User] = Relationship(back_populates="workflow_executions")
+    
+    workflow: Optional[AIWorkflow] = Relationship(back_populates="executions")
+    credit_transactions: List["CreditTransaction"] = Relationship(back_populates="workflow_execution")
+
+class CreditTransaction(SQLModel, table=True):
+    """Tracks all credit additions/deductions"""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    amount: int  # Positive for additions, negative for deductions
+    transaction_type: str  # 'purchase', 'subscription', 'workflow_execution', 'refund', 'bonus'
+    description: str
+    workflow_execution_id: Optional[uuid.UUID] = Field(default=None, foreign_key="workflowexecution.id")
+    stripe_payment_intent_id: Optional[str] = None
+    created_at: int = Field(sa_type=BigInteger)
+    
+    user: Optional[User] = Relationship(back_populates="credit_transactions")
+    workflow_execution: Optional[WorkflowExecution] = Relationship(back_populates="credit_transactions")
+
+class ReplicateModelCache(SQLModel, table=True):
+    """Cache for Replicate model metadata"""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    model_id: str = Field(unique=True, index=True)  # e.g., "stability-ai/sdxl"
+    model_name: str
+    description: str = Field(sa_type=Text)
+    category: str  # 'image-generation', 'video-generation', 'image-editing', 'upscaling', 'background-removal'
+    input_schema: str = Field(sa_type=Text)  # JSON schema
+    output_schema: str = Field(sa_type=Text)  # JSON schema
+    cost_per_run: float  # Estimated cost in credits
+    is_active: bool = Field(default=True)
+    last_updated: int = Field(sa_type=BigInteger)

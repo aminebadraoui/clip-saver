@@ -4,7 +4,7 @@ import type { Tag } from "@/types/tag";
 import { formatTime } from "@/utils/formatTime";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Trash2, MoreVertical, Tag as TagIcon, Eye, Clock, Film } from "lucide-react";
+import { Play, Trash2, MoreVertical, Tag as TagIcon, Eye, Clock, Film, Wand2 } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ThumbnailGenerator } from "@/components/ThumbnailGenerator";
 
 interface ClipCardProps {
     clip: Clip;
@@ -104,6 +105,18 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
 
+                            {/* AI Workflows */}
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>
+                                    <Wand2 className="w-4 h-4 mr-2" />
+                                    AI Workflows
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent className="w-48">
+                                    <div onClick={(e) => e.stopPropagation()}>
+                                        <ThumbnailGenerator clip={clip} />
+                                    </div>
+                                </DropdownMenuSubContent>
+                            </DropdownMenuSub>
 
                             <DropdownMenuSub>
                                 <DropdownMenuSubTrigger>
