@@ -1,6 +1,6 @@
 export interface Clip {
     id: string;
-    type: 'video' | 'clip';
+    type: 'video' | 'clip' | 'short';
     videoId: string;
     start?: number;
     end?: number;

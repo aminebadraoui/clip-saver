@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Folder, Layers, Wand2 } from "lucide-react"; // Import appropriate icons
+import { Folder, Layers, Wand2, Lightbulb } from "lucide-react"; // Import appropriate icons
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useAppData } from "@/context/AppDataContext";
@@ -136,6 +136,18 @@ export function Sidebar({
                 ))}
 
                 {/* Add standard "AI Workflows" link at bottom */}
+                <Separator className="my-2 bg-border/50" />
+
+                <Link to="/ideation">
+                    <Button
+                        variant={location.pathname.startsWith('/ideation') ? "secondary" : "ghost"}
+                        className="w-full justify-start"
+                    >
+                        <Lightbulb className="w-4 h-4 mr-2" />
+                        Video Ideation
+                    </Button>
+                </Link>
+
                 <Separator className="my-2 bg-border/50" />
 
                 <Link to="/workflows">

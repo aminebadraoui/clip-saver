@@ -143,7 +143,53 @@ async function saveClip(payload) {
 
 // --- DOM Scraping Helpers ---
 function parseCount(str) { if (!str) return 0; str = str.replace(/[^0-9.KMB]/g, ''); const multiplier = str.toUpperCase().endsWith('K') ? 1000 : str.toUpperCase().endsWith('M') ? 1000000 : str.toUpperCase().endsWith('B') ? 1000000000 : 1; const num = parseFloat(str.replace(/[KMB]/i, '')); return Math.round(num * multiplier) || 0; }
-function scrapeCurrentPage() { try { const videoId = new URLSearchParams(window.location.search).get('v'); if (!videoId) return null; const title = document.querySelector('h1.ytd-watch-metadata')?.innerText?.trim() || document.querySelector('meta[property="og:title"]')?.content || ""; const channelName = document.querySelector('ytd-channel-name a')?.innerText?.trim() || ""; const subCountEl = document.querySelector('#owner-sub-count'); const subscriberCount = parseCount(subCountEl?.innerText?.trim()); const viewCountMeta = document.querySelector('meta[itemprop="interactionCount"]'); let viewCount = viewCountMeta ? parseInt(viewCountMeta.content) : 0; const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`; const uploadDate = document.querySelector('meta[itemprop="uploadDate"]')?.content || ""; return { videoId, title, channelName, subscriberCount, viewCount, thumbnail, uploadDate, originalVideoUrl: window.location.href }; } catch (e) { return null; } }
+
+function scrapeCurrentPage() {
+    try {
+        let videoId = new URLSearchParams(window.location.search).get('v');
+        let isShort = false;
+
+        if (!videoId && window.location.pathname.startsWith('/shorts/')) {
+            videoId = window.location.pathname.split('/shorts/')[1];
+            isShort = true;
+        }
+
+        if (!videoId) return null;
+
+        let title, channelName, subscriberCount, viewCount, uploadDate;
+
+        if (isShort) {
+            title = document.querySelector('ytd-reel-video-renderer[is-active] .yt-reel-metapanel-view-model h2, ytd-reel-video-renderer[is-active] h2.ytShortsVideoTitleViewModelShortsVideoTitle')?.innerText?.trim() || "";
+            channelName = document.querySelector('ytd-reel-video-renderer[is-active] .yt-reel-channel-bar-view-model .yt-core-attributed-string a')?.innerText?.trim() || "";
+            // Shorts often hide date/views in overlay, simplifying fallback
+            subscriberCount = 0;
+            viewCount = 0;
+            uploadDate = "";
+        } else {
+            title = document.querySelector('h1.ytd-watch-metadata')?.innerText?.trim() || document.querySelector('meta[property="og:title"]')?.content || "";
+            channelName = document.querySelector('ytd-channel-name a')?.innerText?.trim() || "";
+            const subCountEl = document.querySelector('#owner-sub-count');
+            subscriberCount = parseCount(subCountEl?.innerText?.trim());
+            const viewCountMeta = document.querySelector('meta[itemprop="interactionCount"]');
+            viewCount = viewCountMeta ? parseInt(viewCountMeta.content) : 0;
+            uploadDate = document.querySelector('meta[itemprop="uploadDate"]')?.content || "";
+        }
+
+        const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+
+        return {
+            videoId,
+            title,
+            channelName,
+            subscriberCount,
+            viewCount,
+            thumbnail,
+            uploadDate,
+            originalVideoUrl: isShort ? `https://www.youtube.com/shorts/${videoId}` : window.location.href,
+            type: isShort ? 'short' : 'video'
+        };
+    } catch (e) { console.error("Scraping error", e); return null; }
+}
 
 // --- UI Injection ---
 let activePopupCleanup = null;
@@ -185,7 +231,7 @@ function createDropdown(x, y, videoData, anchorElement) {
     }
 
     dropdown.innerHTML = `
-        <div class="clip-saver-header"><span class="clip-saver-title">Bookmark to Clip Coba</span><span class="clip-saver-close">&times;</span></div>
+        <div class="clip-saver-header"><span class="clip-saver-title">Clip Coba</span><span class="clip-saver-close">&times;</span></div>
         ${scoreHtml}
         <div id="cs-space-container" style="padding: 0 12px;"></div>
         <div class="clip-saver-tags-list" id="cs-tags"></div>
@@ -193,7 +239,7 @@ function createDropdown(x, y, videoData, anchorElement) {
             <input type="text" class="clip-saver-input" placeholder="New tag..." id="cs-new-tag-input">
             <button class="clip-saver-add-btn">+</button>
         </div>
-        <button class="clip-saver-save-btn">SAVE BOOKMARK</button>
+        <button class="clip-saver-save-btn">Send to Clip Coba</button>
         <div class="clip-saver-status" id="cs-status"></div>
     `;
     document.body.appendChild(dropdown);
@@ -340,6 +386,23 @@ function injectAll() {
         // Pass 'player-metadata' context
         injectButton(ownerMetadata, playerForData, 'player-metadata');
     }
+    // 5. Shorts Actions Overlay
+    // We target the action bar container to inject our button
+    const shortsActionContainers = document.querySelectorAll('ytd-reel-player-overlay-renderer #actions');
+    shortsActionContainers.forEach(container => {
+        // Find the parent renderer (the specific short container)
+        const parentRenderer = container.closest('ytd-reel-video-renderer');
+        if (parentRenderer) injectButton(container, parentRenderer, 'shorts');
+    });
+
+    // 6. Channel Page Shorts Grid (New Request)
+    // Target: The text container inside the metadata block to flow naturally
+    // Structure: .shortsLockupViewModelHostOutsideMetadata -> div (text container)
+    const channelShortsTextContainers = document.querySelectorAll('.shortsLockupViewModelHostOutsideMetadata > div:first-child');
+    channelShortsTextContainers.forEach(container => {
+        const parentViewModel = container.closest('ytm-shorts-lockup-view-model');
+        if (parentViewModel) injectButton(container, parentViewModel, 'shorts-grid');
+    });
 }
 
 function injectButton(container, videoDataContainer, context = 'default') {
@@ -352,12 +415,36 @@ function injectButton(container, videoDataContainer, context = 'default') {
     // Add context-specific class to wrapper
     if (context === 'search') wrapper.classList.add('clip-saver-wrapper-search');
     if (context === 'lockup') wrapper.classList.add('clip-saver-wrapper-lockup');
+    if (context === 'shorts') {
+        wrapper.classList.add('clip-saver-wrapper-shorts');
+        // Add some basic style for shorts button to fit in vertical list
+        wrapper.style.marginTop = '16px';
+        wrapper.style.marginBottom = '16px';
+        wrapper.style.display = 'flex';
+        wrapper.style.justifyContent = 'center';
+    }
+    if (context === 'shorts-grid') {
+        wrapper.classList.add('clip-saver-wrapper-shorts-grid');
+        // Flow layout: add margin to separate from text
+        wrapper.style.marginTop = '4px';
+        wrapper.style.marginBottom = '8px';
+        wrapper.style.display = 'block';
+        // Force left align or inherit
+        wrapper.style.textAlign = 'left';
+    }
     if (context === 'player') wrapper.classList.add('clip-saver-wrapper-player'); // Legacy/Fallback
     if (context === 'player-metadata') wrapper.classList.add('clip-saver-wrapper-player-metadata');
 
     const btn = document.createElement('button');
     btn.className = 'clip-saver-btn';
-    btn.textContent = 'BOOKMARK';
+    btn.textContent = 'ClipCoba';
+
+    if (context === 'shorts-grid') {
+        // Smaller button for grid
+        btn.style.fontSize = '10px';
+        btn.style.padding = '2px 6px';
+    }
+
 
     btn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); handleSnapClick(e, btn, videoDataContainer); };
 
@@ -371,6 +458,7 @@ function injectButton(container, videoDataContainer, context = 'default') {
         wrapper.style.right = '10px';
         wrapper.style.zIndex = '2000';
     }
+
     // 'player-metadata' does NOT need absolute positioning, it should flow in the document
     else {
         // For other contexts, ensure the container is relative for proper positioning of the wrapper
@@ -397,19 +485,79 @@ async function handleSnapClick(e, btn, dataContainer) {
             if (enriched) videoData = { ...videoData, ...enriched };
         }
     }
-    // 2. Thumbnail Case (dataContainer is renderer or lockup)
+    // 2. Shorts Player Overlay Case
+    else if (dataContainer.tagName.toLowerCase() === 'ytd-reel-video-renderer') {
+        if (dataContainer.hasAttribute('is-active')) {
+            videoData = scrapeCurrentPage();
+            if (videoData && videoData.videoId) {
+                const enriched = await fetchVideoInfo(videoData.videoId);
+                if (enriched) videoData = { ...videoData, ...enriched };
+            }
+        } else {
+            videoData = scrapeCurrentPage();
+        }
+    }
+    // 4. Channel Page Shorts Grid Case
+    else if (dataContainer.tagName.toLowerCase() === 'ytm-shorts-lockup-view-model') {
+        // Find the link
+        const link = dataContainer.querySelector('a.shortsLockupViewModelHostEndpoint');
+        if (link) {
+            const href = link.getAttribute('href');
+            // href might be relative e.g. /shorts/ID
+            if (href && href.includes('/shorts/')) {
+                const vId = href.split('/shorts/')[1];
+                if (vId) {
+                    let title = "Unknown Short";
+                    const titleEl = dataContainer.querySelector('.shortsLockupViewModelHostMetadataTitle span');
+                    if (titleEl) title = titleEl.innerText;
+
+                    let viewsTitle = "";
+                    const viewsEl = dataContainer.querySelector('.shortsLockupViewModelHostMetadataSubhead span');
+                    if (viewsEl) viewsTitle = viewsEl.innerText; // "363k views"
+
+                    videoData = {
+                        videoId: vId,
+                        title: title,
+                        thumbnail: `https://img.youtube.com/vi/${vId}/maxresdefault.jpg`,
+                        originalVideoUrl: `https://www.youtube.com${href}`,
+                        type: 'short' // explicit short type
+                    };
+                    const enriched = await fetchVideoInfo(vId);
+                    if (enriched) videoData = { ...videoData, ...enriched };
+                }
+            }
+        }
+    }
+    // 3. Thumbnail / Shelf Case (Default)
     else {
         const link = dataContainer.querySelector('a#thumbnail, a.yt-lockup-view-model__content-image');
         if (link) {
             const href = link.href;
             if (href) {
-                const urlObj = new URL(href); const vId = urlObj.searchParams.get('v');
+                const urlObj = new URL(href);
+                let vId = urlObj.searchParams.get('v');
+                let isShort = false;
+
+                // Handle Shorts Links in Shelves
+                if (!vId && urlObj.pathname.startsWith('/shorts/')) {
+                    vId = urlObj.pathname.split('/shorts/')[1];
+                    isShort = true;
+                }
+
                 if (vId) {
                     let title = "Unknown Video";
                     const titleEl = dataContainer.querySelector('#video-title, .yt-lockup-metadata-view-model__title span');
                     if (titleEl) title = titleEl.innerText;
-                    videoData = { videoId: vId, title: title, thumbnail: `https://img.youtube.com/vi/${vId}/maxresdefault.jpg`, originalVideoUrl: href };
-                    const enriched = await fetchVideoInfo(vId); if (enriched) videoData = { ...videoData, ...enriched };
+
+                    videoData = {
+                        videoId: vId,
+                        title: title,
+                        thumbnail: `https://img.youtube.com/vi/${vId}/maxresdefault.jpg`,
+                        originalVideoUrl: href,
+                        type: isShort ? 'short' : 'video'
+                    };
+                    const enriched = await fetchVideoInfo(vId);
+                    if (enriched) videoData = { ...videoData, ...enriched };
                 }
             }
         }

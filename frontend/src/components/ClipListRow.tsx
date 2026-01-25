@@ -28,7 +28,7 @@ export function ClipListRow({ clip, tags, onDelete, onCinemaMode }: ClipListRowP
                     className="w-full h-full object-cover rounded-md"
                 />
                 <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1 rounded">
-                    {clip.type === 'clip' ? 'CLIP' : 'VIDEO'}
+                    {clip.type === 'clip' ? 'CLIP' : clip.type === 'short' ? 'SHORT' : 'VIDEO'}
                 </div>
                 {clip.engagementScore != null && (
                     <div className="absolute top-1 left-1 bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm z-10">
