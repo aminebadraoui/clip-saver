@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Folder, Layers, Wand2 } from "lucide-react"; // Import appropriate icons
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useAppData } from "@/context/AppDataContext";
 import { updateClip } from "@/utils/storage";
@@ -18,6 +18,7 @@ export function Sidebar({
     onSelectFilterType,
 }: SidebarProps) {
     const location = useLocation();
+    const navigate = useNavigate();
     const { spaces, currentSpace, setCurrentSpace } = useAuth(); // Assuming createSpace is available or we add a button
     const { clips, refreshData } = useAppData();
     const [dragOverSpaceId, setDragOverSpaceId] = React.useState<string | null>(null);
@@ -58,8 +59,11 @@ export function Sidebar({
 
         onSelectTag(null);
         onSelectFilterType('video');
-        onSelectTag(null);
-        onSelectFilterType('video');
+
+        // Navigate to dashboard if not there
+        if (location.pathname !== '/dashboard') {
+            navigate('/dashboard');
+        }
     };
 
     const handleDragOver = (e: React.DragEvent, spaceId: string | null) => {
@@ -73,6 +77,9 @@ export function Sidebar({
 
     const handleDrop = async (e: React.DragEvent, targetSpaceId: string) => {
         e.preventDefault();
+        // Clear highlight immediately on drop
+        setDragOverSpaceId(null);
+
         const clipId = e.dataTransfer.getData("clipId");
         if (!clipId) return;
 
