@@ -23,6 +23,7 @@ export interface Clip {
     outlierScore?: number;
     engagementScore?: number;
     channelAverageViews?: number;
+    spaceId?: string;
     notesList?: Note[];
 }
 

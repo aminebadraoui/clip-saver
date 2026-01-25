@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from typing import Optional
+import uuid
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -944,6 +945,7 @@ def read_clips(
     for clip in clips:
         clip_dict = clip.model_dump()
         clip_dict["tagIds"] = [tag.id for tag in clip.tags]
+        clip_dict["spaceId"] = str(clip.space_id) if clip.space_id else None
         # Include granular notes
         # We need to explicitly convert Note objects to dicts or rely on FastAPI/Pydantic serialization 
         # But since we are manually building the dict, let's include them.
@@ -963,7 +965,7 @@ class ClipCreate(BaseModel):
     title: str
     thumbnail: str
     createdAt: int
-    folderId: Optional[str] = None
+    # folderId removed from model
     tagIds: List[str] = []
     notes: Optional[str] = None
     aiPrompt: Optional[str] = None
@@ -979,6 +981,7 @@ class ClipCreate(BaseModel):
     engagementScore: Optional[float] = None
     outlierScore: Optional[float] = None
     channelAverageViews: Optional[int] = None
+    spaceId: Optional[str] = None
 
 @app.post("/api/clips")
 def create_clip(
@@ -1054,10 +1057,24 @@ def update_clip(
     if not clip:
         raise HTTPException(status_code=404, detail="Clip not found")
     
-    clip_data_dict = clip_data.model_dump(exclude={"tagIds"})
+    clip_data_dict = clip_data.model_dump(exclude={"tagIds", "spaceId", "folderId"})
     for key, value in clip_data_dict.items():
         setattr(clip, key, value)
     
+    # Handle Space Move
+    if clip_data.spaceId:
+        # Verify target space exists and belongs to user
+        try:
+            target_uuid = uuid.UUID(clip_data.spaceId)
+            target_space = session.exec(select(Space).where(Space.id == target_uuid, Space.user_id == current_user.id)).first()
+            if target_space:
+                clip.space_id = target_space.id
+            else:
+                print(f"Warning: Target space {clip_data.spaceId} not found for user {current_user.id}")
+        except ValueError:
+             print(f"Error: Invalid spaceId format {clip_data.spaceId}")
+             # raise HTTPException(status_code=400, detail="Invalid spaceId")
+
     # Update tags
     clip.tags = []
     if clip_data.tagIds:

@@ -39,6 +39,7 @@ export function ClipsPage() {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [sortBy, setSortBy] = useState<'date' | 'viralRatio' | 'timeRatio' | 'engagementScore'>('date');
     const [selectedClipForCinema, setSelectedClipForCinema] = useState<Clip | null>(null);
+    const [lastDeletedClip, setLastDeletedClip] = useState<Clip | null>(null); // State for Undo
 
     // Check for addVideo query param
     useEffect(() => {
@@ -103,10 +104,50 @@ export function ClipsPage() {
         handleAutoAdd();
     }, [clips]); // Add clips dependency to check for duplicates correctly
 
-    const handleDeleteClip = async (id: string) => {
-        await deleteClip(id);
-        await refreshData();
+    const handleUndoDelete = async (clip: Clip) => {
+        try {
+            await saveClip(clip);
+            await refreshData();
+            setLastDeletedClip(null);
+            toast.success("Clip restored");
+        } catch (e) {
+            toast.error("Failed to restore clip");
+        }
     };
+
+    const handleDeleteClip = async (id: string) => {
+        const clipToDelete = clips.find(c => c.id === id);
+        if (clipToDelete) {
+            setLastDeletedClip(clipToDelete);
+
+            // Optimistic update? Or wait? safe to wait.
+            await deleteClip(id);
+            await refreshData();
+
+            toast.success("Clip deleted", {
+                action: {
+                    label: "Undo",
+                    onClick: () => handleUndoDelete(clipToDelete)
+                },
+                duration: 5000,
+            });
+        }
+    };
+
+    // Keyboard Listener for Undo (Cmd+Z)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) { // Cmd+Z only (not Redo)
+                if (lastDeletedClip) {
+                    e.preventDefault();
+                    handleUndoDelete(lastDeletedClip);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [lastDeletedClip]);
 
     const handleUpdateClip = async (updatedClip: Clip) => {
         await updateClip(updatedClip);

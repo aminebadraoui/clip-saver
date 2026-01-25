@@ -59,7 +59,7 @@ export const LandingPage = () => {
                             <ul className="text-xl text-muted-foreground leading-relaxed max-w-xl mx-auto lg:mx-0 space-y-2 list-none">
                                 <li className="flex items-center gap-2 justify-center lg:justify-start">
                                     <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
-                                    Snap videos instantly
+                                    Bookmark videos instantly
                                 </li>
                                 <li className="flex items-center gap-2 justify-center lg:justify-start">
                                     <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
@@ -80,12 +80,12 @@ export const LandingPage = () => {
 
                         {/* Feature Grid (Shifted up to be above fold) */}
                         <div className="grid grid-cols-2 gap-4">
-                            {/* Feature 1: Snap & Save */}
+                            {/* Feature 1: Bookmark & Save */}
                             <div className="group p-6 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md hover:bg-white/10 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-primary/5">
                                 <div className="w-10 h-10 bg-red-500/20 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-red-500/30 transition-colors">
                                     <Youtube className="w-5 h-5 text-red-500" />
                                 </div>
-                                <h3 className="text-lg font-bold mb-2">Snap & Save</h3>
+                                <h3 className="text-lg font-bold mb-2">Bookmark & Save</h3>
                                 <p className="text-sm text-muted-foreground leading-relaxed">
                                     One-click capture from YouTube.
                                 </p>
