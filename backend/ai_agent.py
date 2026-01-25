@@ -2,11 +2,10 @@ import os
 from typing import Optional
 from dotenv import load_dotenv
 from youtube_transcript_api import YouTubeTranscriptApi
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_core.prompts import ChatPromptTemplate
+import replicate
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
+import json
 
 # Define structured output models
 class TitleIdea(BaseModel):
@@ -52,14 +51,12 @@ def fetch_transcript(video_id: str) -> Optional[str]:
 
 def generate_video_outline(transcript: str, video_title: str) -> str:
     """
-    Generates a viral script outline/skeleton from a video transcript using OpenAI.
+    Generates a viral script outline/skeleton from a video transcript using Gemini 3 Pro.
     """
     
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("REPLICATE_API_TOKEN")
     if not api_key:
-        return "Error: OPENAI_API_KEY not found in environment variables."
-
-    llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
+        return "Error: REPLICATE_API_TOKEN not found in environment variables."
 
     system_prompt = """You are an expert viral video strategist and scriptwriter. 
 Your goal is to deconstruct a successful YouTube video into its core skeletal structure/outline.
@@ -84,17 +81,21 @@ Format the output as a clean Markdown outline."""
     
     Output the outline in Markdown format."""
 
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=user_prompt)
-    ]
-
     try:
-        response = llm.invoke(messages)
-        content = response.content
+        output = ""
+        for event in replicate.stream(
+            "google/gemini-3-pro",
+            input={
+                "prompt": user_prompt,
+                "system_instruction": system_prompt,
+                "temperature": 0.7,
+                "thinking_level": "low",
+            },
+        ):
+            output += str(event)
         
         # Clean up markdown code blocks if present
-        content = content.replace("```markdown", "").replace("```", "").strip()
+        content = output.replace("```markdown", "").replace("```", "").strip()
         
         return content
     except Exception as e:
@@ -102,14 +103,11 @@ Format the output as a clean Markdown outline."""
 
 def generate_title_ideas(inspiration_titles: List[Dict[str, Any]], concept_data: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
-    Generates new title ideas based on inspiration titles and concept data.
+    Generates new title ideas based on inspiration titles and concept data using Gemini 3 Pro.
     """
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("REPLICATE_API_TOKEN")
     if not api_key:
-        raise ValueError("OPENAI_API_KEY not found")
-
-    llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
-    structured_llm = llm.with_structured_output(TitleList)
+        raise ValueError("REPLICATE_API_TOKEN not found")
 
     # Format inspiration titles for prompt
     inspiration_text = "\n".join([f"- {t.get('text', '')}" for t in inspiration_titles if t.get('text')])
@@ -140,32 +138,47 @@ The new titles must:
     Generate 5 new viral titles.
     """
 
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=user_prompt)
-    ]
-
     try:
-        title_list = structured_llm.invoke(messages)
-        # Convert back to dict list with IDs
+        output = ""
+        for event in replicate.stream(
+            "google/gemini-3-pro",
+            input={
+                "prompt": user_prompt,
+                "system_instruction": system_prompt,
+                "temperature": 0.7,
+                "thinking_level": "low",
+            },
+        ):
+            output += str(event)
+        
+        # Parse JSON response
         import uuid
-        return [
-            {"id": str(uuid.uuid4()), "text": t.text, "score": t.score}
-            for t in title_list.titles
-        ]
+        try:
+            # Try to extract JSON from response
+            lines = output.strip().split('\n')
+            titles = []
+            for line in lines:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    titles.append({
+                        "id": str(uuid.uuid4()),
+                        "text": line.lstrip('0123456789.-) '),
+                        "score": 7
+                    })
+            return titles[:5] if titles else []
+        except:
+            return []
     except Exception as e:
         print(f"Error generating titles: {e}")
         return []
 
 def readapt_script_outline(current_outline: str, concept_data: Dict[str, Any]) -> str:
     """
-    Readapts an existing script outline to match the new Main Concept.
+    Readapts an existing script outline to match the new Main Concept using Gemini 3 Pro.
     """
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("REPLICATE_API_TOKEN")
     if not api_key:
-        return "Error: OPENAI_API_KEY not found"
-
-    llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
+        return "Error: REPLICATE_API_TOKEN not found"
 
     system_prompt = """You are an expert script editor.
 Your task is to take an EXISTING script outline (structure) and rewrite its content points 
@@ -189,28 +202,31 @@ to fit a NEW 'Main Concept'.
     Rewrite the outline for the new concept.
     """
 
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=user_prompt)
-    ]
-
     try:
-        response = llm.invoke(messages)
-        content = response.content
-        content = content.replace("```markdown", "").replace("```", "").strip()
+        output = ""
+        for event in replicate.stream(
+            "google/gemini-3-pro",
+            input={
+                "prompt": user_prompt,
+                "system_instruction": system_prompt,
+                "temperature": 0.7,
+                "thinking_level": "low",
+            },
+        ):
+            output += str(event)
+        
+        content = output.replace("```markdown", "").replace("```", "").strip()
         return content
     except Exception as e:
         return f"Error readapting outline: {str(e)}"
 
 def generate_viral_script(outline: str, titles: List[Dict[str, Any]], concept_data: Dict[str, Any]) -> str:
     """
-    Generates a full viral script based on outline, titles, and concept.
+    Generates a full viral script based on outline, titles, and concept using Gemini 3 Pro.
     """
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("REPLICATE_API_TOKEN")
     if not api_key:
-        return "Error: OPENAI_API_KEY not found"
-
-    llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
+        return "Error: REPLICATE_API_TOKEN not found"
 
     # Pick the best title or list them
     title_text = "\n".join([f"- {t.get('text', '')}" for t in titles])
@@ -241,15 +257,20 @@ Guidelines:
     Write the full script now.
     """
 
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=user_prompt)
-    ]
-
     try:
-        response = llm.invoke(messages)
-        content = response.content
-        content = content.replace("```markdown", "").replace("```", "").strip()
+        output = ""
+        for event in replicate.stream(
+            "google/gemini-3-pro",
+            input={
+                "prompt": user_prompt,
+                "system_instruction": system_prompt,
+                "temperature": 0.7,
+                "thinking_level": "low",
+            },
+        ):
+            output += str(event)
+        
+        content = output.replace("```markdown", "").replace("```", "").strip()
         return content
     except Exception as e:
         return f"Error generating script: {str(e)}"

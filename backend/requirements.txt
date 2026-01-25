@@ -18,3 +18,5 @@ langchain-community
 langgraph
 langchain-openai
 youtube-transcript-api
+replicate
+networkx
