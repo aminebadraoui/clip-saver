@@ -14,10 +14,13 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuSubContent,
     DropdownMenuCheckboxItem,
+    DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ThumbnailGenerator } from "@/components/ThumbnailGenerator";
+import { useAuth } from "@/context/AuthContext";
+import { FolderInput } from "lucide-react";
 
 interface ClipCardProps {
     clip: Clip;
@@ -30,6 +33,17 @@ interface ClipCardProps {
 }
 
 export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, onCinemaMode }: ClipCardProps) {
+    const { spaces } = useAuth();
+
+    // Hide spaces submenu if only 1 space? No, allow moving even if only 1 space (to 'all' maybe? or just show list).
+    // Or filter out current space? We don't know current space of clip unless passed or inferred.
+    // Clip has spaceId.
+
+    const handleMoveToSpace = (spaceId: string) => {
+        if (onUpdate && clip.spaceId !== spaceId) {
+            onUpdate({ ...clip, spaceId });
+        }
+    };
 
 
     const handleToggleTag = (tagId: string) => {
@@ -57,6 +71,12 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
         <Card
             className="group overflow-hidden flex flex-col h-full border-border/50 bg-card/50 backdrop-blur-sm hover:shadow-xl hover:border-primary/20 transition-all duration-300 cursor-pointer"
             onClick={() => onCinemaMode?.(clip)}
+            draggable
+            onDragStart={(e) => {
+                e.dataTransfer.setData('clipId', clip.id);
+                // Also setting effect allowed
+                e.dataTransfer.effectAllowed = 'move';
+            }}
         >
             <div
                 className="relative aspect-video overflow-hidden"
@@ -111,11 +131,42 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
                                     <Wand2 className="w-4 h-4 mr-2" />
                                     AI Workflows
                                 </DropdownMenuSubTrigger>
-                                <DropdownMenuSubContent className="w-48">
-                                    <div onClick={(e) => e.stopPropagation()}>
-                                        <ThumbnailGenerator clip={clip} />
-                                    </div>
-                                </DropdownMenuSubContent>
+                                <DropdownMenuPortal>
+                                    <DropdownMenuSubContent className="w-48">
+                                        <div onClick={(e) => e.stopPropagation()}>
+                                            <ThumbnailGenerator clip={clip} />
+                                        </div>
+                                    </DropdownMenuSubContent>
+                                </DropdownMenuPortal>
+                            </DropdownMenuSub>
+
+                            {/* Move to Space Submenu */}
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>
+                                    <FolderInput className="w-4 h-4 mr-2" />
+                                    Move to Space
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuPortal>
+                                    <DropdownMenuSubContent className="w-48">
+                                        {spaces.length === 0 && <div className="p-2 text-xs text-muted-foreground">No spaces created</div>}
+                                        {spaces.map(space => (
+                                            <DropdownMenuItem
+                                                key={space.id}
+                                                disabled={clip.spaceId === space.id}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleMoveToSpace(space.id);
+                                                }}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    {/* <div className="w-2 h-2 rounded-full bg-primary/50" /> */}
+                                                    <span className={clip.spaceId === space.id ? "font-bold" : ""}>{space.name}</span>
+                                                    {clip.spaceId === space.id && <span className="text-[10px] ml-auto opacity-50">(Current)</span>}
+                                                </div>
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuSubContent>
+                                </DropdownMenuPortal>
                             </DropdownMenuSub>
 
                             <DropdownMenuSub>
@@ -123,21 +174,23 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
                                     <TagIcon className="w-4 h-4 mr-2" />
                                     Manage Tags
                                 </DropdownMenuSubTrigger>
-                                <DropdownMenuSubContent className="w-48">
-                                    {tags.length === 0 && <div className="p-2 text-xs text-muted-foreground">No tags created</div>}
-                                    {tags.map(tag => (
-                                        <DropdownMenuCheckboxItem
-                                            key={tag.id}
-                                            checked={clip.tagIds?.includes(tag.id)}
-                                            onCheckedChange={() => handleToggleTag(tag.id)}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
-                                                {tag.name}
-                                            </div>
-                                        </DropdownMenuCheckboxItem>
-                                    ))}
-                                </DropdownMenuSubContent>
+                                <DropdownMenuPortal>
+                                    <DropdownMenuSubContent className="w-48">
+                                        {tags.length === 0 && <div className="p-2 text-xs text-muted-foreground">No tags created</div>}
+                                        {tags.map(tag => (
+                                            <DropdownMenuCheckboxItem
+                                                key={tag.id}
+                                                checked={clip.tagIds?.includes(tag.id)}
+                                                onCheckedChange={() => handleToggleTag(tag.id)}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
+                                                    {tag.name}
+                                                </div>
+                                            </DropdownMenuCheckboxItem>
+                                        ))}
+                                    </DropdownMenuSubContent>
+                                </DropdownMenuPortal>
                             </DropdownMenuSub>
 
                             <DropdownMenuItem
@@ -273,6 +326,6 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
                     )}
                 </Button>
             </CardFooter>
-        </Card>
+        </Card >
     );
 }

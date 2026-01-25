@@ -41,7 +41,7 @@ export const PrivacyPolicyPage = () => {
                             <p className="mb-4 text-white">We collect minimal data necessary to provide our services:</p>
                             <ul className="list-disc pl-6 space-y-2 text-white">
                                 <li><strong>Account Information:</strong> When you register, we collect your email address and password (encrypted).</li>
-                                <li><strong>Extension Data:</strong> If you use our Chrome Extension, we collect the YouTube Video IDs and Titles of the videos you explicitly choose to "Snap" (save). We also store your authentication token locally to sync with your account.</li>
+                                <li><strong>Extension Data:</strong> If you use our Chrome Extension, we collect the YouTube Video IDs and Titles of the videos you explicitly choose to "Bookmark" (save). We also store your authentication token locally to sync with your account.</li>
                                 <li><strong>Usage Data:</strong> We may collect anonymous usage statistics to improve our service functionality.</li>
                             </ul>
                         </section>
