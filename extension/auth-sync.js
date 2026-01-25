@@ -16,11 +16,13 @@ function syncToken() {
         }
 
         const token = localStorage.getItem('clipcoba_token');
+        const refreshToken = localStorage.getItem('clipcoba_refresh_token');
 
         if (token) {
             // WE found a token on this page, so WE take authority
             chrome.storage.local.set({
                 'authToken': token,
+                'refreshToken': refreshToken,
                 'tokenSource': currentSource
             }, () => {
                 if (chrome.runtime.lastError) {
@@ -37,7 +39,7 @@ function syncToken() {
                 if (result.tokenSource === currentSource) {
                     // We set it, so we can clear it
                     console.log(`Clip Coba: Clearing token from ${currentSource}`);
-                    chrome.storage.local.remove(['authToken', 'tokenSource'], () => {
+                    chrome.storage.local.remove(['authToken', 'refreshToken', 'tokenSource'], () => {
                         if (chrome.runtime.lastError) clearInterval(syncInterval);
                     });
                 } else {

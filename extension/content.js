@@ -7,8 +7,9 @@ let availableSpaces = [];
 let userTags = [];
 
 // --- Auth Sync ---
+// --- Auth Sync ---
 const syncToken = () => {
-    chrome.storage.local.get(['authToken'], (result) => {
+    chrome.storage.local.get(['authToken', 'refreshToken'], (result) => {
         currentToken = result.authToken || null;
         if (currentToken) {
             fetchTags();
@@ -20,10 +21,68 @@ syncToken();
 chrome.storage.onChanged.addListener(syncToken);
 
 // --- API Interactions ---
+async function attemptExtensionRefresh() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['refreshToken'], async (result) => {
+            const rToken = result.refreshToken;
+            if (!rToken) { resolve(false); return; }
+
+            try {
+                // Use API_BASE, but remove /api suffix for auth endpoint if needed, or assume backend paths
+                // API_BASE is .../api. Backend has /auth/refresh at root or under /api?
+                // Backend main.py: @app.post("/auth/refresh"). It is NOT under a router prefix, but app root.
+                // However, API_BASE is "https://api.clipcoba.com/api".
+                // So we need "https://api.clipcoba.com/auth/refresh".
+                const authUrl = API_BASE.replace('/api', '/auth/refresh');
+
+                const refreshRes = await fetch(authUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refresh_token: rToken })
+                });
+
+                if (refreshRes.ok) {
+                    const data = await refreshRes.json();
+                    currentToken = data.access_token;
+                    // Update storage so other tabs/popup know
+                    chrome.storage.local.set({ 'authToken': currentToken });
+                    console.log("Extension: Token refreshed successfully");
+                    resolve(true);
+                } else {
+                    console.warn("Extension: Refresh failed", refreshRes.status);
+                    resolve(false);
+                }
+            } catch (e) {
+                console.error("Extension refresh failed", e);
+                resolve(false);
+            }
+        });
+    });
+}
+
+async function fetchWithAuth(url, options = {}) {
+    if (!currentToken) throw new Error("Please log in to Clip Coba web app first.");
+
+    options.headers = options.headers || {};
+    options.headers['Authorization'] = `Bearer ${currentToken}`;
+
+    let res = await fetch(url, options);
+
+    if (res.status === 401) {
+        console.log("Extension: 401, attempting refresh...");
+        const refreshed = await attemptExtensionRefresh();
+        if (refreshed) {
+            options.headers['Authorization'] = `Bearer ${currentToken}`;
+            res = await fetch(url, options);
+        }
+    }
+    return res;
+}
+
 const fetchTags = async () => {
     if (!currentToken) return;
     try {
-        const res = await fetch(`${API_BASE}/tags`, { headers: { 'Authorization': `Bearer ${currentToken}` } });
+        const res = await fetchWithAuth(`${API_BASE}/tags`);
         if (res.ok) userTags = await res.json();
     } catch (e) { console.error("Error fetching tags", e); }
 };
@@ -31,7 +90,7 @@ const fetchTags = async () => {
 const fetchSpaces = async () => {
     if (!currentToken) return;
     try {
-        const res = await fetch(`${API_BASE}/spaces/`, { headers: { 'Authorization': `Bearer ${currentToken}` } });
+        const res = await fetchWithAuth(`${API_BASE}/spaces/`);
         if (res.ok) {
             availableSpaces = await res.json();
             // Load saved space preference
@@ -49,21 +108,24 @@ const fetchSpaces = async () => {
 async function createTag(name, color = "#cc0000") {
     if (!currentToken) return null;
     try {
-        const res = await fetch(`${API_BASE}/tags`, { method: "POST", headers: { 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ name, color }) });
+        const res = await fetchWithAuth(`${API_BASE}/tags`, {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, color })
+        });
         if (res.ok) { const newTag = await res.json(); userTags.push(newTag); return newTag; }
     } catch (e) { console.error("Failed to create tag", e); }
     return null;
 }
 
 async function fetchVideoInfo(videoId) {
+    // Public endpoint, no auth needed usually? Backend says /api/info.
+    // Check main.py: @app.get("/api/info"). No Depends(auth). So correct.
     try { const res = await fetch(`${API_BASE}/info?videoId=${videoId}`); if (res.ok) return await res.json(); } catch (e) { console.error("Backend info fetch failed", e); } return null;
 }
 
 async function saveClip(payload) {
-    if (!currentToken) throw new Error("Please log in to Clip Coba web app first.");
-
     const headers = {
-        'Authorization': `Bearer ${currentToken}`,
         'Content-Type': 'application/json'
     };
 
@@ -71,7 +133,7 @@ async function saveClip(payload) {
         headers['X-Space-Id'] = currentSpaceId;
     }
 
-    const res = await fetch(`${API_BASE}/clips`, {
+    const res = await fetchWithAuth(`${API_BASE}/clips`, {
         method: "POST",
         headers: headers,
         body: JSON.stringify(payload)

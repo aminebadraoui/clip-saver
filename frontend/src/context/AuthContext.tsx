@@ -26,7 +26,7 @@ export const ALL_SPACES: Space = {
 interface AuthContextType {
     user: User | null;
     token: string | null;
-    login: (token: string, user: User) => void;
+    login: (token: string, refreshToken: string, user: User) => void;
     logout: () => void;
     isAuthenticated: boolean;
     isSubscribed: boolean;
@@ -63,16 +63,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    const attemptRefreshToken = async (): Promise<string | null> => {
+        const rToken = localStorage.getItem('clipcoba_refresh_token');
+        if (!rToken) return null;
+        try {
+            console.log("Attempting to refresh token...");
+            const res = await fetch(`${API_URL}/auth/refresh`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: rToken })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                const newAccess = data.access_token;
+                localStorage.setItem('clipcoba_token', newAccess);
+                setToken(newAccess);
+                console.log("Token refreshed successfully.");
+                return newAccess;
+            } else {
+                console.log("Refresh failed, logging out.");
+                logout();
+                return null;
+            }
+        } catch (e) {
+            console.error("Refresh request error:", e);
+            logout();
+            return null;
+        }
+    };
+
     const refreshUser = async (overrideToken?: string) => {
-        const tokenToUse = overrideToken || token;
+        let tokenToUse = overrideToken || token;
         if (!tokenToUse) return;
 
         try {
-            const response = await fetch(`${API_URL}/users/me`, {
+            let response = await fetch(`${API_URL}/users/me`, {
                 headers: {
                     'Authorization': `Bearer ${tokenToUse}`
                 }
             });
+
+            if (response.status === 401 && !overrideToken) {
+                // Try refresh only if not using an override token (which implies manual call)
+                const newAccess = await attemptRefreshToken();
+                if (newAccess) {
+                    tokenToUse = newAccess;
+                    response = await fetch(`${API_URL}/users/me`, {
+                        headers: { 'Authorization': `Bearer ${tokenToUse}` }
+                    });
+                }
+            }
 
             if (response.ok) {
                 const userData = await response.json();
@@ -85,15 +126,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const refreshSpaces = async (overrideToken?: string) => {
-        const tokenToUse = overrideToken || token;
+        let tokenToUse = overrideToken || token;
         if (!tokenToUse) return;
 
         try {
-            const response = await fetch(`${API_URL}/api/spaces/`, {
+            let response = await fetch(`${API_URL}/api/spaces/`, {
                 headers: {
                     'Authorization': `Bearer ${tokenToUse}`
                 }
             });
+
+            if (response.status === 401 && !overrideToken) {
+                const newAccess = await attemptRefreshToken();
+                if (newAccess) {
+                    tokenToUse = newAccess;
+                    response = await fetch(`${API_URL}/api/spaces/`, {
+                        headers: { 'Authorization': `Bearer ${tokenToUse}` }
+                    });
+                }
+            }
 
             if (response.ok) {
                 const spacesData: Space[] = await response.json();
@@ -142,8 +193,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         initAuth();
     }, []);
 
-    const login = async (newToken: string, newUser: User) => {
+    const login = async (newToken: string, newRefreshToken: string, newUser: User) => {
         localStorage.setItem('clipcoba_token', newToken);
+        if (newRefreshToken) {
+            localStorage.setItem('clipcoba_refresh_token', newRefreshToken);
+        }
         setToken(newToken);
 
         // We set the initial partial user, but immediately fetch the full profile
@@ -162,6 +216,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const logout = () => {
         // Clear storage
         localStorage.removeItem('clipcoba_token');
+        localStorage.removeItem('clipcoba_refresh_token');
         localStorage.removeItem('clipcoba_user');
         localStorage.removeItem('clipcoba_space_id');
 
@@ -172,12 +227,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const createSpace = async (name: string): Promise<Space> => {
         if (!token) throw new Error("No token");
-        const response = await fetch(`${API_URL}/api/spaces/?name=${encodeURIComponent(name)}`, {
+        // Simple fetch wrapper could be better, but implementing direct retry here
+        let currentToken = token;
+
+        let response = await fetch(`${API_URL}/api/spaces/?name=${encodeURIComponent(name)}`, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Authorization': `Bearer ${currentToken}` }
         });
+
+        if (response.status === 401) {
+            const newToken = await attemptRefreshToken();
+            if (newToken) {
+                currentToken = newToken;
+                response = await fetch(`${API_URL}/api/spaces/?name=${encodeURIComponent(name)}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${currentToken}` }
+                });
+            }
+        }
+
         if (!response.ok) throw new Error("Failed to create space");
         const newSpace = await response.json();
         setSpaces(prev => [...prev, newSpace]);
@@ -187,12 +255,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const renameSpace = async (spaceId: string, name: string): Promise<Space> => {
         if (!token) throw new Error("No token");
-        const response = await fetch(`${API_URL}/api/spaces/${spaceId}?name=${encodeURIComponent(name)}`, {
+        let currentToken = token;
+
+        let response = await fetch(`${API_URL}/api/spaces/${spaceId}?name=${encodeURIComponent(name)}`, {
             method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Authorization': `Bearer ${currentToken}` }
         });
+
+        if (response.status === 401) {
+            const newToken = await attemptRefreshToken();
+            if (newToken) {
+                currentToken = newToken;
+                response = await fetch(`${API_URL}/api/spaces/${spaceId}?name=${encodeURIComponent(name)}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${currentToken}` }
+                });
+            }
+        }
 
         if (!response.ok) {
             const err = await response.json();
@@ -212,12 +291,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const deleteSpace = async (spaceId: string) => {
         if (!token) throw new Error("No token");
-        const response = await fetch(`${API_URL}/api/spaces/${spaceId}`, {
+        let currentToken = token;
+
+        let response = await fetch(`${API_URL}/api/spaces/${spaceId}`, {
             method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Authorization': `Bearer ${currentToken}` }
         });
+
+        if (response.status === 401) {
+            const newToken = await attemptRefreshToken();
+            if (newToken) {
+                currentToken = newToken;
+                response = await fetch(`${API_URL}/api/spaces/${spaceId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${currentToken}` }
+                });
+            }
+        }
 
         if (!response.ok) {
             const err = await response.json();

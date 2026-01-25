@@ -44,7 +44,8 @@ export function LoginPage() {
             // Backend /auth/login returns { access_token, token_type }
             // Let's decode or just store email for now. 
             // Actually, let's just store the email we used to login.
-            login(data.access_token, { id: "temp-id", email });
+            // Actually, let's just store the email we used to login.
+            login(data.access_token, data.refresh_token, { id: "temp-id", email });
         } catch (err: any) {
             setError(err.message);
         } finally {
