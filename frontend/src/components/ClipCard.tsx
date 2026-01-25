@@ -318,6 +318,11 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
                             <Play className="w-3.5 h-3.5 mr-2 fill-current" />
                             Details
                         </>
+                    ) : clip.type === 'short' ? (
+                        <>
+                            <Film className="w-3.5 h-3.5 mr-2" />
+                            Watch Short
+                        </>
                     ) : (
                         <>
                             <Film className="w-3.5 h-3.5 mr-2" />

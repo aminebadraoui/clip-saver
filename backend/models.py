@@ -75,7 +75,7 @@ class Tag(SQLModel, table=True):
 
 class Clip(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    type: str = Field(default="video") # 'video' | 'clip'
+    type: str = Field(default="video") # 'video' | 'clip' | 'short'
     videoId: str
     start: Optional[int] = None
     end: Optional[int] = None
