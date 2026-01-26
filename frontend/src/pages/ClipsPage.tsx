@@ -335,7 +335,6 @@ export function ClipsPage() {
                                 tags={tags}
                                 onDelete={handleDeleteClip}
                                 onUpdate={handleUpdateClip}
-                                onCinemaMode={setSelectedClipForCinema}
                             />
                         ) : (
                             <ClipListRow
@@ -343,7 +342,6 @@ export function ClipsPage() {
                                 clip={clip}
                                 tags={tags}
                                 onDelete={handleDeleteClip}
-                                onCinemaMode={setSelectedClipForCinema}
                             />
                         )
                     ))}
