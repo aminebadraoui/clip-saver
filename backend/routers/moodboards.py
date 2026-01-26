@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List, Optional
 from database import get_session
-from models import Moodboard, User, Space
+from models import Moodboard, User, Space, Image, ImageTagLink
 from auth import get_current_user
 from dependencies import get_current_space
 from pydantic import BaseModel
@@ -136,8 +136,20 @@ async def delete_moodboard(
     if moodboard.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
     
-    # Note: Images will have their moodboard_id set to NULL (cascade behavior)
+    # Manually cascade delete images
+    # 1. Get all images in this moodboard
+    images = session.exec(select(Image).where(Image.moodboard_id == moodboard.id)).all()
+    
+    for image in images:
+        # 2. Delete tag links for each image
+        for link in session.exec(select(ImageTagLink).where(ImageTagLink.image_id == image.id)).all():
+            session.delete(link)
+        
+        # 3. Delete the image
+        session.delete(image)
+        
     session.delete(moodboard)
     session.commit()
     
     return {"message": "Moodboard deleted successfully"}
+
