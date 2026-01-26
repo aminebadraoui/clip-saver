@@ -2,7 +2,9 @@
  * API client for workflow operations
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { API_URL } from "@/config";
+
+const API_BASE_URL = API_URL;
 
 export interface Workflow {
   id: string;

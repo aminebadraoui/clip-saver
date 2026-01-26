@@ -1,15 +1,8 @@
-
 const getApiUrl = () => {
-    // 1. Hardcoded Override for Production Domain
-    // This is the most critical check to fix mixed content errors.
-    if (typeof window !== 'undefined' && window.location.hostname.includes('clipcoba.com')) {
-        return 'https://api.clipcoba.com';
-    }
+    // Standard Logic: Rely on VITE_API_URL provided by the build environment
+    let url = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-    // 2. Standard Logic for Dev/Localhost
-    let url = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
-    // Upgrade to HTTPS if PROD flag is set, just in case
+    // Upgrade to HTTPS if PROD flag is set, just in case (optional safety)
     if (import.meta.env.PROD && url.startsWith('http://') && !url.includes('localhost')) {
         url = url.replace('http://', 'https://');
     }
@@ -19,6 +12,7 @@ const getApiUrl = () => {
         url = url.slice(0, -1);
     }
 
+    console.log("Config: Determined API_URL as:", url);
     return url;
 };
 
