@@ -13,7 +13,7 @@ let currentHoverButton = null;
 let currentDropdown = null;
 
 // Sync auth token from storage
-const syncToken = () => {
+const syncImageSaverToken = () => {
     chrome.storage.local.get(['authToken', 'refreshToken'], (result) => {
         currentToken = result.authToken || null;
         console.log('ClipCoba Image Saver: Token synced', currentToken ? 'Token present' : 'No token');
@@ -22,10 +22,10 @@ const syncToken = () => {
         }
     });
 };
-syncToken();
+syncImageSaverToken();
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === 'local' && (changes.authToken || changes.refreshToken)) {
-        syncToken();
+        syncImageSaverToken();
     }
 });
 
