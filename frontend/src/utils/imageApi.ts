@@ -38,6 +38,7 @@ export interface ImageUpdateData {
 export interface ImageFilters {
     search?: string;
     tag_ids?: string;
+    moodboard_id?: string;
     limit?: number;
     offset?: number;
 }
@@ -51,6 +52,7 @@ export async function fetchImages(
 
     if (filters?.search) params.append("search", filters.search);
     if (filters?.tag_ids) params.append("tag_ids", filters.tag_ids);
+    if (filters?.moodboard_id) params.append("moodboard_id", filters.moodboard_id);
     if (filters?.limit) params.append("limit", filters.limit.toString());
     if (filters?.offset) params.append("offset", filters.offset.toString());
 
