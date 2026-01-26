@@ -29,6 +29,8 @@ class User(SQLModel, table=True):
     workflow_executions: List["WorkflowExecution"] = Relationship(back_populates="user")
     credit_transactions: List["CreditTransaction"] = Relationship(back_populates="user")
     refresh_tokens: List["RefreshToken"] = Relationship(back_populates="user")
+    images: List["Image"] = Relationship(back_populates="user")
+    moodboards: List["Moodboard"] = Relationship(back_populates="user")
 
 class RefreshToken(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -51,11 +53,17 @@ class Space(SQLModel, table=True):
     tags: List["Tag"] = Relationship(back_populates="space")
     ideations: List["VideoIdeation"] = Relationship(back_populates="space")
     workflows: List["AIWorkflow"] = Relationship(back_populates="space")
+    images: List["Image"] = Relationship(back_populates="space")
+    moodboards: List["Moodboard"] = Relationship(back_populates="space")
 
 
 
 class ClipTagLink(SQLModel, table=True):
     clip_id: Optional[uuid.UUID] = Field(default=None, foreign_key="clip.id", primary_key=True)
+    tag_id: Optional[uuid.UUID] = Field(default=None, foreign_key="tag.id", primary_key=True)
+
+class ImageTagLink(SQLModel, table=True):
+    image_id: Optional[uuid.UUID] = Field(default=None, foreign_key="image.id", primary_key=True)
     tag_id: Optional[uuid.UUID] = Field(default=None, foreign_key="tag.id", primary_key=True)
 
 class Tag(SQLModel, table=True):
@@ -72,6 +80,7 @@ class Tag(SQLModel, table=True):
     space: Optional["Space"] = Relationship(back_populates="tags")
 
     clips: List["Clip"] = Relationship(back_populates="tags", link_model=ClipTagLink)
+    images: List["Image"] = Relationship(back_populates="tags", link_model=ImageTagLink)
 
 class Clip(SQLModel, table=True):
     __table_args__ = (
@@ -128,6 +137,45 @@ class Note(SQLModel, table=True):
     user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
 
     space_id: Optional[uuid.UUID] = Field(default=None, foreign_key="space.id")
+
+class Moodboard(SQLModel, table=True):
+    """Collection of images within a space"""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    name: str
+    description: Optional[str] = Field(default=None, sa_type=Text)
+    createdAt: int = Field(sa_type=BigInteger)
+    updatedAt: int = Field(sa_type=BigInteger)
+    
+    user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
+    user: Optional[User] = Relationship(back_populates="moodboards")
+    
+    space_id: Optional[uuid.UUID] = Field(default=None, foreign_key="space.id")
+    space: Optional["Space"] = Relationship(back_populates="moodboards")
+    
+    images: List["Image"] = Relationship(back_populates="moodboard")
+
+class Image(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    title: str
+    image_url: str  # Original image URL
+    source_url: Optional[str] = None  # Page URL where image was found
+    source_domain: Optional[str] = None  # e.g., "pinterest.com"
+    thumbnail_url: Optional[str] = None  # Smaller version if available
+    width: Optional[int] = None
+    height: Optional[int] = None
+    notes: Optional[str] = Field(default=None, sa_type=Text)
+    createdAt: int = Field(sa_type=BigInteger)
+    
+    user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
+    user: Optional[User] = Relationship(back_populates="images")
+    
+    space_id: Optional[uuid.UUID] = Field(default=None, foreign_key="space.id")
+    space: Optional["Space"] = Relationship(back_populates="images")
+    
+    moodboard_id: Optional[uuid.UUID] = Field(default=None, foreign_key="moodboard.id")
+    moodboard: Optional["Moodboard"] = Relationship(back_populates="images")
+    
+    tags: List[Tag] = Relationship(back_populates="images", link_model=ImageTagLink)
 
 class VideoIdeation(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)

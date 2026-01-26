@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Folder, Layers, Wand2, Lightbulb } from "lucide-react"; // Import appropriate icons
+import { Folder, Layers, Wand2, Lightbulb, Image } from "lucide-react"; // Import appropriate icons
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useAppData } from "@/context/AppDataContext";
@@ -145,6 +145,16 @@ export function Sidebar({
                     >
                         <Lightbulb className="w-4 h-4 mr-2" />
                         Video Ideation
+                    </Button>
+                </Link>
+
+                <Link to="/moodboard">
+                    <Button
+                        variant={location.pathname.startsWith('/moodboard') ? "secondary" : "ghost"}
+                        className="w-full justify-start"
+                    >
+                        <Image className="w-4 h-4 mr-2" />
+                        Moodboard
                     </Button>
                 </Link>
 

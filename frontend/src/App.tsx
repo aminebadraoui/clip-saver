@@ -19,6 +19,7 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import { PrivacyPolicyPage } from "@/pages/PrivacyPolicyPage";
 import WorkflowsPage from "@/pages/WorkflowsPage";
 import WorkflowEditorPage from "@/pages/WorkflowEditorPage";
+import { MoodboardPage } from "@/pages/MoodboardPage";
 
 
 
@@ -65,6 +66,7 @@ function App() {
             <Route path="/clip/:id" element={<Layout><ViewClipPage /></Layout>} />
             <Route path="/viral-tracker" element={<Layout><ViralTrackerPage /></Layout>} />
             <Route path="/ideation" element={<Layout><IdeationPage /></Layout>} />
+            <Route path="/moodboard" element={<Layout><MoodboardPage /></Layout>} />
 
             {/* AI Workflow Routes */}
             <Route path="/workflows" element={<Layout><WorkflowsPage /></Layout>} />
