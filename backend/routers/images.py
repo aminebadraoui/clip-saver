@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlmodel import Session, select, or_
 from typing import List, Optional
 from database import get_session
-from models import Image, User, Tag, ImageTagLink
+from models import Image, User, Tag, ImageTagLink, Space
 from auth import get_current_user
 from dependencies import get_current_space
 from pydantic import BaseModel
@@ -33,9 +33,12 @@ async def create_image(
     image_data: ImageCreate,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
-    space_id: Optional[uuid.UUID] = Depends(get_current_space)
+    current_space: Optional[Space] = Depends(get_current_space)
 ):
     """Save a new image to the moodboard"""
+    
+    # Extract space_id from the Space object
+    space_id = current_space.id if current_space else None
     
     # Extract domain from source URL
     source_domain = None
@@ -84,13 +87,16 @@ async def create_image(
 async def get_images(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
-    space_id: Optional[uuid.UUID] = Depends(get_current_space),
+    current_space: Optional[Space] = Depends(get_current_space),
     search: Optional[str] = None,
     tag_ids: Optional[str] = None,  # Comma-separated tag IDs
     limit: int = 100,
     offset: int = 0
 ):
     """Get all images with optional filtering"""
+    
+    # Extract space_id from the Space object
+    space_id = current_space.id if current_space else None
     
     # Base query
     query = select(Image).where(
