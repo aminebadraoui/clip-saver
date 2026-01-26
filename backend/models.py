@@ -2,7 +2,7 @@ import uuid
 from typing import List, Optional
 from datetime import datetime
 from sqlmodel import Field, Relationship, SQLModel
-from sqlalchemy import BigInteger, Text
+from sqlalchemy import BigInteger, Text, UniqueConstraint
 # from enum import Enum # Removed as it's no longer used
 
 class User(SQLModel, table=True):
@@ -74,6 +74,9 @@ class Tag(SQLModel, table=True):
     clips: List["Clip"] = Relationship(back_populates="tags", link_model=ClipTagLink)
 
 class Clip(SQLModel, table=True):
+    __table_args__ = (
+        UniqueConstraint("videoId", "space_id", name="unique_clip_video_space"),
+    )
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     type: str = Field(default="video") # 'video' | 'clip' | 'short'
     videoId: str

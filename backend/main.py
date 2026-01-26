@@ -13,6 +13,7 @@ import shutil
 from googleapiclient.discovery import build
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from sqlalchemy.exc import IntegrityError
 # Load environment variables first
 load_dotenv()
 
@@ -1065,6 +1066,15 @@ def create_clip(
     if existing_clip:
         # Update existing
         return update_clip(clip_data.id, clip_data, session, current_user, current_space)
+
+    # Prevent duplicates in the same space
+    duplicate_clip = session.exec(select(Clip).where(
+        Clip.videoId == clip_data.videoId, 
+        Clip.space_id == current_space.id,
+    )).first()
+    
+    if duplicate_clip:
+        raise HTTPException(status_code=409, detail="Video already exists in this space")
 
     clip = Clip.model_validate(clip_data, update={"tags": [], "user_id": current_user.id, "space_id": current_space.id})
     

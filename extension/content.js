@@ -1,6 +1,7 @@
 // --- Config & State ---
 // To use local backend, switch to: "http://localhost:3001/api"
 const API_BASE = "https://api.clipcoba.com/api";
+// const API_BASE = "http://localhost:3001/api";
 let currentToken = null;
 let currentSpaceId = null;
 let availableSpaces = [];
@@ -138,7 +139,15 @@ async function saveClip(payload) {
         headers: headers,
         body: JSON.stringify(payload)
     });
-    if (!res.ok) throw new Error(await res.text()); return await res.json();
+    if (!res.ok) {
+        let errorMsg = await res.text();
+        try {
+            const errorJson = JSON.parse(errorMsg);
+            if (errorJson.detail) errorMsg = errorJson.detail;
+        } catch (e) { /* ignore */ }
+        throw new Error(errorMsg);
+    }
+    return await res.json();
 }
 
 // --- DOM Scraping Helpers ---
@@ -325,15 +334,30 @@ function createDropdown(x, y, videoData, anchorElement) {
                 ...videoData,
                 createdAt: Date.now(),
                 tagIds: selectedTagIds,
-                type: "video"
+                type: videoData.type || "video"
             };
             await saveClip(payload);
             statusDiv.textContent = "Saved!";
             statusDiv.className = "clip-saver-status success";
             setTimeout(cleanup, 1500);
         } catch (e) {
-            statusDiv.textContent = e.message.substring(0, 30);
-            statusDiv.className = "clip-saver-status error";
+            console.error(e);
+            let msg = e.message;
+            if (msg.toLowerCase().includes("already exists")) {
+                msg = "Video Already Exists";
+                statusDiv.style.backgroundColor = "#f97316"; // Orange
+            } else {
+                // Show actual error if possible, or fallback
+                // Truncate if too long
+                msg = msg.length > 30 ? "Error: " + msg.substring(0, 27) + "..." : msg;
+                statusDiv.style.backgroundColor = "#ef4444"; // Red
+            }
+
+            statusDiv.textContent = msg;
+            setTimeout(() => {
+                statusDiv.textContent = "";
+                statusDiv.style.backgroundColor = ""; // Reset
+            }, 3000);
         }
     };
 
