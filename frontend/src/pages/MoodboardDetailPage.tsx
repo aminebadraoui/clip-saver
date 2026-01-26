@@ -3,11 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useAppData } from "@/context/AppDataContext";
 import type { Image } from "@/utils/imageApi";
-import { fetchImages, deleteImage } from "@/utils/imageApi";
-import { fetchMoodboards, type Moodboard } from "@/utils/moodboardApi";
+import { fetchImages, deleteImage, saveImage } from "@/utils/imageApi";
+import { fetchMoodboards, updateMoodboard, type Moodboard } from "@/utils/moodboardApi";
 import { ImageDetailModal } from "@/components/ImageDetailModal";
 import { Button } from "@/components/ui/button";
-import { Grid3x3, Loader2, ArrowLeft } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Grid3x3, Loader2, ArrowLeft, Pencil, Check, X, Plus, Link as LinkIcon } from "lucide-react";
 import { toast } from "sonner";
 
 export function MoodboardDetailPage() {
@@ -19,6 +21,14 @@ export function MoodboardDetailPage() {
     const [images, setImages] = useState<Image[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedImage, setSelectedImage] = useState<Image | null>(null);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editName, setEditName] = useState("");
+    const [editDescription, setEditDescription] = useState("");
+
+    // Add Image State
+    const [isAddingImage, setIsAddingImage] = useState(false);
+    const [newImageUrl, setNewImageUrl] = useState("");
+    const [isSavingImage, setIsSavingImage] = useState(false);
 
     useEffect(() => {
         loadMoodboardAndImages();
@@ -75,6 +85,62 @@ export function MoodboardDetailPage() {
         );
     };
 
+    const handleSaveMoodboard = async () => {
+        if (!token || !moodboard) return;
+
+        try {
+            const updated = await updateMoodboard(token, moodboard.id, {
+                name: editName,
+                description: editDescription,
+            });
+            setMoodboard(updated);
+            setIsEditing(false);
+            toast.success("Moodboard updated successfully");
+        } catch (error: any) {
+            toast.error(error.message || "Failed to update moodboard");
+        }
+    };
+
+
+
+    const handleAddImage = async () => {
+        if (!newImageUrl || !moodboard || !token) return;
+
+        try {
+            // Basic URL validation
+            new URL(newImageUrl);
+        } catch (e) {
+            toast.error("Please enter a valid URL");
+            return;
+        }
+
+        setIsSavingImage(true);
+        try {
+            const newImage = await saveImage(token, {
+                title: "New Image",
+                image_url: newImageUrl,
+                source_url: newImageUrl,
+                moodboard_id: moodboard.id
+            }, moodboard.space_id);
+
+            setImages(prev => [newImage, ...prev]);
+            setNewImageUrl("");
+            setIsAddingImage(false);
+            toast.success("Image added successfully");
+        } catch (error: any) {
+            toast.error(error.message || "Failed to add image");
+        } finally {
+            setIsSavingImage(false);
+        }
+    };
+
+    const startEditing = () => {
+        if (!moodboard) return;
+        setEditName(moodboard.name);
+        setEditDescription(moodboard.description || "");
+        setIsEditing(true);
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -88,12 +154,104 @@ export function MoodboardDetailPage() {
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Back to Moodboards
                 </Button>
-                <h1 className="text-3xl font-bold mb-2">{moodboard?.name || "Moodboard"}</h1>
-                {moodboard?.description && (
-                    <p className="text-muted-foreground">
-                        {moodboard.description}
-                    </p>
+
+                {isEditing ? (
+                    <div className="space-y-4 max-w-xl">
+                        <div className="space-y-2">
+                            <Input
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                placeholder="Moodboard Name"
+                                className="text-xl font-bold"
+                            />
+                            <Textarea
+                                value={editDescription}
+                                onChange={(e) => setEditDescription(e.target.value)}
+                                placeholder="Description (optional)"
+                                rows={3}
+                            />
+                        </div>
+                        <div className="flex gap-2">
+                            <Button onClick={handleSaveMoodboard} size="sm">
+                                <Check className="w-4 h-4 mr-2" />
+                                Save
+                            </Button>
+                            <Button variant="ghost" onClick={() => setIsEditing(false)} size="sm">
+                                <X className="w-4 h-4 mr-2" />
+                                Cancel
+                            </Button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="group relative">
+                        <div className="flex items-center gap-4 mb-2">
+                            <h1 className="text-3xl font-bold">{moodboard?.name || "Moodboard"}</h1>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={startEditing}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <Pencil className="w-4 h-4" />
+                            </Button>
+                        </div>
+                        {moodboard?.description && (
+                            <p className="text-muted-foreground">
+                                {moodboard.description}
+                            </p>
+                        )}
+                    </div>
                 )}
+
+                {/* Add Image Section */}
+                <div className="mt-6 mb-2">
+                    {!isAddingImage ? (
+                        <Button
+                            variant="outline"
+                            className="w-full border-dashed py-8 hover:bg-muted/50"
+                            onClick={() => setIsAddingImage(true)}
+                        >
+                            <Plus className="w-5 h-5 mr-2" />
+                            Add Image from URL
+                        </Button>
+                    ) : (
+                        <div className="bg-muted/30 p-4 rounded-lg border border-dashed">
+                            <h3 className="text-sm font-medium mb-3 flex items-center">
+                                <LinkIcon className="w-4 h-4 mr-2" />
+                                Add Image URL
+                            </h3>
+                            <div className="flex gap-2">
+                                <Input
+                                    value={newImageUrl}
+                                    onChange={(e) => setNewImageUrl(e.target.value)}
+                                    placeholder="https://example.com/image.jpg"
+                                    className="flex-1 bg-background"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleAddImage();
+                                        if (e.key === 'Escape') setIsAddingImage(false);
+                                    }}
+                                />
+                                <Button onClick={handleAddImage} disabled={isSavingImage || !newImageUrl}>
+                                    {isSavingImage ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <Check className="w-4 h-4" />
+                                    )}
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => {
+                                        setIsAddingImage(false);
+                                        setNewImageUrl("");
+                                    }}
+                                    disabled={isSavingImage}
+                                >
+                                    <X className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Images Masonry Grid */}

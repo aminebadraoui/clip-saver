@@ -27,6 +27,7 @@ export interface ImageCreateData {
     height?: number;
     notes?: string;
     tagIds?: string[];
+    moodboard_id?: string;
 }
 
 export interface ImageUpdateData {
