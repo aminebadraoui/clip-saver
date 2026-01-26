@@ -148,13 +148,13 @@ export function Sidebar({
                     </Button>
                 </Link>
 
-                <Link to="/moodboard">
+                <Link to="/moodboards">
                     <Button
-                        variant={location.pathname.startsWith('/moodboard') ? "secondary" : "ghost"}
+                        variant={location.pathname.startsWith('/moodboards') ? "secondary" : "ghost"}
                         className="w-full justify-start"
                     >
                         <Image className="w-4 h-4 mr-2" />
-                        Moodboard
+                        Moodboards
                     </Button>
                 </Link>
 

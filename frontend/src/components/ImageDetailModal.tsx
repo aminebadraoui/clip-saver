@@ -21,21 +21,15 @@ export function ImageDetailModal({
     isOpen,
     onClose,
     onUpdate,
-    availableTags,
 }: ImageDetailModalProps) {
     const { token } = useAuth();
     const [title, setTitle] = useState(image.title);
     const [notes, setNotes] = useState(image.notes || "");
-    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         setTitle(image.title);
         setNotes(image.notes || "");
-        // Extract tag IDs from image tags if available
-        if (image.tags) {
-            setSelectedTagIds(image.tags.map((tag: any) => tag.id));
-        }
     }, [image]);
 
     const handleSave = async () => {
@@ -46,7 +40,6 @@ export function ImageDetailModal({
             const updated = await updateImage(token, image.id, {
                 title,
                 notes,
-                tagIds: selectedTagIds,
             });
             onUpdate(updated);
             toast.success("Image updated successfully");
@@ -56,14 +49,6 @@ export function ImageDetailModal({
         } finally {
             setIsSaving(false);
         }
-    };
-
-    const toggleTag = (tagId: string) => {
-        setSelectedTagIds((prev) =>
-            prev.includes(tagId)
-                ? prev.filter((id) => id !== tagId)
-                : [...prev, tagId]
-        );
     };
 
     if (!isOpen) return null;
@@ -142,24 +127,6 @@ export function ImageDetailModal({
                                     placeholder="Add notes about this image..."
                                     rows={4}
                                 />
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium mb-2 block">Tags</label>
-                                <div className="flex flex-wrap gap-2">
-                                    {availableTags.map((tag) => (
-                                        <button
-                                            key={tag.id}
-                                            onClick={() => toggleTag(tag.id)}
-                                            className={`px-3 py-1 rounded-full text-sm transition-colors ${selectedTagIds.includes(tag.id)
-                                                ? "bg-primary text-primary-foreground"
-                                                : "bg-muted hover:bg-muted/80"
-                                                }`}
-                                        >
-                                            {tag.name}
-                                        </button>
-                                    ))}
-                                </div>
                             </div>
 
                             <div className="pt-4">

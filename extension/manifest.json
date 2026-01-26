@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
     "name": "Clip Coba",
-    "version": "1.1",
-    "description": "Bookmark YouTube timestamps and organize video research in Clip Coba.",
+    "version": "1.3.0",
+    "description": "Save YouTube videos and timestamps to organized spaces, create moodboards from images across the web, and manage your research with tags and collections in Clip Coba.",
     "icons": {
         "16": "icons/icon-16.png",
         "32": "icons/icon-32.png",
@@ -12,7 +12,9 @@
     "permissions": [
         "storage",
         "contextMenus",
-        "activeTab"
+        "activeTab",
+        "notifications",
+        "scripting"
     ],
     "host_permissions": [
         "https://api.clipcoba.com/*"
@@ -47,15 +49,6 @@
             "js": [
                 "auth-sync.js"
             ]
-        },
-        {
-            "matches": [
-                "<all_urls>"
-            ],
-            "js": [
-                "image-saver.js"
-            ],
-            "run_at": "document_end"
         }
     ],
     "background": {
