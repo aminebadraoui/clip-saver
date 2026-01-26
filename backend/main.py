@@ -98,23 +98,12 @@ app = FastAPI(lifespan=lifespan)
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
-# CORS middleware
+# CORS middleware - Allow all origins for image-saver extension
+# The image-saver extension runs on all websites, so we need to allow requests from any origin
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-        "https://www.youtube.com",
-        "https://www.clipcoba.com",
-        "https://clipcoba.com",
-        "https://dev.clipcoba.com",
-        "https://www.dev.clipcoba.com",
-        "https://api.clipcoba.com"
-    ],
-    allow_origin_regex=r"https://.*\.clipcoba\.com",
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for the image-saver extension
+    allow_credentials=False,  # Must be False when allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
