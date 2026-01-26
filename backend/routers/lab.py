@@ -332,9 +332,12 @@ async def extract_summary_endpoint(request: ExtractRequest, session: Session = D
         raise HTTPException(status_code=404, detail="Clip not found")
 
     from ai_agent import fetch_transcript
-    transcript = fetch_transcript(clip.videoId)
-    if not transcript:
-        raise HTTPException(status_code=400, detail="Could not fetch transcript")
+    try:
+        transcript = fetch_transcript(clip.videoId)
+    except Exception as e:
+         error_msg = str(e)
+         print(f"DEBUG: Failed to fetch transcript/proxies for {clip.videoId}. Error: {error_msg}")
+         raise HTTPException(status_code=400, detail=f"Transcript Error: {error_msg}")
 
     summary = summarize_video(transcript)
     
