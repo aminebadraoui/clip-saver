@@ -24,37 +24,66 @@ def fetch_transcript(video_id: str) -> Optional[str]:
     Returns the transcript as a single string, or None if not found/error.
     """
     try:
-        # Debug: Inspect available methods if something goes wrong
-        # print(f"DEBUG: YouTubeTranscriptApi dir: {dir(YouTubeTranscriptApi)}")
-
-        # Try the modern object-oriented approach first (filters for English)
-        transcript_list_obj = YouTubeTranscriptApi.list_transcripts(video_id)
+        transcript_list = None
         
-        # Try to get English (manual or auto)
-        try:
-            transcript = transcript_list_obj.find_transcript(['en'])
-        except:
-            # Fallback: just get the first available one
-            transcript = next(iter(transcript_list_obj))
+        # 1. Try modern object-oriented approach (Standard: static list_transcripts)
+        if hasattr(YouTubeTranscriptApi, 'list_transcripts'):
+            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        
+        # 2. Try Weird Instance approach (Local env: instance .list method)
+        elif hasattr(YouTubeTranscriptApi, 'list'):
+            # It seems local version is a class that needs instantiation
+            inst = YouTubeTranscriptApi()
+            transcript_list = inst.list(video_id)
             
-        # fetch() returns the list of dicts
-        transcript_data = transcript.fetch()
-        
-        full_text = " ".join([item['text'] for item in transcript_data])
-        return full_text
+        # 3. If we got a TranscriptList object, process it
+        if transcript_list:
+            try:
+                # Try english variants
+                transcript = transcript_list.find_transcript(['en', 'en-US', 'en-GB'])
+            except:
+                # Fallback: take the first one available (better than failing)
+                transcript = next(iter(transcript_list))
+            
+            data = transcript.fetch()
+            
+            # Robust text extraction
+            text_parts = []
+            for item in data:
+                if isinstance(item, dict):
+                    text_parts.append(item.get('text', ''))
+                elif hasattr(item, 'text'):
+                    text_parts.append(item.text)
+                else:
+                    text_parts.append(str(item))
+            return " ".join(text_parts)
+
+        # 4. Fallback: Old-school static get_transcript (Standard old)
+        if hasattr(YouTubeTranscriptApi, 'get_transcript'):
+            data = YouTubeTranscriptApi.get_transcript(video_id)
+            return " ".join([item['text'] for item in data])
+            
+        # 5. Fallback: Weird Instance .fetch (Local env?)
+        if hasattr(YouTubeTranscriptApi, 'fetch'):
+            inst = YouTubeTranscriptApi()
+            data = inst.fetch(video_id)
+            # Handle list of objects vs list of dicts
+            text_parts = []
+            for item in data:
+                if isinstance(item, dict):
+                    text_parts.append(item.get('text', ''))
+                elif hasattr(item, 'text'):
+                    text_parts.append(item.text)
+                else:
+                    text_parts.append(str(item))
+            return " ".join(text_parts)
+            
+        raise Exception("YouTubeTranscriptApi has no known methods (list_transcripts, list, get_transcript, fetch)")
 
     except Exception as e:
-        # If list_transcripts fails, check if we can fall back to static get_transcript 
-        # (though likely if one fails, both might, or version mismatch)
-        try:
-             print(f"DEBUG: list_transcripts failed: {e}. Trying static get_transcript.")
-             data = YouTubeTranscriptApi.get_transcript(video_id)
-             return " ".join([item['text'] for item in data])
-        except Exception as e2:
-             # Raise the original or new error with debug info
-             # We include dir() to see what's actually available in this version
-             attrs = dir(YouTubeTranscriptApi)
-             raise Exception(f"Fetch failed. Error: {str(e)}. Attributes: {attrs}")
+        # Raise detailed error for lab.py to catch
+        attrs = dir(YouTubeTranscriptApi)
+        raise Exception(f"Fetch failed. Error: {str(e)}. Attributes: {attrs}")
 
 import time
 import random
