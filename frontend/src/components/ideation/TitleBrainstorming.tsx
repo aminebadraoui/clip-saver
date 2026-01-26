@@ -6,6 +6,7 @@ import { Lightbulb, Trash2, ChevronDown, ChevronUp, Loader2, Wand2 } from "lucid
 import { InspirationSidebar } from "./InspirationSidebar";
 import { useAuth } from "@/context/AuthContext";
 import { API_URL } from "@/config";
+import { workflowApi } from "@/utils/workflowApi";
 
 
 interface TitleBrainstormingProps {
@@ -24,13 +25,36 @@ export const TitleBrainstorming = ({ titles, onUpdate, conceptData }: TitleBrain
 
 
 
+    const pollJob = async (jobId: string): Promise<any> => {
+        return new Promise((resolve, reject) => {
+            const interval = setInterval(async () => {
+                try {
+                    const job = await workflowApi.getJob(jobId);
+                    if (job.status === 'succeeded') {
+                        clearInterval(interval);
+                        let content = "";
+                        // Replicate output handling
+                        if (Array.isArray(job.output)) {
+                            content = job.output.join("");
+                        } else {
+                            content = String(job.output);
+                        }
+                        resolve(content);
+                    } else if (job.status === 'failed') {
+                        clearInterval(interval);
+                        reject(new Error(job.error || 'Job failed'));
+                    }
+                } catch (e) {
+                    clearInterval(interval);
+                    reject(e);
+                }
+            }, 2000);
+        });
+    };
+
     const handleGenerate = async () => {
         // Collect inspiration titles
         const inspirationTitles = titles.filter(t => t.type === 'inspiration');
-        // If user hasn't added any titles yet, we can't really "use inspiration", 
-        // but maybe they want general ideas? 
-        // The prompt says "if the user selects titles from inspiration...".
-        // But let's pass whatever is there + the concept.
 
         setIsGenerating(true);
         try {
@@ -47,9 +71,39 @@ export const TitleBrainstorming = ({ titles, onUpdate, conceptData }: TitleBrain
             });
             if (res.ok) {
                 const data = await res.json();
-                // Append new titles with type 'generated'
-                const newTitles = data.titles.map((t: any) => ({ ...t, type: 'generated' }));
-                onUpdate([...titles, ...newTitles]);
+                let rawOutput = "";
+
+                if (data.jobId) {
+                    rawOutput = await pollJob(data.jobId);
+                } else if (data.titles) {
+                    // Fallback if backend returns titles directly (e.g. cached or sync)
+                    const newTitles = data.titles.map((t: any) => ({ ...t, type: 'generated' }));
+                    onUpdate([...titles, ...newTitles]);
+                    return;
+                }
+
+                // Parse rawOutput to extract titles (mocking python logic)
+                const lines = rawOutput.trim().split('\n');
+                const parsedTitles: any[] = [];
+
+                lines.forEach(line => {
+                    const cleanLine = line.trim();
+                    if (cleanLine && !cleanLine.startsWith('#')) {
+                        // Remove numbering '1. ', '1)', etc
+                        const text = cleanLine.replace(/^[0-9]+[\.\)\-]\s*/, '').replace(/^-\s*/, '');
+                        if (text) {
+                            parsedTitles.push({
+                                id: crypto.randomUUID(),
+                                text: text,
+                                score: 7,
+                                type: 'generated'
+                            });
+                        }
+                    }
+                });
+
+                onUpdate([...titles, ...parsedTitles]);
+
             } else {
                 console.error("Failed to generate titles");
             }

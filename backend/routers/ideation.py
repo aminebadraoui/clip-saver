@@ -7,10 +7,21 @@ import uuid
 import json
 
 from database import get_session
-from models import VideoIdeation, User, Clip, Space
+from models import VideoIdeation, User, Clip, Space, AsyncJob
 from auth import get_current_user
 from dependencies import get_current_space, get_current_space_optional
-from ai_agent import fetch_transcript, generate_video_outline, generate_title_ideas, readapt_script_outline, generate_viral_script
+from ai_agent import (
+    fetch_transcript, 
+    generate_video_outline, 
+    generate_title_ideas, 
+    readapt_script_outline, 
+    generate_viral_script,
+    generate_video_outline_async,
+    generate_title_ideas_async,
+    readapt_script_outline_async,
+    generate_viral_script_async
+)
+import os
 
 router = APIRouter(prefix="/api/ideation", tags=["ideation"])
 
@@ -135,16 +146,37 @@ async def generate_outline(
         # Fallback if transcript fails (e.g. no captions)
         raise HTTPException(status_code=400, detail="Could not fetch transcript for this video. Use manual creation.")
 
-    # Generate Outline via AI
-    outline = generate_video_outline(transcript, clip.title)
-    
-    # Save to DB (Cache)
-    clip.scriptOutline = outline
-    session.add(clip)
+    # Async Job Creation
+    webhook_url = os.getenv("REPLICATE_WEBHOOK_URL")
+    if not webhook_url:
+         raise HTTPException(status_code=500, detail="REPLICATE_WEBHOOK_URL not configured")
+         
+    # Create Job
+    job = AsyncJob(
+        type="video_outline",
+        status="pending",
+        input_payload=json.dumps({"transcript": transcript[:100], "title": clip.title}), # Log partial input
+        created_at=int(time.time() * 1000),
+        updated_at=int(time.time() * 1000),
+        user_id=user.id
+    )
+    session.add(job)
     session.commit()
-    session.refresh(clip)
+    session.refresh(job)
     
-    return {"outline": outline}
+    try:
+        prediction = await generate_video_outline_async(transcript, clip.title, webhook_url)
+        job.prediction_id = prediction.id
+        session.add(job)
+        session.commit()
+    except Exception as e:
+        job.status = "failed"
+        job.error_message = str(e)
+        session.add(job)
+        session.commit()
+        raise HTTPException(status_code=500, detail=f"Failed to start AI job: {e}")
+    
+    return {"jobId": str(job.id)}
 
 @router.post("/generate-titles")
 async def generate_titles_endpoint(
@@ -158,10 +190,36 @@ async def generate_titles_endpoint(
     # Extract inspiration titles from the format the frontend sends
     inspiration = concept_data.get("inspirationTitles", [])
     
-    # Generate
-    new_titles = generate_title_ideas(inspiration, concept_data)
+    webhook_url = os.getenv("REPLICATE_WEBHOOK_URL")
+    if not webhook_url:
+         raise HTTPException(status_code=500, detail="REPLICATE_WEBHOOK_URL not configured")
+         
+    # Create Job
+    job = AsyncJob(
+        type="title_generation",
+        status="pending",
+        input_payload=json.dumps({"concept": concept_data.get("mainIdea")}),
+        created_at=int(time.time() * 1000),
+        updated_at=int(time.time() * 1000),
+        user_id=user.id
+    )
+    session.add(job)
+    session.commit()
+    session.refresh(job)
     
-    return {"titles": new_titles}
+    try:
+        prediction = await generate_title_ideas_async(inspiration, concept_data, webhook_url)
+        job.prediction_id = prediction.id
+        session.add(job)
+        session.commit()
+    except Exception as e:
+        job.status = "failed"
+        job.error_message = str(e)
+        session.add(job)
+        session.commit()
+        raise HTTPException(status_code=500, detail=f"Failed to start AI job: {e}")
+    
+    return {"jobId": str(job.id)}
 
 @router.post("/readapt-outline")
 async def readapt_outline_endpoint(
@@ -178,9 +236,36 @@ async def readapt_outline_endpoint(
     if not current_outline:
         raise HTTPException(status_code=400, detail="No outline provided")
         
-    new_outline = readapt_script_outline(current_outline, concept_data)
+    webhook_url = os.getenv("REPLICATE_WEBHOOK_URL")
+    if not webhook_url:
+         raise HTTPException(status_code=500, detail="REPLICATE_WEBHOOK_URL not configured")
+         
+    # Create Job
+    job = AsyncJob(
+        type="script_readaptation",
+        status="pending",
+        input_payload=json.dumps({"concept": concept_data.get("mainIdea")}),
+        created_at=int(time.time() * 1000),
+        updated_at=int(time.time() * 1000),
+        user_id=user.id
+    )
+    session.add(job)
+    session.commit()
+    session.refresh(job)
     
-    return {"outline": new_outline}
+    try:
+        prediction = await readapt_script_outline_async(current_outline, concept_data, webhook_url)
+        job.prediction_id = prediction.id
+        session.add(job)
+        session.commit()
+    except Exception as e:
+        job.status = "failed"
+        job.error_message = str(e)
+        session.add(job)
+        session.commit()
+        raise HTTPException(status_code=500, detail=f"Failed to start AI job: {e}")
+    
+    return {"jobId": str(job.id)}
 
 @router.post("/generate-script")
 async def generate_script_endpoint(
@@ -198,6 +283,33 @@ async def generate_script_endpoint(
     if not outline:
         raise HTTPException(status_code=400, detail="No outline provided")
         
-    script = generate_viral_script(outline, titles, concept_data)
+    webhook_url = os.getenv("REPLICATE_WEBHOOK_URL")
+    if not webhook_url:
+         raise HTTPException(status_code=500, detail="REPLICATE_WEBHOOK_URL not configured")
+         
+    # Create Job
+    job = AsyncJob(
+        type="script_generation",
+        status="pending",
+        input_payload=json.dumps({"concept": concept_data.get("mainIdea")}),
+        created_at=int(time.time() * 1000),
+        updated_at=int(time.time() * 1000),
+        user_id=user.id
+    )
+    session.add(job)
+    session.commit()
+    session.refresh(job)
     
-    return {"script": script}
+    try:
+        prediction = await generate_viral_script_async(outline, titles, concept_data, webhook_url)
+        job.prediction_id = prediction.id
+        session.add(job)
+        session.commit()
+    except Exception as e:
+        job.status = "failed"
+        job.error_message = str(e)
+        session.add(job)
+        session.commit()
+        raise HTTPException(status_code=500, detail=f"Failed to start AI job: {e}")
+    
+    return {"jobId": str(job.id)}

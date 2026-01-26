@@ -101,12 +101,15 @@ Format the output as a clean Markdown outline."""
     (Transcript truncated if too long)
     
     Output the outline in Markdown format."""
+    
+    # Initialize client with longer timeout
+    request_client = replicate.Client(api_token=api_key, timeout=300.0)
 
     try:
         def api_call():
             output = ""
-            for event in replicate.stream(
-                "google/gemini-1.5-pro",
+            for event in request_client.stream(
+                "google/gemini-3-pro",
                 input={
                     "prompt": user_prompt,
                     "system_instruction": system_prompt,
@@ -125,6 +128,51 @@ Format the output as a clean Markdown outline."""
         return content
     except Exception as e:
         return f"Error generating outline: {str(e)}"
+
+async def generate_video_outline_async(transcript: str, video_title: str, webhook_url: str) -> Any:
+    """
+    Starts an async prediction for video outline.
+    """
+    api_key = os.getenv("REPLICATE_API_TOKEN")
+    if not api_key:
+        raise ValueError("REPLICATE_API_TOKEN not found")
+
+    system_prompt = """You are an expert viral video strategist and scriptwriter. 
+Your goal is to deconstruct a successful YouTube video into its core skeletal structure/outline.
+Identify the hidden structure that makes it engaging.
+Focus on:
+1. The Hook (how they grabbed attention immediately).
+2. The Setup/Context (how they introduced the premise).
+3. The Core Conflict/Journey (the middle meat structure).
+4. The Payoff/Climax.
+5. The Call to Action/Ending.
+
+Do NOT just summarize the content. Extract the *structural template* that could be reused for another video.
+Format the output as a clean Markdown outline."""
+
+    user_prompt = f"""Analyze the following YouTube video transcript and extract its viral structure/outline.
+    
+    Video Title: {video_title}
+    
+    Transcript:
+    {transcript[:15000]} 
+    (Transcript truncated if too long)
+    
+    Output the outline in Markdown format."""
+
+    client = replicate.Client(api_token=api_key)
+    return await client.predictions.async_create(
+        version="google/gemini-3-pro",
+        input={
+            "prompt": user_prompt,
+            "system_instruction": system_prompt,
+            "temperature": 0.7,
+            "thinking_level": "low",
+        },
+        webhook=webhook_url,
+        webhook_events_filter=["completed"]
+    )
+
 
 def generate_title_ideas(inspiration_titles: List[Dict[str, Any]], concept_data: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
@@ -164,10 +212,13 @@ The new titles must:
     """
 
     try:
+        # Initialize client with longer timeout
+        request_client = replicate.Client(api_token=api_key, timeout=300.0)
+
         def api_call():
             output = ""
-            for event in replicate.stream(
-                "google/gemini-1.5-pro",
+            for event in request_client.stream(
+                "google/gemini-3-pro",
                 input={
                     "prompt": user_prompt,
                     "system_instruction": system_prompt,
@@ -197,9 +248,62 @@ The new titles must:
             return titles[:5] if titles else []
         except:
             return []
+
     except Exception as e:
         print(f"Error generating titles: {e}")
         return []
+
+async def generate_title_ideas_async(inspiration_titles: List[Dict[str, Any]], concept_data: Dict[str, Any], webhook_url: str) -> Any:
+    """
+    Starts an async prediction for title ideas.
+    """
+    api_key = os.getenv("REPLICATE_API_TOKEN")
+    if not api_key:
+        raise ValueError("REPLICATE_API_TOKEN not found")
+
+    # Format inspiration titles for prompt
+    inspiration_text = "\n".join([f"- {t.get('text', '')}" for t in inspiration_titles if t.get('text')])
+
+    system_prompt = """You are a viral YouTube title expert. 
+Your task is to analyze the patterns, hooks, and structures of the provided 'Inspiration Titles' 
+and generate 5 NEW, different title ideas that follow those same winning patterns but are adapted 
+to the user's 'Main Concept'.
+
+The new titles must:
+1. Be catchy and high CTR (Click Through Rate).
+2. Strictly relate to the 'Main Concept' provided.
+3. Mimic the style/format of the inspiration titles (e.g. if they use lists, use lists; if they use 'How to', use 'How to').
+4. Be different from each other.
+"""
+
+    user_prompt = f"""
+    MAIN CONCEPT DATA:
+    - Main Idea: {concept_data.get('mainIdea', '')}
+    - Why Viewer Cares: {concept_data.get('whyViewerCare', '')}
+    - Common Assumptions: {concept_data.get('commonAssumptions', '')}
+    - Breaking Assumptions: {concept_data.get('breakingAssumptions', '')}
+    - Viewer Feeling: {concept_data.get('viewerFeeling', '')}
+
+    INSPIRATION TITLES:
+    {inspiration_text}
+
+    Generate 5 new viral titles.
+    """
+
+    client = replicate.Client(api_token=api_key)
+    return await client.predictions.async_create(
+        version="google/gemini-3-pro",
+        input={
+            "prompt": user_prompt,
+            "system_instruction": system_prompt,
+            "temperature": 0.7,
+            "thinking_level": "low",
+        },
+        webhook=webhook_url,
+        webhook_events_filter=["completed"]
+    )
+
+
 
 def readapt_script_outline(current_outline: str, concept_data: Dict[str, Any]) -> str:
     """
@@ -232,10 +336,13 @@ to fit a NEW 'Main Concept'.
     """
 
     try:
+        # Initialize client with longer timeout
+        request_client = replicate.Client(api_token=api_key, timeout=300.0)
+
         def api_call():
             output = ""
-            for event in replicate.stream(
-                "google/gemini-1.5-pro",
+            for event in request_client.stream(
+                "google/gemini-3-pro",
                 input={
                     "prompt": user_prompt,
                     "system_instruction": system_prompt,
@@ -252,6 +359,50 @@ to fit a NEW 'Main Concept'.
         return content
     except Exception as e:
         return f"Error readapting outline: {str(e)}"
+
+async def readapt_script_outline_async(current_outline: str, concept_data: Dict[str, Any], webhook_url: str) -> Any:
+    """
+    Starts an async prediction to readapt script outline.
+    """
+    api_key = os.getenv("REPLICATE_API_TOKEN")
+    if not api_key:
+        raise ValueError("REPLICATE_API_TOKEN not found")
+
+    system_prompt = """You are an expert script editor.
+Your task is to take an EXISTING script outline (structure) and rewrite its content points 
+to fit a NEW 'Main Concept'.
+
+1. Keep the same structural beats (Hook, Setup, conflict, Payoff, etc.) as the original outline.
+2. COMPLETELY CHANGE the topic/content to match the 'Main Concept'.
+3. Output the result in clean Markdown.
+"""
+
+    user_prompt = f"""
+    NEW MAIN CONCEPT:
+    - Main Idea: {concept_data.get('mainIdea', '')}
+    - Why Viewer Cares: {concept_data.get('whyViewerCare', '')}
+    - Common Assumptions: {concept_data.get('commonAssumptions', '')}
+    - Breaking Assumptions: {concept_data.get('breakingAssumptions', '')}
+
+    ORIGINAL OUTLINE (Structure to keep):
+    {current_outline}
+
+    Rewrite the outline for the new concept.
+    """
+
+    client = replicate.Client(api_token=api_key)
+    return await client.predictions.async_create(
+        version="google/gemini-3-pro",
+        input={
+            "prompt": user_prompt,
+            "system_instruction": system_prompt,
+            "temperature": 0.7,
+            "thinking_level": "low",
+        },
+        webhook=webhook_url,
+        webhook_events_filter=["completed"]
+    )
+
 
 def generate_viral_script(outline: str, titles: List[Dict[str, Any]], concept_data: Dict[str, Any]) -> str:
     """
@@ -291,10 +442,13 @@ Guidelines:
     """
 
     try:
+        # Initialize client with longer timeout
+        request_client = replicate.Client(api_token=api_key, timeout=300.0)
+
         def api_call():
             output = ""
-            for event in replicate.stream(
-                "google/gemini-1.5-pro",
+            for event in request_client.stream(
+                "google/gemini-3-pro",
                 input={
                     "prompt": user_prompt,
                     "system_instruction": system_prompt,
@@ -311,6 +465,57 @@ Guidelines:
         return content
     except Exception as e:
         return f"Error generating script: {str(e)}"
+
+async def generate_viral_script_async(outline: str, titles: List[Dict[str, Any]], concept_data: Dict[str, Any], webhook_url: str) -> Any:
+    """
+    Starts an async prediction for viral script generation.
+    """
+    api_key = os.getenv("REPLICATE_API_TOKEN")
+    if not api_key:
+        raise ValueError("REPLICATE_API_TOKEN not found")
+
+    # Pick the best title or list them
+    title_text = "\n".join([f"- {t.get('text', '')}" for t in titles])
+
+    system_prompt = """You are a world-class YouTube scriptwriter (MrBeast style).
+Write a full, engaging, high-retention script based on the provided Outline and Main Concept.
+
+Guidelines:
+1. **Tone**: Conversational, high energy, fast-paced.
+2. **Hook**: The first 30 seconds must be incredibly gripping.
+3. **Structure**: Follow the provided Outline strictly.
+4. **Formatting**: Use Markdown. identifying speakers (if any) or Visual Cues in [Brackets].
+5. **Content**: Integrate the 'Common Assumptions' and 'Breaking Assumptions' to create curiosity gaps.
+"""
+
+    user_prompt = f"""
+    MAIN CONCEPT:
+    - Main Idea: {concept_data.get('mainIdea', '')}
+    - Why Viewer Cares: {concept_data.get('whyViewerCare', '')}
+    - Assumptions to Break: {concept_data.get('breakingAssumptions', '')}
+
+    POTENTIAL TITLES:
+    {title_text}
+
+    APPROVED OUTLINE:
+    {outline}
+
+    Write the full script now.
+    """
+
+    client = replicate.Client(api_token=api_key)
+    return await client.predictions.async_create(
+        version="google/gemini-3-pro",
+        input={
+            "prompt": user_prompt,
+            "system_instruction": system_prompt,
+            "temperature": 0.7,
+            "thinking_level": "low",
+        },
+        webhook=webhook_url,
+        webhook_events_filter=["completed"]
+    )
+
 
 def extract_title_structure(title: str) -> str:
     """
@@ -337,9 +542,12 @@ def extract_title_structure(title: str) -> str:
     user_prompt = f"Extract the structure for: {title}"
     
     try:
+        # Initialize client with longer timeout
+        request_client = replicate.Client(api_token=api_key, timeout=300.0)
+
         def api_call():
             output = ""
-            for event in replicate.stream(
+            for event in request_client.stream(
                 "google/gemini-3-pro",
                 input={
                     "prompt": user_prompt,
@@ -356,6 +564,44 @@ def extract_title_structure(title: str) -> str:
         return output.strip().replace('"', '')
     except Exception as e:
         return f"Error extracting title structure: {str(e)}"
+
+async def extract_title_structure_async(title: str, webhook_url: str) -> Any:
+    """
+    Starts an async prediction to extract title structure.
+    """
+    api_key = os.getenv("REPLICATE_API_TOKEN")
+    if not api_key:
+        raise ValueError("REPLICATE_API_TOKEN not found")
+
+    system_prompt = """You are an expert YouTube strategist.
+    Your task is to analyze a successful video title and extract its "Viral Structure" or pattern.
+    Identify the template that can be reused.
+    
+    Examples:
+    Input: "I Survived 100 Days in Hardcore Minecraft"
+    Output: "I Survived [Time Period] in [Hard Challenge]"
+    
+    Input: "Why iPhone 15 is a Waste of Money"
+    Output: "Why [Popular Product] is [Controversial Opinion]"
+    
+    Output ONLY the structural pattern string.
+    """
+    
+    user_prompt = f"Extract the structure for: {title}"
+    
+    client = replicate.Client(api_token=api_key)
+    return await client.predictions.async_create(
+        version="google/gemini-3-pro",
+        input={
+            "prompt": user_prompt,
+            "system_instruction": system_prompt,
+            "temperature": 0.3,
+            "thinking_level": "low",
+        },
+        webhook=webhook_url,
+        webhook_events_filter=["completed"]
+    )
+
 
 def extract_thumbnail_description(image_url: str) -> str:
     """
@@ -378,14 +624,17 @@ def extract_thumbnail_description(image_url: str) -> str:
     """
     
     try:
+        # Initialize client with longer timeout
+        request_client = replicate.Client(api_token=api_key, timeout=300.0)
+
         def api_call():
             output = ""
-            for event in replicate.stream(
+            for event in request_client.stream(
                  "google/gemini-3-pro",
                  input={
                      "prompt": "Describe the structural template of this thumbnail.",
                      "system_instruction": system_prompt,
-                     "image": image_url,
+                     "images": [image_url],
                      "temperature": 0.5,
                      "thinking_level": "low",
                  },
@@ -398,6 +647,41 @@ def extract_thumbnail_description(image_url: str) -> str:
         return output.strip()
     except Exception as e:
          return f"Error extracting thumbnail description: {str(e)}"
+
+async def extract_thumbnail_description_async(image_url: str, webhook_url: str) -> Any:
+    """
+    Starts an async prediction to extract thumbnail description.
+    """
+    api_key = os.getenv("REPLICATE_API_TOKEN")
+    if not api_key:
+        raise ValueError("REPLICATE_API_TOKEN not found")
+        
+    system_prompt = """You are a YouTube thumbnail analyst.
+    Analyze the provided thumbnail image and describe its structural composition so it can be recreated.
+    Focus on:
+    1. Subject placement (Left, Right, Center).
+    2. Facial expression/Emotion (if any).
+    3. Background elements/Colors (Contrast, brightness).
+    4. Text overlays (Font style, color, placement, shortness).
+    5. The "Visual Hook" (what draws the eye).
+    
+    Output a concise paragraph describing this "Thumbnail Template".
+    """
+    
+    client = replicate.Client(api_token=api_key)
+    return await client.predictions.async_create(
+        version="google/gemini-3-pro",
+        input={
+            "prompt": "Describe the structural template of this thumbnail.",
+            "system_instruction": system_prompt,
+            "images": [image_url],
+            "temperature": 0.5,
+            "thinking_level": "low",
+        },
+        webhook=webhook_url,
+        webhook_events_filter=["completed"]
+    )
+
 
 def extract_script_structure(transcript: str) -> str:
     """
@@ -424,9 +708,12 @@ def summarize_video(transcript: str) -> str:
     """
 
     try:
+        # Initialize client with longer timeout
+        request_client = replicate.Client(api_token=api_key, timeout=300.0)
+
         def api_call():
             output = ""
-            for event in replicate.stream(
+            for event in request_client.stream(
                 "google/gemini-3-pro",
                 input={
                     "prompt": user_prompt,
@@ -443,3 +730,35 @@ def summarize_video(transcript: str) -> str:
         return output.strip()
     except Exception as e:
         return f"Error generating summary: {str(e)}"
+
+async def summarize_video_async(transcript: str, webhook_url: str) -> Any:
+    """
+    Starts an async prediction for video summary.
+    """
+    api_key = os.getenv("REPLICATE_API_TOKEN")
+    if not api_key:
+        raise ValueError("REPLICATE_API_TOKEN not found")
+
+    system_prompt = """You are a concise video summarizer.
+    Summarize the provided video transcript into 2-3 sentences.
+    Focus on the main topic, the key insight/conflict, and the resolution.
+    Keep it engaging but brief.
+    """
+
+    user_prompt = f"""Summarize this transcript:
+    {transcript[:10000]}
+    """
+
+    client = replicate.Client(api_token=api_key)
+    return await client.predictions.async_create(
+        version="google/gemini-3-pro",
+        input={
+            "prompt": user_prompt,
+            "system_instruction": system_prompt,
+            "temperature": 0.5,
+            "thinking_level": "low",
+        },
+        webhook=webhook_url,
+        webhook_events_filter=["completed"]
+    )
+
