@@ -14,6 +14,7 @@ import YouTube from "react-youtube";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import ReactMarkdown from 'react-markdown';
+import { API_URL } from "@/config";
 
 export function ViewClipPage() {
     const { currentSpace, token } = useAuth();
@@ -77,7 +78,7 @@ export function ViewClipPage() {
             const storedToken = localStorage.getItem('clipcoba_token') || token; // Fallback to localStorage if token state not yet ready
             if (!storedToken) return;
 
-            const response = await fetch(`/api/lab/extract/summary`, {
+            const response = await fetch(`${API_URL}/api/lab/extract/summary`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${storedToken}` },
                 body: JSON.stringify({ clipId })
@@ -101,7 +102,7 @@ export function ViewClipPage() {
             if (!token) throw new Error("Not authenticated");
 
             // This endpoint now auto-saves/upserts to the library
-            const response = await fetch(`/api/lab/extract/${type}`, {
+            const response = await fetch(`${API_URL}/api/lab/extract/${type}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                 body: JSON.stringify({ clipId: clip.id })
@@ -132,7 +133,7 @@ export function ViewClipPage() {
         try {
             if (!token) throw new Error("Not authenticated");
 
-            const response = await fetch(`/api/lab/save/${type}`, {
+            const response = await fetch(`${API_URL}/api/lab/save/${type}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                 body: JSON.stringify({
@@ -288,7 +289,7 @@ export function ViewClipPage() {
 
                                                 // Save to backend
                                                 const token = localStorage.getItem('clipcoba_token');
-                                                fetch(`/api/lab/extract/summary`, {
+                                                fetch(`${API_URL}/api/lab/extract/summary`, {
                                                     method: "PATCH",
                                                     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                                                     body: JSON.stringify({ clipId: clip.id, summary: newNotes })
@@ -315,7 +316,7 @@ export function ViewClipPage() {
                                             setClip({ ...clip, notes: newNotes });
 
                                             const token = localStorage.getItem('clipcoba_token');
-                                            fetch(`/api/lab/extract/summary`, {
+                                            fetch(`${API_URL}/api/lab/extract/summary`, {
                                                 method: "PATCH",
                                                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                                                 body: JSON.stringify({ clipId: clip.id, summary: newNotes })
@@ -356,7 +357,7 @@ export function ViewClipPage() {
                                 onBlur={() => {
                                     // Auto-save on blur
                                     const token = localStorage.getItem('clipcoba_token');
-                                    fetch(`/api/lab/notes`, {
+                                    fetch(`${API_URL}/api/lab/notes`, {
                                         method: "PATCH",
                                         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                                         body: JSON.stringify({ clipId: clip.id, notes: clip.user_notes })
