@@ -24,30 +24,16 @@ def fetch_transcript(video_id: str) -> Optional[str]:
     Returns the transcript as a single string, or None if not found/error.
     """
     try:
-        # 1.2.3+ API requires instantiation
-        ytt = YouTubeTranscriptApi()
-        transcript_list = ytt.fetch(video_id)
+        # Standard static method usage
+        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
         
-        # Check if it returns a list of dicts (old style) or object
-        # Based on _api.py docstring it returns FetchedTranscript. 
-        # But if it acts like the old one, we iterate.
-        # Let's handle both just in case or rely on test to confirm.
-        # Assuming list of dicts for now based on typical behavior, or list of objects?
-        # Actually _api.py says it returns FetchedTranscript.
-        # Let's convert it to string.
-        
-        # If it's a list (standard old behavior)
-        if isinstance(transcript_list, list):
-             full_text = " ".join([item['text'] for item in transcript_list])
-        else:
-             # It acts as an iterable of objects (FetchedTranscriptSnippet)
-             # Based on error 'FetchedTranscriptSnippet' object is not subscriptable
-             full_text = " ".join([item.text for item in transcript_list])
+        # transcript_list is a list of dicts: [{'text': '...', 'start': 0.0, 'duration': 1.0}, ...]
+        full_text = " ".join([item['text'] for item in transcript_list])
              
         return full_text
     except Exception as e:
-        print(f"Error fetching transcript for {video_id}: {e}")
-        return None
+        # Re-raise the exception so the caller (lab.py) can report it
+        raise e
 
 import time
 import random
