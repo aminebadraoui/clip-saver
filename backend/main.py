@@ -101,12 +101,26 @@ app = FastAPI(lifespan=lifespan)
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
-# CORS middleware - Allow all origins for image-saver extension
-# The image-saver extension runs on all websites, so we need to allow requests from any origin
+# CORS middleware
+# We need to allow specific origins to support credentials (Auth headers/cookies)
+# Wildcard "*" with credentials=True is not allowed by spec.
+origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://clipcoba.com",
+    "https://www.clipcoba.com",
+    "https://api.clipcoba.com",
+    # Extension ID might be variable, but extensions usually need "*" or specific ID.
+    # If extension sends auth, we need its specific ID. If not, we can keep a loose policy or separate middleware.
+    # For now, adding common ones.
+    "*" 
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for the image-saver extension
-    allow_credentials=False,  # Must be False when allow_origins=["*"]
+    allow_origins=origins, 
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
