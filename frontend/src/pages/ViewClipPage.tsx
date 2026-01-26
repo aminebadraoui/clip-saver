@@ -28,6 +28,7 @@ export function ViewClipPage() {
     const [extractedTitle, setExtractedTitle] = useState("");
     const [extractedThumbnail, setExtractedThumbnail] = useState("");
     const [isExtracting, setIsExtracting] = useState(false);
+    const [isTranscriptLoading, setIsTranscriptLoading] = useState(false);
 
     // UI State
     const [activeTab, setActiveTab] = useState("script");
@@ -62,6 +63,28 @@ export function ViewClipPage() {
                     if (foundClip.thumbnail_templates && foundClip.thumbnail_templates.length > 0) {
                         setExtractedThumbnail(foundClip.thumbnail_templates[0].description);
                     }
+
+                    // If transcript is missing, try to auto-fetch it (lazy load)
+                    // Auto-Flow: Check Transcript -> Then Summary
+                    if (!foundClip.transcript) {
+                        // Start chain
+                        ensureTranscript(foundClip.id).then((freshTranscript) => {
+                            if (freshTranscript) {
+                                // Update local state immediately
+                                setClip(prev => prev ? { ...prev, transcript: freshTranscript } : null);
+
+                                // After transcript is confirmed, trigger summary if needed
+                                if (!foundClip.notes || foundClip.notes.startsWith("Error")) {
+                                    generateSummary(foundClip.id);
+                                }
+                            }
+                        });
+                    } else {
+                        // Transcript exists, just check summary
+                        if (!foundClip.notes || foundClip.notes.startsWith("Error")) {
+                            generateSummary(foundClip.id);
+                        }
+                    }
                 }
             } catch (e) {
                 console.error("Failed to load clip", e);
@@ -71,6 +94,33 @@ export function ViewClipPage() {
         };
         init();
     }, [id, currentSpace]);
+
+    const ensureTranscript = async (clipId: string) => {
+        setIsTranscriptLoading(true);
+        try {
+            const storedToken = localStorage.getItem('clipcoba_token') || token;
+            if (!storedToken) return null;
+
+            const response = await fetch(`${API_URL}/api/lab/transcript/fetch`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${storedToken}` },
+                body: JSON.stringify({ clipId })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                return data.transcript;
+            } else {
+                console.error("Failed to fetch transcript");
+                return null;
+            }
+        } catch (e) {
+            console.error("Error ensuring transcript", e);
+            return null;
+        } finally {
+            setIsTranscriptLoading(false);
+        }
+    };
 
     const generateSummary = async (clipId: string) => {
         try {
@@ -219,10 +269,13 @@ export function ViewClipPage() {
         <div className="container max-w-7xl mx-auto py-6 space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
-                <Button variant="ghost" onClick={() => navigate("/")} className="gap-2 pl-0 hover:pl-2 transition-all">
+                <Button variant="ghost" onClick={() => navigate("/dashboard")} className="gap-2 pl-0 hover:pl-2 transition-all">
                     <ArrowLeft className="w-4 h-4" /> Back to Dashboard
                 </Button>
                 <div className="flex items-center gap-2">
+                    <Badge variant={clip.transcript ? "secondary" : "outline"} className={clip.transcript ? "bg-green-500/10 text-green-500 border-green-500/20" : "text-amber-500 border-amber-500/20"}>
+                        {clip.transcript ? "Script Loaded" : "Script Missing"}
+                    </Badge>
                     <Badge variant="outline" className="text-muted-foreground">Video Lab</Badge>
                 </div>
             </div>
@@ -332,9 +385,18 @@ export function ViewClipPage() {
                                     {clip.notes}
                                 </div>
                             ) : (
-                                <div className="flex items-center gap-2 animate-pulse">
-                                    <Sparkles className="w-4 h-4 animate-spin text-primary" />
-                                    <span>Generating summary...</span>
+                                <div className="flex items-center gap-2 text-muted-foreground/70">
+                                    {isTranscriptLoading ? (
+                                        <>
+                                            <Sparkles className="w-4 h-4 opacity-50" />
+                                            <span>Waiting for script...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles className="w-4 h-4 animate-spin text-primary" />
+                                            <span>Generating summary...</span>
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -413,6 +475,26 @@ export function ViewClipPage() {
                         </CardHeader>
 
                         <CardContent className="flex-1 p-6 relative flex flex-col">
+                            {/* Loading Overlay for Scripts */}
+                            {isTranscriptLoading && (
+                                <div className="absolute inset-0 bg-background/80 backdrop-blur-md z-50 flex flex-col items-center justify-center animate-in fade-in duration-300">
+                                    <div className="flex flex-col items-center gap-4 text-center max-w-xs">
+                                        <div className="relative">
+                                            <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+                                            <div className="bg-background rounded-full p-4 shadow-lg border relative">
+                                                <Sparkles className="w-8 h-8 text-primary animate-spin" />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h3 className="font-semibold text-lg">Fetching Transcript...</h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                Retrieving the latest script from our sources to ensure perfect accuracy.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Script Tab */}
                             <div className={activeTab === "script" ? "flex-1 flex flex-col h-full" : "hidden"}>
                                 {renderContentArea(
@@ -430,7 +512,7 @@ export function ViewClipPage() {
                                     </div>
                                 )}
                                 <div className="flex justify-between items-center mt-4">
-                                    <Button variant="outline" onClick={() => handleExtract("script")} disabled={isExtracting}>
+                                    <Button variant="outline" onClick={() => handleExtract("script")} disabled={isExtracting || isTranscriptLoading || !clip.transcript}>
                                         <Sparkles className="w-4 h-4 mr-2" /> Extract Structure
                                     </Button>
                                     <Button onClick={() => handleSaveLibrary("script")} disabled={!extractedScript}>
