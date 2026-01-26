@@ -90,6 +90,7 @@ async def get_images(
     current_space: Optional[Space] = Depends(get_current_space),
     search: Optional[str] = None,
     tag_ids: Optional[str] = None,  # Comma-separated tag IDs
+    moodboard_id: Optional[uuid.UUID] = None,
     limit: int = 100,
     offset: int = 0
 ):
@@ -103,6 +104,10 @@ async def get_images(
         Image.user_id == current_user.id,
         Image.space_id == space_id
     )
+    
+    # Moodboard filter
+    if moodboard_id:
+        query = query.where(Image.moodboard_id == moodboard_id)
     
     # Search filter
     if search:
