@@ -78,6 +78,7 @@ export function ViewClipPage() {
             const storedToken = localStorage.getItem('clipcoba_token') || token; // Fallback to localStorage if token state not yet ready
             if (!storedToken) return;
 
+            console.log("Generating Summary. API_URL:", API_URL);
             const response = await fetch(`${API_URL}/api/lab/extract/summary`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${storedToken}` },
