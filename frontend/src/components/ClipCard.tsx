@@ -1,10 +1,13 @@
 import type { Clip } from "@/types/clip";
+import { useNavigate } from "react-router-dom";
 
 import type { Tag } from "@/types/tag";
 import { formatTime } from "@/utils/formatTime";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Trash2, MoreVertical, Tag as TagIcon, Eye, Clock, Film, Wand2 } from "lucide-react";
+// removed Play, Film if unused or check if they are used elsewhere. They were only used in the button.
+// But I should just add FlaskConical and keep the others for now to minimize diff or remove them if unused.
+import { Trash2, MoreVertical, Tag as TagIcon, Eye, Clock, Wand2, FlaskConical } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -29,14 +32,15 @@ interface ClipCardProps {
     tags?: Tag[];
     onDelete: (id: string) => void;
     onUpdate?: (clip: Clip) => void;
-    onCinemaMode?: (clip: Clip) => void;
 }
 
-export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, onCinemaMode }: ClipCardProps) {
+export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate }: ClipCardProps) {
     const { spaces } = useAuth();
 
     // Hide spaces submenu if only 1 space? No, allow moving even if only 1 space (to 'all' maybe? or just show list).
     // Or filter out current space? We don't know current space of clip unless passed or inferred.
+    // Link to space ID etc.
+    const navigate = useNavigate();
     // Clip has spaceId.
 
     const handleMoveToSpace = (spaceId: string) => {
@@ -70,7 +74,7 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
     return (
         <Card
             className="group overflow-hidden flex flex-col h-full border-border/50 bg-card/50 backdrop-blur-sm hover:shadow-xl hover:border-primary/20 transition-all duration-300 cursor-pointer"
-            onClick={() => onCinemaMode?.(clip)}
+            onClick={() => navigate(`/clip/${clip.id}`)}
             draggable
             onDragStart={(e) => {
                 e.dataTransfer.setData('clipId', clip.id);
@@ -321,11 +325,12 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
                     className="w-full bg-primary/90 hover:bg-primary shadow-sm hover:shadow transition-all"
                     onClick={(e) => {
                         e.stopPropagation();
-                        onCinemaMode?.(clip);
+                        // Navigate to details page instead of popup
+                        navigate(`/clip/${clip.id}`);
                     }}
                 >
-                    {clip.type === 'short' ? <Film className="w-3.5 h-3.5 mr-2" /> : <Play className="w-3.5 h-3.5 mr-2 fill-current" />}
-                    Details
+                    <FlaskConical className="w-3.5 h-3.5 mr-2" />
+                    Open in Lab
                 </Button>
             </CardFooter>
         </Card >

@@ -21,6 +21,7 @@ import WorkflowsPage from "@/pages/WorkflowsPage";
 import WorkflowEditorPage from "@/pages/WorkflowEditorPage";
 import { MoodboardsPage } from "@/pages/MoodboardsPage";
 import { MoodboardDetailPage } from "@/pages/MoodboardDetailPage";
+import { LibraryPage } from "@/pages/LibraryPage";
 
 
 // Guard for routes that require active subscription
@@ -73,6 +74,9 @@ function App() {
             <Route path="/workflows" element={<Layout><WorkflowsPage /></Layout>} />
             <Route path="/workflows/new" element={<Layout><WorkflowEditorPage /></Layout>} />
             <Route path="/workflows/:id/edit" element={<Layout><WorkflowEditorPage /></Layout>} />
+
+            {/* Video Lab Libraries */}
+            <Route path="/library/:type" element={<Layout><LibraryPage /></Layout>} />
           </Route>
         </Route>
       </Routes>

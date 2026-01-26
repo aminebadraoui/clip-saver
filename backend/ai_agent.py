@@ -49,6 +49,27 @@ def fetch_transcript(video_id: str) -> Optional[str]:
         print(f"Error fetching transcript for {video_id}: {e}")
         return None
 
+import time
+import random
+
+def run_with_retry(func, retries=3, base_delay=2):
+    """
+    Executes a function with exponential backoff retry logic for Rate Limit errors.
+    """
+    for attempt in range(retries):
+        try:
+            return func()
+        except Exception as e:
+            # Check for Replicate 429 (Rate Limit)
+            error_msg = str(e)
+            if "429" in error_msg or "rate limit" in error_msg.lower():
+                if attempt < retries - 1:
+                    sleep_time = (base_delay * (2 ** attempt)) + random.uniform(0, 1)
+                    print(f"Replicate Rate Limit hit. Retrying in {sleep_time:.2f}s...")
+                    time.sleep(sleep_time)
+                    continue
+            raise e
+
 def generate_video_outline(transcript: str, video_title: str) -> str:
     """
     Generates a viral script outline/skeleton from a video transcript using Gemini 3 Pro.
@@ -82,17 +103,21 @@ Format the output as a clean Markdown outline."""
     Output the outline in Markdown format."""
 
     try:
-        output = ""
-        for event in replicate.stream(
-            "google/gemini-3-pro",
-            input={
-                "prompt": user_prompt,
-                "system_instruction": system_prompt,
-                "temperature": 0.7,
-                "thinking_level": "low",
-            },
-        ):
-            output += str(event)
+        def api_call():
+            output = ""
+            for event in replicate.stream(
+                "google/gemini-1.5-pro",
+                input={
+                    "prompt": user_prompt,
+                    "system_instruction": system_prompt,
+                    "temperature": 0.7,
+                    "thinking_level": "low",
+                },
+            ):
+                output += str(event)
+            return output
+
+        output = run_with_retry(api_call)
         
         # Clean up markdown code blocks if present
         content = output.replace("```markdown", "").replace("```", "").strip()
@@ -139,17 +164,21 @@ The new titles must:
     """
 
     try:
-        output = ""
-        for event in replicate.stream(
-            "google/gemini-3-pro",
-            input={
-                "prompt": user_prompt,
-                "system_instruction": system_prompt,
-                "temperature": 0.7,
-                "thinking_level": "low",
-            },
-        ):
-            output += str(event)
+        def api_call():
+            output = ""
+            for event in replicate.stream(
+                "google/gemini-1.5-pro",
+                input={
+                    "prompt": user_prompt,
+                    "system_instruction": system_prompt,
+                    "temperature": 0.7,
+                    "thinking_level": "low",
+                },
+            ):
+                output += str(event)
+            return output
+
+        output = run_with_retry(api_call)
         
         # Parse JSON response
         import uuid
@@ -203,17 +232,21 @@ to fit a NEW 'Main Concept'.
     """
 
     try:
-        output = ""
-        for event in replicate.stream(
-            "google/gemini-3-pro",
-            input={
-                "prompt": user_prompt,
-                "system_instruction": system_prompt,
-                "temperature": 0.7,
-                "thinking_level": "low",
-            },
-        ):
-            output += str(event)
+        def api_call():
+            output = ""
+            for event in replicate.stream(
+                "google/gemini-1.5-pro",
+                input={
+                    "prompt": user_prompt,
+                    "system_instruction": system_prompt,
+                    "temperature": 0.7,
+                    "thinking_level": "low",
+                },
+            ):
+                output += str(event)
+            return output
+
+        output = run_with_retry(api_call)
         
         content = output.replace("```markdown", "").replace("```", "").strip()
         return content
@@ -258,19 +291,155 @@ Guidelines:
     """
 
     try:
-        output = ""
-        for event in replicate.stream(
-            "google/gemini-3-pro",
-            input={
-                "prompt": user_prompt,
-                "system_instruction": system_prompt,
-                "temperature": 0.7,
-                "thinking_level": "low",
-            },
-        ):
-            output += str(event)
+        def api_call():
+            output = ""
+            for event in replicate.stream(
+                "google/gemini-1.5-pro",
+                input={
+                    "prompt": user_prompt,
+                    "system_instruction": system_prompt,
+                    "temperature": 0.7,
+                    "thinking_level": "low",
+                },
+            ):
+                output += str(event)
+            return output
+
+        output = run_with_retry(api_call)
         
         content = output.replace("```markdown", "").replace("```", "").strip()
         return content
     except Exception as e:
         return f"Error generating script: {str(e)}"
+
+def extract_title_structure(title: str) -> str:
+    """
+    Analyzes a video title and extracts its repeatable structural pattern using Gemini.
+    """
+    api_key = os.getenv("REPLICATE_API_TOKEN")
+    if not api_key:
+        return "Error: REPLICATE_API_TOKEN not found"
+
+    system_prompt = """You are an expert YouTube strategist.
+    Your task is to analyze a successful video title and extract its "Viral Structure" or pattern.
+    Identify the template that can be reused.
+    
+    Examples:
+    Input: "I Survived 100 Days in Hardcore Minecraft"
+    Output: "I Survived [Time Period] in [Hard Challenge]"
+    
+    Input: "Why iPhone 15 is a Waste of Money"
+    Output: "Why [Popular Product] is [Controversial Opinion]"
+    
+    Output ONLY the structural pattern string.
+    """
+    
+    user_prompt = f"Extract the structure for: {title}"
+    
+    try:
+        def api_call():
+            output = ""
+            for event in replicate.stream(
+                "google/gemini-3-pro",
+                input={
+                    "prompt": user_prompt,
+                    "system_instruction": system_prompt,
+                    "temperature": 0.3, # Low temp for precision
+                    "thinking_level": "low",
+                },
+            ):
+                output += str(event)
+            return output
+
+        output = run_with_retry(api_call)
+        
+        return output.strip().replace('"', '')
+    except Exception as e:
+        return f"Error extracting title structure: {str(e)}"
+
+def extract_thumbnail_description(image_url: str) -> str:
+    """
+    Analyzes a thumbnail image and extracts a detailed descriptive structure using Gemini Multimodal.
+    """
+    api_key = os.getenv("REPLICATE_API_TOKEN")
+    if not api_key:
+        return "Error: REPLICATE_API_TOKEN not found"
+        
+    system_prompt = """You are a YouTube thumbnail analyst.
+    Analyze the provided thumbnail image and describe its structural composition so it can be recreated.
+    Focus on:
+    1. Subject placement (Left, Right, Center).
+    2. Facial expression/Emotion (if any).
+    3. Background elements/Colors (Contrast, brightness).
+    4. Text overlays (Font style, color, placement, shortness).
+    5. The "Visual Hook" (what draws the eye).
+    
+    Output a concise paragraph describing this "Thumbnail Template".
+    """
+    
+    try:
+        def api_call():
+            output = ""
+            for event in replicate.stream(
+                 "google/gemini-3-pro",
+                 input={
+                     "prompt": "Describe the structural template of this thumbnail.",
+                     "system_instruction": system_prompt,
+                     "image": image_url,
+                     "temperature": 0.5,
+                     "thinking_level": "low",
+                 },
+            ):
+                output += str(event)
+            return output
+
+        output = run_with_retry(api_call)
+            
+        return output.strip()
+    except Exception as e:
+         return f"Error extracting thumbnail description: {str(e)}"
+
+def extract_script_structure(transcript: str) -> str:
+    """
+    Wrapper for generate_video_outline to standardize naming.
+    """
+    return generate_video_outline(transcript, "Video")
+
+def summarize_video(transcript: str) -> str:
+    """
+    Generates a concise 2-3 sentence summary of the video content.
+    """
+    api_key = os.getenv("REPLICATE_API_TOKEN")
+    if not api_key:
+        return "Error: REPLICATE_API_TOKEN not found"
+
+    system_prompt = """You are a concise video summarizer.
+    Summarize the provided video transcript into 2-3 sentences.
+    Focus on the main topic, the key insight/conflict, and the resolution.
+    Keep it engaging but brief.
+    """
+
+    user_prompt = f"""Summarize this transcript:
+    {transcript[:10000]}
+    """
+
+    try:
+        def api_call():
+            output = ""
+            for event in replicate.stream(
+                "google/gemini-3-pro",
+                input={
+                    "prompt": user_prompt,
+                    "system_instruction": system_prompt,
+                    "temperature": 0.5,
+                    "thinking_level": "low",
+                },
+            ):
+                output += str(event)
+            return output
+
+        output = run_with_retry(api_call)
+        
+        return output.strip()
+    except Exception as e:
+        return f"Error generating summary: {str(e)}"

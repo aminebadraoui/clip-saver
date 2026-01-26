@@ -66,6 +66,19 @@ class ImageTagLink(SQLModel, table=True):
     image_id: Optional[uuid.UUID] = Field(default=None, foreign_key="image.id", primary_key=True)
     tag_id: Optional[uuid.UUID] = Field(default=None, foreign_key="tag.id", primary_key=True)
 
+# Laboratory Link Models (Moved up for reference in Clip)
+class TitleTemplateClipLink(SQLModel, table=True):
+    template_id: Optional[uuid.UUID] = Field(default=None, foreign_key="titletemplate.id", primary_key=True)
+    clip_id: Optional[uuid.UUID] = Field(default=None, foreign_key="clip.id", primary_key=True)
+
+class ThumbnailTemplateClipLink(SQLModel, table=True):
+    template_id: Optional[uuid.UUID] = Field(default=None, foreign_key="thumbnailtemplate.id", primary_key=True)
+    clip_id: Optional[uuid.UUID] = Field(default=None, foreign_key="clip.id", primary_key=True)
+
+class ScriptTemplateClipLink(SQLModel, table=True):
+    template_id: Optional[uuid.UUID] = Field(default=None, foreign_key="scripttemplate.id", primary_key=True)
+    clip_id: Optional[uuid.UUID] = Field(default=None, foreign_key="clip.id", primary_key=True)
+
 class Tag(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     name: str
@@ -96,6 +109,7 @@ class Clip(SQLModel, table=True):
     createdAt: int = Field(sa_type=BigInteger)
     # folderId removed
     notes: Optional[str] = None
+    user_notes: Optional[str] = Field(default=None, sa_type=Text)
     aiPrompt: Optional[str] = None
     originalVideoUrl: Optional[str] = None
     sourceVideoId: Optional[str] = None
@@ -124,6 +138,10 @@ class Clip(SQLModel, table=True):
     # folder relationship removed
     tags: List[Tag] = Relationship(back_populates="clips", link_model=ClipTagLink)
     notes_list: List["Note"] = Relationship(back_populates="clip", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+
+    title_templates: List["TitleTemplate"] = Relationship(back_populates="sources", link_model=TitleTemplateClipLink)
+    thumbnail_templates: List["ThumbnailTemplate"] = Relationship(back_populates="sources", link_model=ThumbnailTemplateClipLink)
+    script_templates: List["ScriptTemplate"] = Relationship(back_populates="sources", link_model=ScriptTemplateClipLink)
 
 class Note(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -268,3 +286,43 @@ class ReplicateModelCache(SQLModel, table=True):
     cost_per_run: float  # Estimated cost in credits
     is_active: bool = Field(default=True)
     last_updated: int = Field(sa_type=BigInteger)
+
+# Laboratory Models
+
+# Laboratory Models defined below
+
+class TitleTemplate(SQLModel, table=True):
+    """Saved title structure library"""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    text: str = Field(sa_type=Text) # The structure pattern
+    category: Optional[str] = Field(default="General") # List, How-to, etc
+    created_at: int = Field(sa_type=BigInteger)
+    
+    user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
+    user: Optional[User] = Relationship() # No back_populates needed on User for now unless requested
+    
+    sources: List["Clip"] = Relationship(back_populates="title_templates", link_model=TitleTemplateClipLink)
+
+class ThumbnailTemplate(SQLModel, table=True):
+    """Saved thumbnail description library"""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    description: str = Field(sa_type=Text) # The structure/description
+    category: Optional[str] = Field(default="General")
+    created_at: int = Field(sa_type=BigInteger)
+    
+    user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
+    user: Optional[User] = Relationship()
+    
+    sources: List["Clip"] = Relationship(back_populates="thumbnail_templates", link_model=ThumbnailTemplateClipLink)
+
+class ScriptTemplate(SQLModel, table=True):
+    """Saved script structure library"""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    structure: str = Field(sa_type=Text) # The outline/structure
+    category: Optional[str] = Field(default="General")
+    created_at: int = Field(sa_type=BigInteger)
+    
+    user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
+    user: Optional[User] = Relationship()
+    
+    sources: List["Clip"] = Relationship(back_populates="script_templates", link_model=ScriptTemplateClipLink)

@@ -1,5 +1,5 @@
+import { useNavigate } from "react-router-dom";
 import type { Clip } from "@/types/clip";
-
 import type { Tag } from "@/types/tag";
 import { Button } from "@/components/ui/button";
 import { Trash2, ExternalLink, Eye, Clock } from "lucide-react";
@@ -9,18 +9,18 @@ interface ClipListRowProps {
     clip: Clip;
     tags: Tag[];
     onDelete: (id: string) => void;
-    onCinemaMode?: (clip: Clip) => void;
 }
 
-export function ClipListRow({ clip, tags, onDelete, onCinemaMode }: ClipListRowProps) {
+export function ClipListRow({ clip, tags, onDelete }: ClipListRowProps) {
+    const navigate = useNavigate();
     // folder find removed
     const clipTags = tags.filter(t => clip.tagIds?.includes(t.id));
 
     return (
         <div className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
             <div
-                className={`relative w-32 h-20 flex-shrink-0 ${clip.type === 'video' ? 'cursor-pointer' : ''}`}
-                onClick={() => clip.type === 'video' && onCinemaMode?.(clip)}
+                className={`relative w-32 h-20 flex-shrink-0 cursor-pointer`}
+                onClick={() => navigate(`/clip/${clip.id}`)}
             >
                 <img
                     src={clip.thumbnail}

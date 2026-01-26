@@ -1,28 +1,36 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useParams, useNavigate } from "react-router-dom";
-import { getClips, updateClip, getTags } from "@/utils/storage";
+import { getClips } from "@/utils/storage";
 import type { Clip } from "@/types/clip";
-import type { Tag } from "@/types/tag";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Save } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Save, Sparkles, FlaskConical, TrendingUp, Eye, Activity, FileText } from "lucide-react";
 import YouTube from "react-youtube";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import ReactMarkdown from 'react-markdown';
 
 export function ViewClipPage() {
-    const { currentSpace } = useAuth();
+    const { currentSpace, token } = useAuth();
     const { id } = useParams();
     const navigate = useNavigate();
     const [clip, setClip] = useState<Clip | null>(null);
-    const [tags, setTags] = useState<Tag[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Edit State
-    const [notes, setNotes] = useState("");
-    const [aiPrompt, setAiPrompt] = useState("");
-    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+    // Extraction State
+    const [extractedScript, setExtractedScript] = useState("");
+    const [extractedTitle, setExtractedTitle] = useState("");
+    const [extractedThumbnail, setExtractedThumbnail] = useState("");
+    const [isExtracting, setIsExtracting] = useState(false);
+
+    // UI State
+    const [activeTab, setActiveTab] = useState("script");
+    const [viewMode, setViewMode] = useState<"edit" | "preview">("preview");
 
     useEffect(() => {
         const init = async () => {
@@ -32,12 +40,28 @@ export function ViewClipPage() {
                 const foundClip = allClips.find((c) => c.id === id);
                 if (foundClip) {
                     setClip(foundClip);
-                    setNotes(foundClip.notes || "");
-                    setAiPrompt(foundClip.aiPrompt || "");
-                    setSelectedTagIds(foundClip.tagIds || []);
-                }
 
-                setTags(await getTags());
+                    // Auto-generate summary if missing or if it contains a previously saved error
+                    if (!foundClip.notes || foundClip.notes.startsWith("Error")) {
+                        generateSummary(foundClip.id);
+                    }
+
+                    // Pre-load existing templates from the updated API response
+                    if (foundClip.script_templates && foundClip.script_templates.length > 0) {
+                        setExtractedScript(foundClip.script_templates[0].structure);
+                    } else if (foundClip.scriptOutline) {
+                        // Fallback to legacy field
+                        setExtractedScript(foundClip.scriptOutline);
+                    }
+
+                    if (foundClip.title_templates && foundClip.title_templates.length > 0) {
+                        setExtractedTitle(foundClip.title_templates[0].text);
+                    }
+
+                    if (foundClip.thumbnail_templates && foundClip.thumbnail_templates.length > 0) {
+                        setExtractedThumbnail(foundClip.thumbnail_templates[0].description);
+                    }
+                }
             } catch (e) {
                 console.error("Failed to load clip", e);
             } finally {
@@ -47,150 +71,431 @@ export function ViewClipPage() {
         init();
     }, [id, currentSpace]);
 
+    const generateSummary = async (clipId: string) => {
+        try {
+            // Check authentication but don't error out hard on auto-fetch, just silently fail or log
+            const storedToken = localStorage.getItem('clipcoba_token') || token; // Fallback to localStorage if token state not yet ready
+            if (!storedToken) return;
 
+            const response = await fetch(`/api/lab/extract/summary`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${storedToken}` },
+                body: JSON.stringify({ clipId })
+            });
 
-    const handleSave = async () => {
-        if (!clip) return;
-        const updatedClip = {
-            ...clip,
-            notes,
-            aiPrompt,
-            tagIds: selectedTagIds
-        };
-        await updateClip(updatedClip);
-        setClip(updatedClip);
-        alert("Changes saved!");
-    };
-
-    const toggleTag = (tagId: string) => {
-        if (selectedTagIds.includes(tagId)) {
-            setSelectedTagIds(selectedTagIds.filter(id => id !== tagId));
-        } else {
-            setSelectedTagIds([...selectedTagIds, tagId]);
+            if (response.ok) {
+                const data = await response.json();
+                setClip(prev => prev ? { ...prev, notes: data.summary } : null);
+                toast.success("Quick Summary generated!");
+            }
+        } catch (e) {
+            console.error("Failed to generate summary", e);
         }
     };
 
-    if (isLoading) {
+    const handleExtract = async (type: "script" | "title" | "thumbnail") => {
+        if (!clip) return;
+        setIsExtracting(true);
+        try {
+            // Using token from AuthContext
+            if (!token) throw new Error("Not authenticated");
+
+            // This endpoint now auto-saves/upserts to the library
+            const response = await fetch(`/api/lab/extract/${type}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ clipId: clip.id })
+            });
+
+            if (!response.ok) throw new Error("Extraction failed");
+
+            const data = await response.json();
+
+            if (type === "script") setExtractedScript(data.structure);
+            if (type === "title") setExtractedTitle(data.structure);
+            if (type === "thumbnail") setExtractedThumbnail(data.structure);
+
+            toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} extracted & saved to library!`);
+        } catch (e) {
+            toast.error("Extraction failed. Please try again.");
+            console.error(e);
+        } finally {
+            setIsExtracting(false);
+        }
+    };
+
+    const handleSaveLibrary = async (type: "script" | "title" | "thumbnail") => {
+        if (!clip) return;
+        const content = type === "script" ? extractedScript : type === "title" ? extractedTitle : extractedThumbnail;
+        if (!content) return toast.error("Nothing to save!");
+
+        try {
+            if (!token) throw new Error("Not authenticated");
+
+            const response = await fetch(`/api/lab/save/${type}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({
+                    content,
+                    sourceClipId: clip.id,
+                    category: "General"
+                })
+            });
+
+            if (response.ok) {
+                toast.success(`Updated ${type} in library!`);
+            } else {
+                toast.error("Failed to update");
+            }
+        } catch (e) {
+            toast.error("Error saving");
+        }
+    };
+
+    // Helper to render content based on viewMode
+    const renderContentArea = (
+        content: string,
+        setContent: (val: string) => void,
+        placeholder: string,
+        minHeight = "min-h-[400px]"
+    ) => {
         return (
-            <div className="container max-w-4xl mx-auto py-8 space-y-6">
-                <div className="flex items-center space-x-2 mb-4">
-                    <Skeleton className="h-4 w-4" />
-                    <Skeleton className="h-4 w-32" />
+            <div className={`flex-1 relative ${minHeight} bg-background/50 rounded-md border overflow-hidden`}>
+                <div className="absolute top-2 right-2 z-10 flex gap-2 bg-background/80 backdrop-blur rounded p-1 border">
+                    <Button
+                        variant={viewMode === "preview" ? "secondary" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("preview")}
+                        className="h-7 text-xs"
+                    >
+                        <Eye className="w-3 h-3 mr-1" /> Preview
+                    </Button>
+                    <Button
+                        variant={viewMode === "edit" ? "secondary" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("edit")}
+                        className="h-7 text-xs"
+                    >
+                        <Activity className="w-3 h-3 mr-1" /> Edit
+                    </Button>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 space-y-4">
-                        <Skeleton className="aspect-video w-full rounded-xl" />
-                        <div className="space-y-2">
-                            <Skeleton className="h-8 w-3/4" />
-                            <Skeleton className="h-6 w-24 rounded-md" />
-                        </div>
-                    </div>
-
-                    <div className="space-y-6 bg-card p-6 rounded-xl border">
-                        <div className="flex justify-between">
-                            <Skeleton className="h-6 w-24" />
-                            <Skeleton className="h-9 w-20" />
-                        </div>
-                        <div className="space-y-2">
-                            <Skeleton className="h-4 w-12" />
-                            <div className="flex gap-2 flex-wrap">
-                                <Skeleton className="h-6 w-16 rounded-full" />
-                                <Skeleton className="h-6 w-20 rounded-full" />
-                                <Skeleton className="h-6 w-14 rounded-full" />
+                {viewMode === "edit" ? (
+                    <Textarea
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                        placeholder={placeholder}
+                        className={`w-full h-full resize-none font-mono text-sm bg-transparent border-none focus-visible:ring-0 p-4 leading-relaxed ${minHeight}`}
+                    />
+                ) : (
+                    <div className={`w-full h-full overflow-y-auto p-6 prose prose-invert max-w-none text-sm ${minHeight}`}>
+                        {content ? (
+                            <ReactMarkdown>{content}</ReactMarkdown>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50 italic">
+                                {placeholder}
                             </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Skeleton className="h-4 w-12" />
-                            <Skeleton className="h-[150px] w-full" />
-                        </div>
-                        <div className="space-y-2">
-                            <Skeleton className="h-4 w-16" />
-                            <Skeleton className="h-[100px] w-full" />
-                        </div>
+                        )}
                     </div>
-                </div>
+                )}
             </div>
         );
-    }
+    };
 
+    if (isLoading) return <div className="p-8"><Skeleton className="h-96 w-full" /></div>;
     if (!clip) return <div className="p-8">Clip not found</div>;
 
-
+    const viralRatio = clip.viralRatio || 0;
+    const outlierScore = clip.outlierScore || 0;
 
     return (
-        <div className="container max-w-4xl mx-auto py-8 space-y-6">
-            <Button variant="ghost" onClick={() => navigate("/")} className="mb-4">
-                <ArrowLeft className="w-4 h-4 mr-2" /> Back to Library
-            </Button>
+        <div className="container max-w-7xl mx-auto py-6 space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <Button variant="ghost" onClick={() => navigate("/")} className="gap-2 pl-0 hover:pl-2 transition-all">
+                    <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+                </Button>
+                <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-muted-foreground">Video Lab</Badge>
+                </div>
+            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-4">
-                    <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-lg">
-                        <YouTube
-                            videoId={clip.videoId}
-                            opts={{
-                                playerVars: {
-                                    start: clip.start,
-                                    end: clip.end,
-                                    autoplay: 1,
-                                },
-                            }}
-                            className="w-full h-full"
-                            iframeClassName="w-full h-full"
-                        />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-bold">{clip.title}</h1>
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+                {/* Left Column: Analysis Board (5 cols) */}
+                <div className="xl:col-span-5 space-y-6">
+                    <Card className="border-none shadow-none bg-transparent">
+                        <h1 className="text-3xl font-bold mb-4 leading-tight">{clip.title}</h1>
 
-                    </div>
+                        {/* Player */}
+                        <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-2xl mb-6 ring-1 ring-white/10">
+                            <YouTube
+                                videoId={clip.videoId}
+                                opts={{ playerVars: { start: clip.start, end: clip.end } }}
+                                className="w-full h-full"
+                                iframeClassName="w-full h-full"
+                            />
+                        </div>
+
+                        {/* Scores Grid */}
+                        <div className="grid grid-cols-3 gap-3 mb-6">
+                            <Card className="bg-card/50 backdrop-blur">
+                                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                                    <TrendingUp className="w-5 h-5 text-green-500 mb-2" />
+                                    <div className="text-2xl font-bold">{viralRatio.toFixed(2)}x</div>
+                                    <div className="text-xs text-muted-foreground uppercase tracking-wider">Viral Score</div>
+                                </CardContent>
+                            </Card>
+                            <Card className="bg-card/50 backdrop-blur">
+                                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                                    <Activity className="w-5 h-5 text-blue-500 mb-2" />
+                                    <div className="text-2xl font-bold">{outlierScore.toFixed(1)}x</div>
+                                    <div className="text-xs text-muted-foreground uppercase tracking-wider">Outlier</div>
+                                </CardContent>
+                            </Card>
+                            <Card className="bg-card/50 backdrop-blur">
+                                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                                    <Eye className="w-5 h-5 text-purple-500 mb-2" />
+                                    <div className="text-lg font-bold truncate w-full">
+                                        {new Intl.NumberFormat('en-US', { notation: "compact" }).format(clip.viewCount || 0)}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground uppercase tracking-wider">Views</div>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {/* Summary / Notes */}
+                        <div className="bg-muted/30 rounded-lg p-4 text-sm text-muted-foreground transition-all duration-500 relative group">
+                            <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2 justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Sparkles className="w-3 h-3" /> Quick Summary
+                                </div>
+                                {clip.notes && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        onClick={() => {
+                                            const newNotes = prompt("Edit Notes:", clip.notes || "");
+                                            if (newNotes !== null && newNotes !== clip.notes) {
+                                                // Optimistic update
+                                                const oldNotes = clip.notes;
+                                                setClip({ ...clip, notes: newNotes });
+
+                                                // Save to backend
+                                                const token = localStorage.getItem('clipcoba_token');
+                                                fetch(`/api/lab/extract/summary`, {
+                                                    method: "PATCH",
+                                                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                                                    body: JSON.stringify({ clipId: clip.id, summary: newNotes })
+                                                }).catch(() => {
+                                                    toast.error("Failed to save notes");
+                                                    setClip({ ...clip, notes: oldNotes });
+                                                });
+                                            }
+                                        }}
+                                    >
+                                        <Activity className="w-3 h-3" />
+                                    </Button>
+                                )}
+                            </h3>
+
+                            {clip.notes ? (
+                                <div
+                                    className="leading-relaxed animate-in fade-in slide-in-from-bottom-2 duration-500 whitespace-pre-wrap cursor-pointer hover:bg-background/50 rounded p-1 -m-1 transition-colors"
+                                    onClick={() => {
+                                        // Same edit logic as button
+                                        const newNotes = prompt("Edit Notes:", clip.notes || "");
+                                        if (newNotes !== null && newNotes !== clip.notes) {
+                                            const oldNotes = clip.notes;
+                                            setClip({ ...clip, notes: newNotes });
+
+                                            const token = localStorage.getItem('clipcoba_token');
+                                            fetch(`/api/lab/extract/summary`, {
+                                                method: "PATCH",
+                                                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                                                body: JSON.stringify({ clipId: clip.id, summary: newNotes })
+                                            }).catch(() => {
+                                                toast.error("Failed to save notes");
+                                                setClip({ ...clip, notes: oldNotes });
+                                            });
+                                        }
+                                    }}
+                                    title="Click to edit"
+                                >
+                                    {clip.notes}
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 animate-pulse">
+                                    <Sparkles className="w-4 h-4 animate-spin text-primary" />
+                                    <span>Generating summary...</span>
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+
+                    {/* User Notes */}
+                    <Card className="border-none shadow-none bg-transparent mt-6">
+                        <div className="bg-muted/30 rounded-lg p-4 text-sm text-foreground transition-all duration-500 relative group min-h-[150px]">
+                            <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2 justify-between">
+                                <div className="flex items-center gap-2">
+                                    <FileText className="w-3 h-3" /> My Notes
+                                </div>
+                            </h3>
+                            <textarea
+                                className="w-full h-32 bg-transparent border-none resize-none focus:ring-0 p-0 text-sm leading-relaxed text-muted-foreground placeholder:text-muted-foreground/50"
+                                placeholder="Write your own observations, ideas, or to-dos for this video..."
+                                value={clip.user_notes || ""}
+                                onChange={(e) => {
+                                    setClip({ ...clip, user_notes: e.target.value });
+                                }}
+                                onBlur={() => {
+                                    // Auto-save on blur
+                                    const token = localStorage.getItem('clipcoba_token');
+                                    fetch(`/api/lab/notes`, {
+                                        method: "PATCH",
+                                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                                        body: JSON.stringify({ clipId: clip.id, notes: clip.user_notes })
+                                    }).then(res => {
+                                        if (res.ok) toast.success("Notes saved");
+                                        else toast.error("Failed to save notes");
+                                    });
+                                }}
+                            />
+                        </div>
+                    </Card>
                 </div>
 
-                <div className="space-y-6 bg-card p-6 rounded-xl border">
-                    <div className="flex items-center justify-between">
-                        <h2 className="font-semibold text-lg">Metadata</h2>
-                        <Button size="sm" onClick={handleSave}>
-                            <Save className="w-4 h-4 mr-2" /> Save
-                        </Button>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Tags</Label>
-                        <div className="flex flex-wrap gap-2">
-                            {tags.map(tag => (
-                                <div
-                                    key={tag.id}
-                                    onClick={() => toggleTag(tag.id)}
-                                    className={`px-3 py-1 rounded-full text-xs cursor-pointer border transition-colors ${selectedTagIds.includes(tag.id)
-                                        ? "bg-primary text-primary-foreground border-primary"
-                                        : "bg-muted hover:bg-muted/80 border-transparent"
-                                        }`}
-                                >
-                                    {tag.name}
+                {/* Right Column: Extraction Station (7 cols) */}
+                <div className="xl:col-span-7">
+                    <Card className="h-full border bg-card/50 backdrop-blur-sm shadow-xl flex flex-col">
+                        <CardHeader className="border-b bg-muted/20 pb-0">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="space-y-1">
+                                    <CardTitle className="flex items-center gap-2 text-xl">
+                                        <FlaskConical className="w-5 h-5 text-primary" />
+                                        Extraction Station
+                                    </CardTitle>
+                                    <p className="text-sm text-muted-foreground">
+                                        Use AI to deconstruct this video into reusable templates.
+                                    </p>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
+                            </div>
 
-                    <div className="space-y-2">
-                        <Label>Notes</Label>
-                        <Textarea
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            placeholder="Add notes..."
-                            className="min-h-[150px]"
-                        />
-                    </div>
+                            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                                <TabsList className="w-full justify-start h-12 bg-transparent p-0 gap-6">
+                                    <TabsTrigger
+                                        value="script"
+                                        className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 pb-3 pt-2 font-medium"
+                                    >
+                                        Script Structure
+                                    </TabsTrigger>
+                                    <TabsTrigger
+                                        value="title"
+                                        className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 pb-3 pt-2 font-medium"
+                                    >
+                                        Title Pattern
+                                    </TabsTrigger>
+                                    <TabsTrigger
+                                        value="thumbnail"
+                                        className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 pb-3 pt-2 font-medium"
+                                    >
+                                        Thumbnail Formula
+                                    </TabsTrigger>
+                                </TabsList>
+                            </Tabs>
+                        </CardHeader>
 
-                    <div className="space-y-2">
-                        <Label>AI Prompt</Label>
-                        <Textarea
-                            value={aiPrompt}
-                            onChange={(e) => setAiPrompt(e.target.value)}
-                            placeholder="AI Prompt..."
-                            className="min-h-[100px]"
-                        />
-                    </div>
+                        <CardContent className="flex-1 p-6 relative flex flex-col">
+                            {/* Script Tab */}
+                            <div className={activeTab === "script" ? "flex-1 flex flex-col h-full" : "hidden"}>
+                                {renderContentArea(
+                                    extractedScript,
+                                    setExtractedScript,
+                                    "Click 'Extract Structure' to analyze the transcript..."
+                                )}
+
+                                {isExtracting && activeTab === "script" && (
+                                    <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
+                                        <div className="animate-pulse flex flex-col items-center">
+                                            <Sparkles className="w-8 h-8 text-primary mb-2 animate-spin" />
+                                            <span className="font-medium">Analyzing Transcript...</span>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="flex justify-between items-center mt-4">
+                                    <Button variant="outline" onClick={() => handleExtract("script")} disabled={isExtracting}>
+                                        <Sparkles className="w-4 h-4 mr-2" /> Extract Structure
+                                    </Button>
+                                    <Button onClick={() => handleSaveLibrary("script")} disabled={!extractedScript}>
+                                        <Save className="w-4 h-4 mr-2" /> Update Library
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Title Tab */}
+                            <div className={activeTab === "title" ? "flex-1 flex flex-col h-full" : "hidden"}>
+                                {renderContentArea(
+                                    extractedTitle,
+                                    setExtractedTitle,
+                                    "Analyze the title to find the winning pattern...",
+                                    "min-h-[200px]"
+                                )}
+
+                                {isExtracting && activeTab === "title" && (
+                                    <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
+                                        <div className="animate-pulse flex flex-col items-center">
+                                            <Sparkles className="w-8 h-8 text-primary mb-2 animate-spin" />
+                                            <span className="font-medium">Analyzing Title...</span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="flex justify-between items-center mt-4">
+                                    <Button variant="outline" onClick={() => handleExtract("title")} disabled={isExtracting}>
+                                        <Sparkles className="w-4 h-4 mr-2" /> Extract Pattern
+                                    </Button>
+                                    <Button onClick={() => handleSaveLibrary("title")} disabled={!extractedTitle}>
+                                        <Save className="w-4 h-4 mr-2" /> Update Library
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Thumbnail Tab */}
+                            <div className={activeTab === "thumbnail" ? "flex-1 flex flex-col h-full" : "hidden"}>
+                                <div className="mb-4">
+                                    <div className="aspect-video w-full max-w-sm rounded-lg overflow-hidden border bg-black mx-auto">
+                                        <img src={clip.thumbnail} alt="Thumbnail" className="w-full h-full object-cover" />
+                                    </div>
+                                </div>
+
+                                {renderContentArea(
+                                    extractedThumbnail,
+                                    setExtractedThumbnail,
+                                    "AI will describe the composition, text placement, and visual hooks...",
+                                    "min-h-[200px]"
+                                )}
+
+                                {isExtracting && activeTab === "thumbnail" && (
+                                    <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
+                                        <div className="animate-pulse flex flex-col items-center">
+                                            <Sparkles className="w-8 h-8 text-primary mb-2 animate-spin" />
+                                            <span className="font-medium">Analyzing Visuals...</span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="flex justify-between items-center mt-4">
+                                    <Button variant="outline" onClick={() => handleExtract("thumbnail")} disabled={isExtracting}>
+                                        <Sparkles className="w-4 h-4 mr-2" /> Extract Formula
+                                    </Button>
+                                    <Button onClick={() => handleSaveLibrary("thumbnail")} disabled={!extractedThumbnail}>
+                                        <Save className="w-4 h-4 mr-2" /> Update Library
+                                    </Button>
+                                </div>
+                            </div>
+
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         </div>
