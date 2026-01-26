@@ -24,16 +24,37 @@ def fetch_transcript(video_id: str) -> Optional[str]:
     Returns the transcript as a single string, or None if not found/error.
     """
     try:
-        # Standard static method usage
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+        # Debug: Inspect available methods if something goes wrong
+        # print(f"DEBUG: YouTubeTranscriptApi dir: {dir(YouTubeTranscriptApi)}")
+
+        # Try the modern object-oriented approach first (filters for English)
+        transcript_list_obj = YouTubeTranscriptApi.list_transcripts(video_id)
         
-        # transcript_list is a list of dicts: [{'text': '...', 'start': 0.0, 'duration': 1.0}, ...]
-        full_text = " ".join([item['text'] for item in transcript_list])
-             
+        # Try to get English (manual or auto)
+        try:
+            transcript = transcript_list_obj.find_transcript(['en'])
+        except:
+            # Fallback: just get the first available one
+            transcript = next(iter(transcript_list_obj))
+            
+        # fetch() returns the list of dicts
+        transcript_data = transcript.fetch()
+        
+        full_text = " ".join([item['text'] for item in transcript_data])
         return full_text
+
     except Exception as e:
-        # Re-raise the exception so the caller (lab.py) can report it
-        raise e
+        # If list_transcripts fails, check if we can fall back to static get_transcript 
+        # (though likely if one fails, both might, or version mismatch)
+        try:
+             print(f"DEBUG: list_transcripts failed: {e}. Trying static get_transcript.")
+             data = YouTubeTranscriptApi.get_transcript(video_id)
+             return " ".join([item['text'] for item in data])
+        except Exception as e2:
+             # Raise the original or new error with debug info
+             # We include dir() to see what's actually available in this version
+             attrs = dir(YouTubeTranscriptApi)
+             raise Exception(f"Fetch failed. Error: {str(e)}. Attributes: {attrs}")
 
 import time
 import random
