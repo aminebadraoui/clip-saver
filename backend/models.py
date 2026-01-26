@@ -31,6 +31,7 @@ class User(SQLModel, table=True):
     refresh_tokens: List["RefreshToken"] = Relationship(back_populates="user")
     images: List["Image"] = Relationship(back_populates="user")
     moodboards: List["Moodboard"] = Relationship(back_populates="user")
+    async_jobs: List["AsyncJob"] = Relationship(back_populates="user")
 
 class RefreshToken(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -286,6 +287,28 @@ class ReplicateModelCache(SQLModel, table=True):
     cost_per_run: float  # Estimated cost in credits
     is_active: bool = Field(default=True)
     last_updated: int = Field(sa_type=BigInteger)
+
+    cost_per_run: float  # Estimated cost in credits
+    is_active: bool = Field(default=True)
+    last_updated: int = Field(sa_type=BigInteger)
+
+class AsyncJob(SQLModel, table=True):
+    """Tracks asynchronous background jobs (e.g. Replicate predictions)"""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    type: str  # e.g. "script_extraction", "title_generation"
+    status: str = Field(default="pending") # pending, processing, completed, failed
+    
+    input_payload: str = Field(sa_type=Text) # JSON input
+    output_payload: Optional[str] = Field(default=None, sa_type=Text) # JSON output
+    error_message: Optional[str] = Field(default=None, sa_type=Text)
+    
+    prediction_id: Optional[str] = Field(default=None, index=True) # Replicate prediction ID
+    
+    created_at: int = Field(sa_type=BigInteger)
+    updated_at: int = Field(sa_type=BigInteger)
+    
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    user: Optional[User] = Relationship(back_populates="async_jobs")
 
 # Laboratory Models
 

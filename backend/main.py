@@ -38,6 +38,8 @@ from routers import replicate_models
 from routers import images
 from routers import moodboards
 from routers import lab
+from routers import webhooks
+from routers import jobs
 from dependencies import get_current_space
 from models import Space
 
@@ -120,6 +122,8 @@ app.include_router(replicate_models.router)
 app.include_router(images.router)
 app.include_router(moodboards.router)
 app.include_router(lab.router)
+app.include_router(webhooks.router)
+app.include_router(jobs.router)
 
 # Ensure temp directory exists
 # forcing reload for env vars 2

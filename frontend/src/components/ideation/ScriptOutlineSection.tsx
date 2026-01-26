@@ -9,6 +9,7 @@ import { InspirationSidebar } from "./InspirationSidebar";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { API_URL } from "@/config";
+import { workflowApi } from "@/utils/workflowApi";
 
 
 interface ScriptOutlineSectionProps {
@@ -28,6 +29,34 @@ export const ScriptOutlineSection = ({ outline, onUpdate, conceptData }: ScriptO
 
 
 
+    const pollJob = async (jobId: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const interval = setInterval(async () => {
+                try {
+                    const job = await workflowApi.getJob(jobId);
+                    if (job.status === 'succeeded') {
+                        clearInterval(interval);
+                        let content = "";
+                        if (Array.isArray(job.output)) {
+                            content = job.output.join("");
+                        } else {
+                            content = String(job.output);
+                        }
+                        // Clean markdown if present
+                        content = content.replace(/```markdown/g, "").replace(/```/g, "").trim();
+                        resolve(content);
+                    } else if (job.status === 'failed') {
+                        clearInterval(interval);
+                        reject(new Error(job.error || 'Job failed'));
+                    }
+                } catch (e) {
+                    clearInterval(interval);
+                    reject(e);
+                }
+            }, 2000);
+        });
+    };
+
     const handleGenerate = async (clip: any) => {
         setIsSidebarOpen(false);
         setIsGenerating(true);
@@ -38,12 +67,20 @@ export const ScriptOutlineSection = ({ outline, onUpdate, conceptData }: ScriptO
             });
             if (res.ok) {
                 const data = await res.json();
-                onUpdate(outline ? outline + "\n\n" + data.outline : data.outline);
+
+                let resultOutline = "";
+                if (data.jobId) {
+                    resultOutline = await pollJob(data.jobId);
+                } else {
+                    resultOutline = data.outline;
+                }
+
+                onUpdate(outline ? outline + "\n\n" + resultOutline : resultOutline);
                 toast.success("Outline generated from clip!");
-                // After generating, ask if they want to readapt? Or maybe just show the button now.
             }
         } catch (e) {
             toast.error("Failed to generate outline");
+            console.error(e);
         } finally {
             setIsGenerating(false);
         }
@@ -66,7 +103,15 @@ export const ScriptOutlineSection = ({ outline, onUpdate, conceptData }: ScriptO
             });
             if (res.ok) {
                 const data = await res.json();
-                onUpdate(data.outline);
+
+                let resultOutline = "";
+                if (data.jobId) {
+                    resultOutline = await pollJob(data.jobId);
+                } else {
+                    resultOutline = data.outline;
+                }
+
+                onUpdate(resultOutline);
                 toast.success("Outline readapted for main concept!");
             } else {
                 toast.error("Failed to readapt outline");

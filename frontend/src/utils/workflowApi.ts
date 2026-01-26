@@ -221,5 +221,14 @@ export const workflowApi = {
     });
     if (!response.ok) throw new Error('Failed to fetch replicate models');
     return response.json();
+  },
+
+  // Get Async Job status
+  async getJob(jobId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch job status');
+    return response.json();
   }
 };

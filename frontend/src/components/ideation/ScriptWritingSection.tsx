@@ -9,6 +9,7 @@ import remarkGfm from 'remark-gfm';
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { API_URL } from "@/config";
+import { workflowApi } from "@/utils/workflowApi";
 
 
 interface ScriptWritingSectionProps {
@@ -27,6 +28,34 @@ export const ScriptWritingSection = ({ content, onUpdate, conceptData, outline, 
 
 
 
+
+    const pollJob = async (jobId: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const interval = setInterval(async () => {
+                try {
+                    const job = await workflowApi.getJob(jobId);
+                    if (job.status === 'succeeded') {
+                        clearInterval(interval);
+                        let content = "";
+                        if (Array.isArray(job.output)) {
+                            content = job.output.join("");
+                        } else {
+                            content = String(job.output);
+                        }
+                        // Clean markdown blocks
+                        content = content.replace(/^```markdown\n/g, "").replace(/^```\n/g, "").replace(/\n```$/g, "").trim();
+                        resolve(content);
+                    } else if (job.status === 'failed') {
+                        clearInterval(interval);
+                        reject(new Error(job.error || 'Job failed'));
+                    }
+                } catch (e) {
+                    clearInterval(interval);
+                    reject(e);
+                }
+            }, 2000);
+        });
+    };
 
     const handleGenerate = async () => {
         if (!outline || !conceptData) {
@@ -49,7 +78,15 @@ export const ScriptWritingSection = ({ content, onUpdate, conceptData, outline, 
             });
             if (res.ok) {
                 const data = await res.json();
-                onUpdate(data.script);
+
+                let resultScript = "";
+                if (data.jobId) {
+                    resultScript = await pollJob(data.jobId);
+                } else {
+                    resultScript = data.script;
+                }
+
+                onUpdate(resultScript);
                 toast.success("Script generated!");
             } else {
                 toast.error("Failed to generate script");

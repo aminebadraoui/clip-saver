@@ -160,44 +160,49 @@ export function ViewClipPage() {
         minHeight = "min-h-[400px]"
     ) => {
         return (
-            <div className={`flex-1 relative ${minHeight} bg-background/50 rounded-md border overflow-hidden`}>
-                <div className="absolute top-2 right-2 z-10 flex gap-2 bg-background/80 backdrop-blur rounded p-1 border">
-                    <Button
-                        variant={viewMode === "preview" ? "secondary" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode("preview")}
-                        className="h-7 text-xs"
-                    >
-                        <Eye className="w-3 h-3 mr-1" /> Preview
-                    </Button>
-                    <Button
-                        variant={viewMode === "edit" ? "secondary" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode("edit")}
-                        className="h-7 text-xs"
-                    >
-                        <Activity className="w-3 h-3 mr-1" /> Edit
-                    </Button>
+            <div className="flex flex-col gap-2">
+                <div className="flex justify-end">
+                    <div className="flex gap-1 bg-muted/40 p-1 rounded-lg border">
+                        <Button
+                            variant={viewMode === "preview" ? "secondary" : "ghost"}
+                            size="sm"
+                            onClick={() => setViewMode("preview")}
+                            className="h-7 text-xs font-medium px-3"
+                        >
+                            <Eye className="w-3 h-3 mr-2" /> Preview
+                        </Button>
+                        <Button
+                            variant={viewMode === "edit" ? "secondary" : "ghost"}
+                            size="sm"
+                            onClick={() => setViewMode("edit")}
+                            className="h-7 text-xs font-medium px-3"
+                        >
+                            <Activity className="w-3 h-3 mr-2" /> Edit
+                        </Button>
+                    </div>
                 </div>
 
-                {viewMode === "edit" ? (
-                    <Textarea
-                        value={content}
-                        onChange={(e) => setContent(e.target.value)}
-                        placeholder={placeholder}
-                        className={`w-full h-full resize-none font-mono text-sm bg-transparent border-none focus-visible:ring-0 p-4 leading-relaxed ${minHeight}`}
-                    />
-                ) : (
-                    <div className={`w-full h-full overflow-y-auto p-6 prose prose-invert max-w-none text-sm ${minHeight}`}>
-                        {content ? (
-                            <ReactMarkdown>{content}</ReactMarkdown>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50 italic">
-                                {placeholder}
-                            </div>
-                        )}
-                    </div>
-                )}
+                <div className={`flex-1 relative ${minHeight} bg-background/50 rounded-md border overflow-hidden transition-all duration-300 ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2`}>
+                    {viewMode === "edit" ? (
+                        <Textarea
+                            value={content}
+                            onChange={(e) => setContent(e.target.value)}
+                            placeholder={placeholder}
+                            className={`w-full h-full resize-none font-mono text-sm bg-transparent border-none focus-visible:ring-0 p-6 leading-relaxed ${minHeight}`}
+                        />
+                    ) : (
+                        <div className={`w-full h-full overflow-y-auto p-6 prose prose-invert max-w-none text-sm prose-p:leading-relaxed prose-headings:font-semibold ${minHeight}`}>
+                            {content ? (
+                                <ReactMarkdown>{content}</ReactMarkdown>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50 italic select-none">
+                                    <Sparkles className="w-8 h-8 mb-2 opacity-50" />
+                                    {placeholder}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
         );
     };
