@@ -148,17 +148,22 @@ export function Sidebar({
                     </Button>
                 </Link>
 
-                <Separator className="my-2 bg-border/50" />
+                {/* AI Workflows - only available in dev/local */}
+                {import.meta.env.DEV && (
+                    <>
+                        <Separator className="my-2 bg-border/50" />
 
-                <Link to="/workflows">
-                    <Button
-                        variant={location.pathname.startsWith('/workflows') ? "secondary" : "ghost"}
-                        className="w-full justify-start"
-                    >
-                        <Wand2 className="w-4 h-4 mr-2" />
-                        AI Workflows
-                    </Button>
-                </Link>
+                        <Link to="/workflows">
+                            <Button
+                                variant={location.pathname.startsWith('/workflows') ? "secondary" : "ghost"}
+                                className="w-full justify-start"
+                            >
+                                <Wand2 className="w-4 h-4 mr-2" />
+                                AI Workflows
+                            </Button>
+                        </Link>
+                    </>
+                )}
 
             </div>
         </div>
