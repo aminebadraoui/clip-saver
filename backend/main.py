@@ -23,7 +23,7 @@ import json
 import statistics
 from sqlmodel import Session, select
 from database import get_session, engine, create_db_and_tables
-from models import Clip, Tag, ClipTagLink, User, Note, RefreshToken
+from models import Clip, Tag, ClipTagLink, User, Note, RefreshToken, Image, ImageTagLink
 from fastapi import Depends, status, Body
 from fastapi.security import OAuth2PasswordRequestForm
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, get_active_subscriber, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, hash_token, REFRESH_TOKEN_EXPIRE_DAYS
@@ -35,6 +35,8 @@ from routers import workflows
 from routers import workflow_executions
 from routers import credits
 from routers import replicate_models
+from routers import images
+from routers import moodboards
 from dependencies import get_current_space
 from models import Space
 
@@ -123,6 +125,8 @@ app.include_router(workflows.router)
 app.include_router(workflow_executions.router)
 app.include_router(credits.router)
 app.include_router(replicate_models.router)
+app.include_router(images.router)
+app.include_router(moodboards.router)
 
 # Ensure temp directory exists
 # forcing reload for env vars 2
