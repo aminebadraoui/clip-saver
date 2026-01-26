@@ -85,6 +85,41 @@ def fetch_transcript(video_id: str) -> Optional[str]:
         attrs = dir(YouTubeTranscriptApi)
         raise Exception(f"Fetch failed. Error: {str(e)}. Attributes: {attrs}")
 
+import requests
+
+def fetch_transcript_scrapecreators(video_id: str) -> Optional[str]:
+    """
+    Fetches transcript using ScrapeCreators API (Server-Side safe).
+    """
+    api_key = os.getenv("SCRAPECREATORS_API_KEY")
+    if not api_key:
+        print("DEBUG: ScrapeCreators API key not found in env")
+        return None
+        
+    url = f"https://api.scrapecreators.com/v1/youtube/video/transcript?url=https://www.youtube.com/watch?v={video_id}"
+    
+    try:
+        response = requests.get(url, headers={"x-api-key": api_key}, timeout=30)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('success'):
+                # Prefer pre-joined text if available
+                if data.get('transcript_only_text'):
+                    return data['transcript_only_text']
+                
+                # Fallback to joining list
+                if data.get('transcript'):
+                    return " ".join([item.get('text', '') for item in data['transcript']])
+            
+            print(f"DEBUG: ScrapeCreators API returned success=False: {data}")
+        else:
+            print(f"DEBUG: ScrapeCreators API failed: {response.status_code} - {response.text}")
+            
+    except Exception as e:
+        print(f"DEBUG: ScrapeCreators API exception: {e}")
+        
+    return None
+
 import time
 import random
 
@@ -767,10 +802,44 @@ def summarize_video(transcript: str) -> str:
     except Exception as e:
         return f"Error generating summary: {str(e)}"
 
-async def summarize_video_async(transcript: str, webhook_url: str) -> Any:
+async def summarize_video_async(transcript: Optional[str], webhook_url: str, video_url: Optional[str] = None) -> Any:
     """
-    Starts an async prediction for video summary.
+    Starts an async prediction for video summary. Can use Transcript OR Video URL.
     """
+    api_key = os.getenv("REPLICATE_API_TOKEN")
+    if not api_key:
+        raise ValueError("REPLICATE_API_TOKEN not found")
+
+    system_prompt = """You are a concise video summarizer.
+    Summarize the provided video content into 2-3 sentences.
+    Focus on the main topic, the key insight/conflict, and the resolution.
+    Keep it engaging but brief.
+    """
+    
+    input_payload = {
+        "system_instruction": system_prompt,
+        "temperature": 0.5,
+        "thinking_level": "low",
+    }
+    
+    if transcript:
+        user_prompt = f"""Summarize this transcript:
+        {transcript[:10000]}
+        """
+        input_payload["prompt"] = user_prompt
+    elif video_url:
+        input_payload["prompt"] = "Summarize this video."
+        input_payload["videos"] = [video_url]
+    else:
+        raise ValueError("Must provide either transcript or video_url")
+
+    client = replicate.Client(api_token=api_key)
+    return await client.predictions.async_create(
+        version="google/gemini-3-pro",
+        input=input_payload,
+        webhook=webhook_url,
+        webhook_events_filter=["completed"]
+    )
     api_key = os.getenv("REPLICATE_API_TOKEN")
     if not api_key:
         raise ValueError("REPLICATE_API_TOKEN not found")

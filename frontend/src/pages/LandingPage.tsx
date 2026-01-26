@@ -4,10 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { Sparkles, Youtube, PenTool, FolderOpen } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useEffect } from "react";
 
 export const LandingPage = () => {
     const navigate = useNavigate();
     const { isAuthenticated } = useAuth();
+
+    // Auto-redirect if already logged in
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate("/dashboard");
+        }
+    }, [isAuthenticated, navigate]);
 
     return (
         <div className="min-h-screen bg-background flex flex-col font-sans selection:bg-primary/30">

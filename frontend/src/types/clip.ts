@@ -21,6 +21,7 @@ export interface Clip {
     uploadDate?: string;
     viralRatio?: number;
     timeSinceUploadRatio?: number;
+    transcript?: string;
 
     outlierScore?: number;
     engagementScore?: number;

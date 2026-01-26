@@ -23,6 +23,38 @@ class SaveTemplateRequest(BaseModel):
 
 # --- Extraction Endpoints ---
 
+@router.post("/transcript/fetch")
+async def fetch_transcript_endpoint(request: ExtractRequest, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    """
+    Explicitly fetches and saves the transcript. 
+    Used for the "Loading Script..." UI phase before summary/extraction.
+    """
+    clip = session.get(Clip, request.clipId)
+    if not clip:
+        raise HTTPException(status_code=404, detail="Clip not found")
+
+    if clip.transcript:
+        return {"status": "exists", "transcript": clip.transcript}
+
+    print(f"DEBUG: Explicit fetch via ScrapeCreators for {clip.videoId}")
+    
+    # Debug: Check environment variable inside the request to ensure it's loaded
+    import os
+    print(f"DEBUG: SCRAPECREATORS_API_KEY present? {'Yes' if os.getenv('SCRAPECREATORS_API_KEY') else 'No'}")
+    
+    transcript = fetch_transcript_scrapecreators(clip.videoId)
+    print(f"DEBUG: Fetch result length: {len(transcript) if transcript else 0}")
+    
+    if transcript:
+        # SAVE the transcript
+        clip.transcript = transcript
+        session.add(clip)
+        session.commit()
+        session.refresh(clip)
+        return {"status": "fetched", "transcript": transcript}
+    else:
+        raise HTTPException(status_code=400, detail="Could not fetch transcript from ScrapeCreators.")
+
 @router.post("/extract/script")
 async def extract_script_endpoint(request: ExtractRequest, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
     clip = session.get(Clip, request.clipId)
@@ -31,18 +63,22 @@ async def extract_script_endpoint(request: ExtractRequest, session: Session = De
     
     transcript = clip.transcript
     
-    # Try fetching transcript if not present (assuming ai_agent used to fetch)
     if not transcript:
-        # ai_agent.fetch_transcript(video_id)
-        # Let's import fetch_transcript
-        from ai_agent import fetch_transcript
+        # ScrapeCreators Exclusive Strategy with Save-on-Fetch
+        from ai_agent import fetch_transcript_scrapecreators
+        print(f"DEBUG: Fetching transcript via ScrapeCreators for {clip.videoId}")
         
-        try:
-            transcript = fetch_transcript(clip.videoId)
-        except Exception as e:
-             error_msg = str(e)
-             print(f"DEBUG: Failed to fetch transcript/proxies for {clip.videoId}. Error: {error_msg}")
-             raise HTTPException(status_code=400, detail=f"Transcript Error: {error_msg}")
+        transcript = fetch_transcript_scrapecreators(clip.videoId)
+        
+        if transcript:
+            # SAVE the transcript for future reuse
+            print(f"DEBUG: Saving transcript for {clip.videoId}")
+            clip.transcript = transcript
+            session.add(clip)
+            session.commit()
+            session.refresh(clip)
+        else:
+             raise HTTPException(status_code=400, detail="Could not fetch transcript from ScrapeCreators.")
 
     structure = extract_script_structure(transcript)
 
@@ -333,14 +369,21 @@ async def extract_summary_endpoint(request: ExtractRequest, session: Session = D
         raise HTTPException(status_code=404, detail="Clip not found")
 
     transcript = clip.transcript
+    
     if not transcript:
-        from ai_agent import fetch_transcript
-        try:
-            transcript = fetch_transcript(clip.videoId)
-        except Exception as e:
-             error_msg = str(e)
-             print(f"DEBUG: Failed to fetch transcript/proxies for {clip.videoId}. Error: {error_msg}")
-             raise HTTPException(status_code=400, detail=f"Transcript Error: {error_msg}")
+        # ScrapeCreators Exclusive Strategy with Save-on-Fetch
+        from ai_agent import fetch_transcript_scrapecreators
+        
+        transcript = fetch_transcript_scrapecreators(clip.videoId)
+        
+        if transcript:
+            # SAVE the transcript
+            clip.transcript = transcript
+            session.add(clip)
+            session.commit()
+            session.refresh(clip)
+        else:
+            raise HTTPException(status_code=400, detail="Could not fetch transcript from ScrapeCreators.")
 
     summary = summarize_video(transcript)
     
