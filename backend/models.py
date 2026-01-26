@@ -118,6 +118,7 @@ class Clip(SQLModel, table=True):
     originalTitle: Optional[str] = None
     channelName: Optional[str] = None
     scriptOutline: Optional[str] = Field(default=None, sa_type=Text)
+    transcript: Optional[str] = Field(default=None, sa_type=Text) # Store full transcript from client
 
     # New Metrics
     subscriberCount: Optional[int] = None

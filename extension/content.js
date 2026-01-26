@@ -125,6 +125,59 @@ async function fetchVideoInfo(videoId) {
     try { const res = await fetch(`${API_BASE}/info?videoId=${videoId}`); if (res.ok) return await res.json(); } catch (e) { console.error("Backend info fetch failed", e); } return null;
 }
 
+// --- Transcript Helper ---
+async function getTranscriptText(videoId) {
+    try {
+        // 1. Fetch the video page HTML (or use current if we are on it, but fetching ensures fresh data/no DOM access issues)
+        // Actually, we are injecting into the page, so we could try to find ytInitialPlayerResponse object in the global scope if possible.
+        // But content scripts can't access page variables directly. Regex on document.body.innerHTML is risky but standard for extensions.
+        // Better: Fetch the video page source via fetch(), which won't be blocked since it's same-origin (youtube.com).
+
+        const videoPageResponse = await fetch(`https://www.youtube.com/watch?v=${videoId}`);
+        const videoPageHtml = await videoPageResponse.text();
+
+        // 2. Extract specific json blob
+        const captionMatch = videoPageHtml.match(/"captionTracks":(\[.*?\])/);
+        if (!captionMatch) return null;
+
+        const tracks = JSON.parse(captionMatch[1]);
+        if (!tracks || tracks.length === 0) return null;
+
+        // 3. Find English track (en, en-US, en-GB) or auto-generated
+        // Priorities: manual en > auto en > first available
+        const enTrack = tracks.find(t => t.languageCode === 'en' && !t.kind) ||
+            tracks.find(t => t.languageCode.startsWith('en') && !t.kind) ||
+            tracks.find(t => t.languageCode === 'en') ||
+            tracks.find(t => t.languageCode.startsWith('en')) ||
+            tracks[0];
+
+        if (!enTrack || !enTrack.baseUrl) return null;
+
+        // 4. Fetch the XML transcript
+        const transcriptResponse = await fetch(enTrack.baseUrl);
+        const transcriptXml = await transcriptResponse.text();
+
+        // 5. Parse XML to Text
+        // Basic parser: remove tags, decode entities
+        // Format is <text ...>Hello world</text>
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(transcriptXml, "text/xml");
+        const textNodes = xmlDoc.getElementsByTagName("text");
+
+        let fullText = "";
+        for (let i = 0; i < textNodes.length; i++) {
+            fullText += textNodes[i].textContent + " ";
+        }
+
+        // Basic decode of html entities (handled by DOMParser usually but just in case)
+        return fullText.trim();
+
+    } catch (e) {
+        console.error("Transcript fetch failed in extension:", e);
+        return null; // Fail silently, save clip without transcript
+    }
+}
+
 async function saveClip(payload) {
     const headers = {
         'Content-Type': 'application/json'
@@ -132,6 +185,16 @@ async function saveClip(payload) {
 
     if (currentSpaceId) {
         headers['X-Space-Id'] = currentSpaceId;
+    }
+
+    // Try to fetch transcript client-side before saving
+    if (!payload.transcript && payload.videoId) {
+        // Only fetch if it's a video (shorts have transcripts too usually but let's be safe)
+        const transcript = await getTranscriptText(payload.videoId);
+        if (transcript) {
+            payload.transcript = transcript;
+            console.log("Extension: Attached client-side transcript.");
+        }
     }
 
     const res = await fetchWithAuth(`${API_BASE}/clips`, {

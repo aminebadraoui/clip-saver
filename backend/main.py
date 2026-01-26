@@ -1064,6 +1064,7 @@ class ClipCreate(BaseModel):
     outlierScore: Optional[float] = None
     channelAverageViews: Optional[int] = None
     spaceId: Optional[str] = None
+    transcript: Optional[str] = None # New optional field
 
 @app.post("/api/clips")
 def create_clip(

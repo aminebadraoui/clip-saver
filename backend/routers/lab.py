@@ -29,19 +29,20 @@ async def extract_script_endpoint(request: ExtractRequest, session: Session = De
     if not clip:
         raise HTTPException(status_code=404, detail="Clip not found")
     
-    transcript = ""
-    # Try fetching transcript if not present (assuming ai_agent used to fetch)
-    # But wait, clip doesn't store transcript text directly in db usually, dynamic fetch?
-    # ai_agent.fetch_transcript(video_id)
-    # Let's import fetch_transcript
-    from ai_agent import fetch_transcript
+    transcript = clip.transcript
     
-    try:
-        transcript = fetch_transcript(clip.videoId)
-    except Exception as e:
-         error_msg = str(e)
-         print(f"DEBUG: Failed to fetch transcript/proxies for {clip.videoId}. Error: {error_msg}")
-         raise HTTPException(status_code=400, detail=f"Transcript Error: {error_msg}")
+    # Try fetching transcript if not present (assuming ai_agent used to fetch)
+    if not transcript:
+        # ai_agent.fetch_transcript(video_id)
+        # Let's import fetch_transcript
+        from ai_agent import fetch_transcript
+        
+        try:
+            transcript = fetch_transcript(clip.videoId)
+        except Exception as e:
+             error_msg = str(e)
+             print(f"DEBUG: Failed to fetch transcript/proxies for {clip.videoId}. Error: {error_msg}")
+             raise HTTPException(status_code=400, detail=f"Transcript Error: {error_msg}")
 
     structure = extract_script_structure(transcript)
 
@@ -331,13 +332,15 @@ async def extract_summary_endpoint(request: ExtractRequest, session: Session = D
     if not clip:
         raise HTTPException(status_code=404, detail="Clip not found")
 
-    from ai_agent import fetch_transcript
-    try:
-        transcript = fetch_transcript(clip.videoId)
-    except Exception as e:
-         error_msg = str(e)
-         print(f"DEBUG: Failed to fetch transcript/proxies for {clip.videoId}. Error: {error_msg}")
-         raise HTTPException(status_code=400, detail=f"Transcript Error: {error_msg}")
+    transcript = clip.transcript
+    if not transcript:
+        from ai_agent import fetch_transcript
+        try:
+            transcript = fetch_transcript(clip.videoId)
+        except Exception as e:
+             error_msg = str(e)
+             print(f"DEBUG: Failed to fetch transcript/proxies for {clip.videoId}. Error: {error_msg}")
+             raise HTTPException(status_code=400, detail=f"Transcript Error: {error_msg}")
 
     summary = summarize_video(transcript)
     
