@@ -10,7 +10,9 @@ export interface Clip {
 
     tagIds?: string[];
     notes?: string;
+    user_notes?: string;
     aiPrompt?: string;
+    scriptOutline?: string;
     originalVideoUrl?: string;
     sourceVideoId?: string;
     originalTitle?: string;
@@ -25,6 +27,9 @@ export interface Clip {
     channelAverageViews?: number;
     spaceId?: string;
     notesList?: Note[];
+    script_templates?: { id: string, structure: string }[];
+    title_templates?: { id: string, text: string }[];
+    thumbnail_templates?: { id: string, description: string }[];
 }
 
 export interface Note {

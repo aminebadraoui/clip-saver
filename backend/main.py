@@ -37,6 +37,7 @@ from routers import credits
 from routers import replicate_models
 from routers import images
 from routers import moodboards
+from routers import lab
 from dependencies import get_current_space
 from models import Space
 
@@ -118,6 +119,7 @@ app.include_router(credits.router)
 app.include_router(replicate_models.router)
 app.include_router(images.router)
 app.include_router(moodboards.router)
+app.include_router(lab.router)
 
 # Ensure temp directory exists
 # forcing reload for env vars 2
@@ -1008,11 +1010,25 @@ def read_clips(
         clip_dict = clip.model_dump()
         clip_dict["tagIds"] = [tag.id for tag in clip.tags]
         clip_dict["spaceId"] = str(clip.space_id) if clip.space_id else None
+        
         # Include granular notes
-        # We need to explicitly convert Note objects to dicts or rely on FastAPI/Pydantic serialization 
-        # But since we are manually building the dict, let's include them.
-        # Assuming notes_list is loaded or lazy loaded.
         clip_dict["notesList"] = [note.model_dump() for note in clip.notes_list]
+        
+        # Include latest templates (for auto-loading in Video Lab)
+        # We take the most recently created one if multiple exist
+        
+        # Script
+        latest_script = sorted(clip.script_templates, key=lambda x: x.created_at, reverse=True)
+        clip_dict["script_templates"] = [{"structure": t.structure, "id": str(t.id)} for t in latest_script[:1]]
+        
+        # Title
+        latest_title = sorted(clip.title_templates, key=lambda x: x.created_at, reverse=True)
+        clip_dict["title_templates"] = [{"text": t.text, "id": str(t.id)} for t in latest_title[:1]]
+        
+        # Thumbnail
+        latest_thumb = sorted(clip.thumbnail_templates, key=lambda x: x.created_at, reverse=True)
+        clip_dict["thumbnail_templates"] = [{"description": t.description, "id": str(t.id)} for t in latest_thumb[:1]]
+        
         result.append(clip_dict)
     return result
 

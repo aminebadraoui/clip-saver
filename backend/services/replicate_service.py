@@ -161,11 +161,12 @@ class ReplicateService:
     """Service for interacting with Replicate API."""
     
     def __init__(self):
-        self.api_key = os.getenv("REPLICATE_API_KEY")
+        self.api_key = os.getenv("REPLICATE_API_TOKEN")
         if not self.api_key:
-            raise ValueError("REPLICATE_API_KEY not found in environment variables")
+            raise ValueError("REPLICATE_API_TOKEN not found in environment variables")
         
-        # Set the API token
+        # Set the API token explicitly for the library if needed, 
+        # though standard lib usages pick it up automatically.
         os.environ["REPLICATE_API_TOKEN"] = self.api_key
     
     def initialize_model_cache(self, session: Session) -> None:

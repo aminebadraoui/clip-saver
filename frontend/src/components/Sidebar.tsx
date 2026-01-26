@@ -158,6 +158,39 @@ export function Sidebar({
                     </Button>
                 </Link>
 
+                <Separator className="my-2 bg-border/50" />
+                <div className="px-2 text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">
+                    Libraries
+                </div>
+
+                <Link to="/library/titles">
+                    <Button
+                        variant={location.pathname === '/library/titles' ? "secondary" : "ghost"}
+                        className="w-full justify-start"
+                    >
+                        <span className="w-4 h-4 mr-2 flex items-center justify-center font-serif font-bold text-xs">T</span>
+                        Title Library
+                    </Button>
+                </Link>
+                <Link to="/library/thumbnails">
+                    <Button
+                        variant={location.pathname === '/library/thumbnails' ? "secondary" : "ghost"}
+                        className="w-full justify-start"
+                    >
+                        <Image className="w-4 h-4 mr-2" />
+                        Thumbnail Library
+                    </Button>
+                </Link>
+                <Link to="/library/scripts">
+                    <Button
+                        variant={location.pathname === '/library/scripts' ? "secondary" : "ghost"}
+                        className="w-full justify-start"
+                    >
+                        <span className="w-4 h-4 mr-2 flex items-center justify-center font-mono text-xs">S</span>
+                        Script Library
+                    </Button>
+                </Link>
+
                 {/* AI Workflows - only available in dev/local */}
                 {import.meta.env.DEV && (
                     <>
