@@ -10,7 +10,6 @@ alembic
 psycopg2-binary
 passlib[bcrypt]
 python-jose[cryptography]
-python-multipart
 bcrypt==4.0.1
 stripe
 langchain
