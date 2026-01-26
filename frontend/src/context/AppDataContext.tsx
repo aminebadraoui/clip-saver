@@ -17,14 +17,14 @@ interface AppDataContextType {
     tags: Tag[];
 
     selectedTagIds: string[];
-    filterType: 'all' | 'video' | 'clip';
+    filterType: 'all' | 'video' | 'clip' | 'short';
     isLoading: boolean;
 
     // Actions
     refreshData: () => Promise<void>;
 
     setSelectedTagIds: (ids: string[] | ((prev: string[]) => string[])) => void;
-    setFilterType: (type: 'all' | 'video' | 'clip') => void;
+    setFilterType: (type: 'all' | 'video' | 'clip' | 'short') => void;
 
     // Derived Actions (Higher level)
 
@@ -48,7 +48,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     // State
 
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
-    const [filterType, setFilterType] = useState<'all' | 'video' | 'clip'>('video');
+    const [filterType, setFilterType] = useState<'all' | 'video' | 'clip' | 'short'>('all');
 
     const refreshData = useCallback(async () => {
         const [loadedClips, loadedTags] = await Promise.all([

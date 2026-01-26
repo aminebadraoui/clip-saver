@@ -2,7 +2,7 @@ import type { Clip } from "@/types/clip";
 
 import type { Tag } from "@/types/tag";
 import { Button } from "@/components/ui/button";
-import { Trash2, ExternalLink } from "lucide-react";
+import { Trash2, ExternalLink, Eye, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface ClipListRowProps {
@@ -30,15 +30,34 @@ export function ClipListRow({ clip, tags, onDelete, onCinemaMode }: ClipListRowP
                 <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1 rounded">
                     {clip.type === 'clip' ? 'CLIP' : clip.type === 'short' ? 'SHORT' : 'VIDEO'}
                 </div>
-                {clip.engagementScore != null && (
-                    <div className="absolute top-1 left-1 bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm z-10">
-                        {Number(clip.engagementScore).toFixed(1)}
+                {clip.outlierScore != null && (
+                    <div className="absolute top-1 left-1 bg-yellow-400 text-black text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm z-10 flex items-center gap-0.5">
+                        {Number(clip.outlierScore).toFixed(1)}x
                     </div>
                 )}
             </div>
 
             <div className="flex-1 min-w-0">
                 <h3 className="font-medium truncate" title={clip.title}>{clip.title}</h3>
+
+                {/* Metrics Row */}
+                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                    {clip.viewCount !== undefined && (
+                        <div className="flex items-center gap-1">
+                            <Eye className="w-3 h-3" />
+                            <span>
+                                {new Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 1 }).format(clip.viewCount)}
+                            </span>
+                        </div>
+                    )}
+                    {clip.createdAt && (
+                        <div className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            <span>{new Date(clip.createdAt).toLocaleDateString()}</span>
+                        </div>
+                    )}
+                </div>
+
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
 
                     {clip.viralRatio && (

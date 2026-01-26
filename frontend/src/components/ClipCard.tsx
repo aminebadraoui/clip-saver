@@ -98,6 +98,8 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
                     </div>
                 )}
 
+
+
                 {/* Outlier Score Badge */}
                 {clip.outlierScore != null && (
                     <div className="absolute top-2 left-2 z-20" onClick={(e) => e.stopPropagation()}>
@@ -232,6 +234,15 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
                     </div>
                 </div>
 
+                {/* Shorts Badge (Body) */}
+                {clip.type === 'short' && (
+                    <div className="-mt-1">
+                        <Badge variant="secondary" className="bg-red-600 text-white hover:bg-red-700 border-none text-[10px] px-2 h-5 font-bold shadow-xs">
+                            Short
+                        </Badge>
+                    </div>
+                )}
+
                 {/* Scores Row */}
                 <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
                     {/* Viral Ratio Pill */}
@@ -313,22 +324,8 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate, o
                         onCinemaMode?.(clip);
                     }}
                 >
-                    {clip.type === 'video' ? (
-                        <>
-                            <Play className="w-3.5 h-3.5 mr-2 fill-current" />
-                            Details
-                        </>
-                    ) : clip.type === 'short' ? (
-                        <>
-                            <Film className="w-3.5 h-3.5 mr-2" />
-                            Watch Short
-                        </>
-                    ) : (
-                        <>
-                            <Film className="w-3.5 h-3.5 mr-2" />
-                            See Details
-                        </>
-                    )}
+                    {clip.type === 'short' ? <Film className="w-3.5 h-3.5 mr-2" /> : <Play className="w-3.5 h-3.5 mr-2 fill-current" />}
+                    Details
                 </Button>
             </CardFooter>
         </Card >

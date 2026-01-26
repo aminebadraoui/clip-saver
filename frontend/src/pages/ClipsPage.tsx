@@ -31,7 +31,8 @@ export function ClipsPage() {
         selectedTagIds, filterType,
         isLoading,
         refreshData,
-        handleCreateTag
+        handleCreateTag,
+        setFilterType
     } = useAppData();
     const { currentSpace } = useAuth();
 
@@ -177,7 +178,12 @@ export function ClipsPage() {
             if (typeof clip.start === 'number' && typeof clip.end === 'number') {
                 type = 'clip';
             } else {
-                type = 'video';
+                // Fallback: if we can detect it's a short from URL?
+                if (clip.originalVideoUrl?.includes('/shorts/')) {
+                    type = 'short';
+                } else {
+                    type = 'video';
+                }
             }
         }
 
@@ -202,7 +208,9 @@ export function ClipsPage() {
                 <h1 className="text-3xl font-bold tracking-tight">
                     {selectedTagIds.length > 0
                         ? `Tags: ${selectedTagIds.map(id => tags.find(t => t.id === id)?.name).filter(Boolean).join(", ")}`
-                        : filterType === 'video' ? (currentSpace?.name || "All Videos") : "All Clips"}
+                        : filterType === 'video' ? (currentSpace?.name || "Longform Videos")
+                            : filterType === 'short' ? "Shorts"
+                                : (currentSpace?.name || "All Videos")}
                 </h1>
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
@@ -223,6 +231,26 @@ export function ClipsPage() {
                             <List className="h-4 w-4" />
                         </Button>
                     </div>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="gap-2">
+                                <List className="h-4 w-4" />
+                                {filterType === 'all' ? 'All Videos' : filterType === 'video' ? 'Longform' : 'Shorts'}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setFilterType('all')}>
+                                All Videos
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setFilterType('video')}>
+                                Longform
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setFilterType('short')}>
+                                Shorts
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
