@@ -94,8 +94,8 @@ class WorkflowEngine:
         
         return True, None
     
-    def get_execution_order(self, nodes: List[WorkflowNode], edges: List[WorkflowEdge]) -> List[str]:
-        """Get topologically sorted execution order."""
+    def get_execution_order(self, nodes: List[WorkflowNode], edges: List[WorkflowEdge], target_node_ids: Optional[List[str]] = None) -> List[str]:
+        """Get topologically sorted execution order, optionally filtered by target nodes."""
         G = nx.DiGraph()
         
         for node in nodes:
@@ -106,15 +106,30 @@ class WorkflowEngine:
         
         # Topological sort
         try:
-            return list(nx.topological_sort(G))
+            full_order = list(nx.topological_sort(G))
         except nx.NetworkXError:
             raise ValueError("Cannot determine execution order - workflow may contain cycles")
+            
+        if not target_node_ids:
+            return full_order
+            
+        # Filter for targets and their dependencies
+        nodes_to_keep = set(target_node_ids)
+        for node_id in target_node_ids:
+            if node_id in G:
+                nodes_to_keep.update(nx.ancestors(G, node_id))
+        
+        return [n for n in full_order if n in nodes_to_keep]
     
-    def calculate_total_cost(self, nodes: List[WorkflowNode]) -> int:
+    def calculate_total_cost(self, nodes: List[WorkflowNode], nodes_to_run: Optional[List[str]] = None) -> int:
         """Estimate total credit cost for workflow."""
         total_cost = 0
         
         for node in nodes:
+            # If nodes_to_run is specified, only count cost for those nodes
+            if nodes_to_run is not None and node.id not in nodes_to_run:
+                continue
+                
             if node.type == 'replicate':
                 model_id = node.data.get('model_id')
                 if model_id:
@@ -143,7 +158,35 @@ class WorkflowEngine:
             # Input nodes just pass through their data
             return node.data.get('value')
         
-        elif node.type == 'replicate':
+        elif node.type == 'utility':
+            # Utility operations
+            op_type = node.data.get('op_type')
+            
+            if op_type == 'concat':
+                # Concatenate strings
+                # Get all inputs that look like 'input_1', 'input_2', etc or just values
+                separator = node.data.get('separator', ' ')
+                
+                # We collect values from dynamic inputs usually labeled 'input1', 'input2'...
+                # Or we can just join all inputs in order of keys? safely, let's use a list of values from data config
+                # But inputs come from edges.
+                # Convention: for concat, we might have specific named inputs or just generic 'input'
+                
+                # Let's assume the node data defines order or keys
+                parts = []
+                # Check for explicit 'parts' configuration in data, which might map input keys to order
+                # Fallback: sort keys
+                input_keys = sorted([k for k in node_inputs.keys()])
+                for k in input_keys:
+                    val = node_inputs[k]
+                    if val is not None:
+                        parts.append(str(val))
+                
+                return separator.join(parts)
+                
+            return None
+        
+        elif node.type in ['replicate', 'inpaint', 'remove_bg']:
             # Run Replicate model
             model_id = node.data.get('model_id')
             if not model_id:
@@ -161,7 +204,12 @@ class WorkflowEngine:
                     model_inputs[key] = value
             
             # Also add direct inputs from edges
+            # Map edge inputs to model inputs
+            # Usually strict mapping, or just pass everything?
+            # Existing code: model_inputs.update(node_inputs)
             model_inputs.update(node_inputs)
+            
+            # Special handling for mask_image if present in inputs vs parameters (for Inpainting)
             
             # Run the prediction
             result = self.replicate_service.run_prediction(model_id, model_inputs)
@@ -169,7 +217,14 @@ class WorkflowEngine:
             if result['status'] == 'failed':
                 raise ValueError(f"Replicate prediction failed: {result.get('error')}")
             
-            return result['output']
+            # Format output
+            output_data = result['output']
+            if isinstance(output_data, list) and len(output_data) == 1:
+                return output_data[0]
+            return output_data
+
+        elif node.type == 'mask_editor':
+            return node.data.get('mask_output')
         
         elif node.type == 'transform':
             # Transform operations (resize, crop, etc.)
@@ -196,9 +251,10 @@ class WorkflowEngine:
         self,
         workflow_data: str,
         input_data: Dict[str, Any],
-        user_id: uuid.UUID
+        user_id: uuid.UUID,
+        target_node_ids: Optional[List[str]] = None
     ) -> Dict[str, Any]:
-        """Execute the workflow."""
+        """Execute the workflow, optionally only specific nodes."""
         start_time = time.time()
         
         # Parse workflow
@@ -212,8 +268,17 @@ class WorkflowEngine:
                 "error": error
             }
         
+        # Get execution order (filtered by target if specified)
+        try:
+            execution_order_ids = self.get_execution_order(nodes, edges, target_node_ids)
+        except ValueError as e:
+            return {
+                "status": "failed",
+                "error": str(e)
+            }
+            
         # Check credits
-        estimated_cost = self.calculate_total_cost(nodes)
+        estimated_cost = self.calculate_total_cost(nodes, execution_order_ids)
         if not self.credit_service.has_sufficient_credits(self.session, user_id, estimated_cost):
             balance = self.credit_service.get_balance(self.session, user_id)
             return {
@@ -221,14 +286,16 @@ class WorkflowEngine:
                 "error": f"Insufficient credits. Required: {estimated_cost}, Available: {balance}"
             }
         
-        # Get execution order
-        execution_order = self.get_execution_order(nodes, edges)
-        
         # Create execution context
         context = {}
         
         # Set input values
+        # Logic update: we might need inputs for nodes that are NOT in execution_order_ids if they are dependencies?
+        # No, execution_order_ids includes dependencies.
+        
         for node in nodes:
+            # We initialize context for ALL input nodes present in standard inputs, 
+            # even if not strictly in execution path, just in case.
             if node.type == 'input':
                 input_name = node.data.get('name', node.id)
                 if input_name in input_data:
@@ -239,7 +306,7 @@ class WorkflowEngine:
         # Execute nodes in order
         credits_used = 0
         try:
-            for node_id in execution_order:
+            for node_id in execution_order_ids:
                 node = next(n for n in nodes if n.id == node_id)
                 
                 # Execute node
@@ -254,8 +321,16 @@ class WorkflowEngine:
             
             # Collect outputs
             outputs = {}
+            # If target_node_ids is set, we might want to return outputs for those specific nodes
+            # regardless of whether they are "output" type nodes.
+            
+            if target_node_ids:
+                for node_id in target_node_ids:
+                    outputs[node_id] = context.get(node_id)
+            
+            # Always also collect standard outputs if they were executed
             for node in nodes:
-                if node.type == 'output':
+                if node.type == 'output' and node.id in context:
                     output_name = node.data.get('name', node.id)
                     outputs[output_name] = context.get(node.id)
             

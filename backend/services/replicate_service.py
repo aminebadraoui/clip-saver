@@ -102,6 +102,12 @@ CURATED_MODELS = {
             "cost_per_run": 2,
         },
         {
+            "model_id": "stability-ai/sdxl-inpainting",
+            "model_name": "SDXL Inpainting",
+            "description": "Fast and reliable inpainting with Stable Diffusion XL",
+            "cost_per_run": 1,
+        },
+        {
             "model_id": "black-forest-labs/flux-kontext-pro",
             "model_name": "Flux Kontext Pro",
             "description": "Text-based image editing with natural language",
@@ -121,6 +127,12 @@ CURATED_MODELS = {
         },
     ],
     "background-removal": [
+        {
+            "model_id": "cjwbw/rembg",
+            "model_name": "RemBG (Standard)",
+            "description": "Standard background removal using U2NET",
+            "cost_per_run": 1,
+        },
         {
             "model_id": "recraft-ai/recraft-remove-background",
             "model_name": "Recraft Background Removal",
@@ -217,11 +229,29 @@ class ReplicateService:
         
         return model
     
+    def _process_inputs(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Process inputs to handle Data URIs."""
+        processed_inputs = inputs.copy()
+        
+        for key, value in processed_inputs.items():
+            if isinstance(value, str) and value.startswith("data:"):
+                processed_inputs[key] = value  # Replicate Python client handles Data URIs natively since v0.15.0
+                # But just in case we need to be explicit or if we want to save temp files:
+                # For now, let's rely on Replicate client, but if it fails we can implement the temp file logic.
+                # Actually, sending large base64 strings might be an issue for some models or the client itself if not handled well.
+                # Let's keep it as is for now, trusting the library.
+                pass
+                
+        return processed_inputs
+
     def run_prediction(self, model_id: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Run a prediction on Replicate."""
         try:
+            # Process inputs (handle Data URIs etc)
+            processed_inputs = self._process_inputs(inputs)
+            
             # Run the model
-            output = replicate.run(model_id, input=inputs)
+            output = replicate.run(model_id, input=processed_inputs)
             
             # Handle different output types
             if isinstance(output, list):
@@ -244,9 +274,12 @@ class ReplicateService:
     async def run_prediction_async(self, model_id: str, inputs: Dict[str, Any]) -> str:
         """Start an async prediction and return prediction ID."""
         try:
+            # Process inputs
+            processed_inputs = self._process_inputs(inputs)
+            
             prediction = await replicate.predictions.create(
                 version=model_id,
-                input=inputs
+                input=processed_inputs
             )
             return prediction.id
         except Exception as e:

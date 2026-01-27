@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Save, Sparkles, FlaskConical, TrendingUp, Eye, Activity, FileText } from "lucide-react";
+import { ArrowLeft, Save, Sparkles, FlaskConical, TrendingUp, Eye, Activity, FileText, Zap } from "lucide-react";
 import YouTube from "react-youtube";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -298,27 +298,52 @@ export function ViewClipPage() {
 
                         {/* Scores Grid */}
                         <div className="grid grid-cols-3 gap-3 mb-6">
+                            {/* Outlier - Main Score */}
+                            <Card className="col-span-3 bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-blue-500/20 shadow-sm">
+                                <CardContent className="p-4 sm:p-6 flex flex-row items-center justify-between">
+                                    <div className="flex flex-col">
+                                        <div className="text-xs sm:text-sm text-blue-400 uppercase tracking-wider font-semibold mb-1 flex items-center gap-2">
+                                            <Activity className="w-4 h-4" /> Outlier Score
+                                        </div>
+                                        <div className="text-3xl sm:text-4xl font-bold flex items-baseline gap-2">
+                                            {outlierScore.toFixed(1)}x
+                                            <span className="text-xs sm:text-sm font-normal text-muted-foreground hidden sm:inline-block">performance vs channel avg</span>
+                                        </div>
+                                    </div>
+                                    <div className="h-12 w-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+                                        <Activity className="w-6 h-6 text-blue-500" />
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Viral Score */}
                             <Card className="bg-card/50 backdrop-blur">
                                 <CardContent className="p-4 flex flex-col items-center justify-center text-center">
                                     <TrendingUp className="w-5 h-5 text-green-500 mb-2" />
-                                    <div className="text-2xl font-bold">{viralRatio.toFixed(2)}x</div>
-                                    <div className="text-xs text-muted-foreground uppercase tracking-wider">Viral Score</div>
+                                    <div className="text-xl sm:text-2xl font-bold">{viralRatio.toFixed(2)}x</div>
+                                    <div className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Viral Score</div>
                                 </CardContent>
                             </Card>
+
+                            {/* Velocity Score */}
                             <Card className="bg-card/50 backdrop-blur">
                                 <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                                    <Activity className="w-5 h-5 text-blue-500 mb-2" />
-                                    <div className="text-2xl font-bold">{outlierScore.toFixed(1)}x</div>
-                                    <div className="text-xs text-muted-foreground uppercase tracking-wider">Outlier</div>
+                                    <Zap className="w-5 h-5 text-orange-500 mb-2" />
+                                    <div className="text-xl sm:text-2xl font-bold">
+                                        {clip.timeSinceUploadRatio ? clip.timeSinceUploadRatio.toFixed(1) : "-"}
+                                    </div>
+                                    <div className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Velocity</div>
                                 </CardContent>
                             </Card>
+
+                            {/* Views */}
                             <Card className="bg-card/50 backdrop-blur">
                                 <CardContent className="p-4 flex flex-col items-center justify-center text-center">
                                     <Eye className="w-5 h-5 text-purple-500 mb-2" />
-                                    <div className="text-lg font-bold truncate w-full">
+                                    <div className="text-lg sm:text-xl font-bold truncate w-full">
                                         {new Intl.NumberFormat('en-US', { notation: "compact" }).format(clip.viewCount || 0)}
                                     </div>
-                                    <div className="text-xs text-muted-foreground uppercase tracking-wider">Views</div>
+                                    <div className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Views</div>
                                 </CardContent>
                             </Card>
                         </div>
