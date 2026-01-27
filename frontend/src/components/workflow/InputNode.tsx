@@ -3,7 +3,7 @@ import type { NodeProps } from 'reactflow';
 import { NodeWrapper } from './NodeWrapper';
 import { Type } from 'lucide-react';
 
-export function InputNode({ data, selected }: NodeProps) {
+export function InputNode({ id, data, selected }: NodeProps) {
     const [value, setValue] = useState(data.value || '');
 
     const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -15,10 +15,11 @@ export function InputNode({ data, selected }: NodeProps) {
 
     return (
         <NodeWrapper
+            id={id}
             selected={selected}
             title="Input"
             icon={Type}
-            color="bg-indigo-600"
+            color="bg-zinc-700"
             outputs={[{ id: 'output', label: 'Text' }]}
         >
             <div className="space-y-2">

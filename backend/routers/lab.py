@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 from database import get_session
 from models import User, Clip, TitleTemplate, ThumbnailTemplate, ScriptTemplate, TitleTemplateClipLink, ThumbnailTemplateClipLink, ScriptTemplateClipLink
 from auth import get_current_user
-from ai_agent import extract_script_structure, extract_title_structure, extract_thumbnail_description, summarize_video
+from ai_agent import extract_script_structure, extract_title_structure, extract_thumbnail_description, summarize_video, fetch_transcript_scrapecreators
 from pydantic import BaseModel
 import uuid
 import time

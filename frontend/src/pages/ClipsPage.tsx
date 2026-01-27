@@ -11,7 +11,8 @@ import { ClipCard } from "@/components/ClipCard";
 
 import { CinemaModeModal } from "@/components/CinemaModeModal";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, List, ArrowUpDown, TrendingUp } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { LayoutGrid, List, ArrowUpDown, TrendingUp, Plus, Filter } from "lucide-react";
 import { ClipListRow } from "@/components/ClipListRow";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
@@ -21,6 +22,9 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    DropdownMenuCheckboxItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -31,6 +35,7 @@ export function ClipsPage() {
         selectedTagIds, filterType,
         isLoading,
         refreshData,
+        handleSelectTag,
         handleCreateTag,
         setFilterType
     } = useAppData();
@@ -41,69 +46,70 @@ export function ClipsPage() {
     const [sortBy, setSortBy] = useState<'date' | 'viralRatio' | 'timeRatio' | 'engagementScore'>('date');
     const [selectedClipForCinema, setSelectedClipForCinema] = useState<Clip | null>(null);
     const [lastDeletedClip, setLastDeletedClip] = useState<Clip | null>(null); // State for Undo
+    const [isAddVideoOpen, setIsAddVideoOpen] = useState(false);
+    const [videoUrl, setVideoUrl] = useState("");
+
+    // Unified handler for adding video
+    const handleAddVideo = async (url: string) => {
+        const toastId = toast.loading("Fetching video details...");
+
+        // Fetch details
+        const videoDetails = await fetchVideoDetails(url);
+
+        if (videoDetails) {
+            toast.loading("Saving video...", { id: toastId });
+
+            // Check for duplicate
+            const isDuplicate = clips.some(c => c.videoId === videoDetails.videoId && c.type === 'video');
+            if (isDuplicate) {
+                toast.error("Video already exists", { id: toastId });
+                const existing = clips.find(c => c.videoId === videoDetails.videoId && c.type === 'video');
+                if (existing) setSelectedClipForCinema(existing);
+                return;
+            }
+
+            // Create and Save
+            const newVideo: Clip = {
+                id: uuidv4(),
+                type: 'video',
+                createdAt: Date.now(),
+                videoId: videoDetails.videoId,
+                title: videoDetails.title,
+                thumbnail: videoDetails.thumbnail,
+                tagIds: [],
+                notes: "",
+                originalVideoUrl: url,
+                viewCount: videoDetails.viewCount,
+                subscriberCount: videoDetails.subscriberCount,
+                uploadDate: videoDetails.uploadDate,
+                viralRatio: videoDetails.viralRatio,
+                timeSinceUploadRatio: videoDetails.timeRatio,
+                engagementScore: videoDetails.engagementScore,
+            };
+
+            try {
+                await saveClip(newVideo);
+                await refreshData();
+                toast.success("Video added!", { id: toastId });
+                setSelectedClipForCinema(newVideo);
+            } catch (e) {
+                toast.error("Failed to save video", { id: toastId });
+            }
+        } else {
+            toast.dismiss(toastId);
+        }
+    };
 
     // Check for addVideo query param
     useEffect(() => {
-        const handleAutoAdd = async () => {
-            const params = new URLSearchParams(window.location.search);
-            const addVideoUrl = params.get('addVideo');
-            if (addVideoUrl) {
-                // Clean up URL immediately
-                window.history.replaceState({}, '', '/dashboard');
-
-                const toastId = toast.loading("Fetching video details...");
-
-                // Fetch details
-                const videoDetails = await fetchVideoDetails(addVideoUrl);
-
-                if (videoDetails) {
-                    toast.loading("Saving video...", { id: toastId });
-
-                    // Check for duplicate
-                    const isDuplicate = clips.some(c => c.videoId === videoDetails.videoId && c.type === 'video');
-                    if (isDuplicate) {
-                        toast.error("Video already exists", { id: toastId });
-                        // Optionally open it?
-                        const existing = clips.find(c => c.videoId === videoDetails.videoId && c.type === 'video');
-                        if (existing) setSelectedClipForCinema(existing);
-                        return;
-                    }
-
-                    // Create and Save
-                    const newVideo: Clip = {
-                        id: uuidv4(),
-                        type: 'video',
-                        createdAt: Date.now(),
-                        videoId: videoDetails.videoId,
-                        title: videoDetails.title,
-                        thumbnail: videoDetails.thumbnail,
-                        tagIds: [],
-                        notes: "",
-                        originalVideoUrl: addVideoUrl,
-                        viewCount: videoDetails.viewCount,
-                        subscriberCount: videoDetails.subscriberCount,
-                        uploadDate: videoDetails.uploadDate,
-                        viralRatio: videoDetails.viralRatio,
-                        timeSinceUploadRatio: videoDetails.timeRatio,
-                        engagementScore: videoDetails.engagementScore,
-                    };
-
-                    try {
-                        await saveClip(newVideo);
-                        await refreshData();
-                        toast.success("Video added!", { id: toastId });
-                        setSelectedClipForCinema(newVideo);
-                    } catch (e) {
-                        toast.error("Failed to save video", { id: toastId });
-                    }
-                } else {
-                    toast.dismiss(toastId);
-                }
-            }
-        };
-
-        handleAutoAdd();
-    }, [clips]); // Add clips dependency to check for duplicates correctly
+        const params = new URLSearchParams(window.location.search);
+        const addVideoUrl = params.get('addVideo');
+        if (addVideoUrl) {
+            // Clean up URL immediately
+            window.history.replaceState({}, '', '/dashboard');
+            handleAddVideo(addVideoUrl);
+        }
+    }, [clips]); // Keep clips dependency? logic relies on it for duplication check.
 
     const handleUndoDelete = async (clip: Clip) => {
         try {
@@ -204,7 +210,7 @@ export function ClipsPage() {
 
     return (
         <>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-8">
                 <h1 className="text-3xl font-bold tracking-tight">
                     {selectedTagIds.length > 0
                         ? `Tags: ${selectedTagIds.map(id => tags.find(t => t.id === id)?.name).filter(Boolean).join(", ")}`
@@ -213,6 +219,48 @@ export function ClipsPage() {
                                 : (currentSpace?.name || "All Videos")}
                 </h1>
                 <div className="flex items-center gap-4">
+                    <div className="relative">
+                        <Button
+                            variant={isAddVideoOpen ? "default" : "outline"}
+                            className="gap-2 border-dashed"
+                            onClick={() => setIsAddVideoOpen(!isAddVideoOpen)}
+                        >
+                            <Plus className="w-4 h-4" /> Add Video
+                        </Button>
+                        {isAddVideoOpen && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setIsAddVideoOpen(false)} />
+                                <div className="absolute right-0 top-full mt-2 w-80 bg-card border border-border rounded-lg shadow-xl p-4 z-50 animate-in fade-in zoom-in-95 duration-200">
+                                    <h4 className="font-medium mb-3 text-sm">Add YouTube Video</h4>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            autoFocus
+                                            placeholder="Paste URL..."
+                                            value={videoUrl}
+                                            onChange={(e) => setVideoUrl(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && videoUrl.trim()) {
+                                                    handleAddVideo(videoUrl.trim());
+                                                    setVideoUrl('');
+                                                    setIsAddVideoOpen(false);
+                                                }
+                                            }}
+                                            className="flex-1"
+                                        />
+                                        <Button size="icon" onClick={() => {
+                                            if (videoUrl.trim()) {
+                                                handleAddVideo(videoUrl.trim());
+                                                setVideoUrl('');
+                                                setIsAddVideoOpen(false);
+                                            }
+                                        }}>
+                                            <Plus className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
                     <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
                         <Button
                             variant={viewMode === 'grid' ? 'default' : 'ghost'}
@@ -248,6 +296,91 @@ export function ClipsPage() {
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setFilterType('short')}>
                                 Shorts
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="gap-2">
+                                <Filter className="h-4 w-4" />
+                                Filter
+                                {selectedTagIds.length > 0 && (
+                                    <span className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full ml-0.5">
+                                        {selectedTagIds.length}
+                                    </span>
+                                )}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuLabel>Filter by Tags</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+
+                            {/* Video Tags */}
+                            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Video Format</DropdownMenuLabel>
+                            {tags.filter(t => t.category === 'video' || !t.category).map(tag => (
+                                <DropdownMenuCheckboxItem
+                                    key={tag.id}
+                                    checked={selectedTagIds.includes(tag.id)}
+                                    onCheckedChange={() => handleSelectTag(tag.id)}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
+                                        {tag.name}
+                                    </div>
+                                </DropdownMenuCheckboxItem>
+                            ))}
+                            {tags.filter(t => t.category === 'video' || !t.category).length === 0 && (
+                                <div className="px-2 py-1 text-xs text-muted-foreground italic">No tags</div>
+                            )}
+
+                            <DropdownMenuSeparator />
+
+                            {/* Title Tags */}
+                            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Title</DropdownMenuLabel>
+                            {tags.filter(t => t.category === 'title').map(tag => (
+                                <DropdownMenuCheckboxItem
+                                    key={tag.id}
+                                    checked={selectedTagIds.includes(tag.id)}
+                                    onCheckedChange={() => handleSelectTag(tag.id)}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
+                                        {tag.name}
+                                    </div>
+                                </DropdownMenuCheckboxItem>
+                            ))}
+                            {tags.filter(t => t.category === 'title').length === 0 && (
+                                <div className="px-2 py-1 text-xs text-muted-foreground italic">No tags</div>
+                            )}
+
+                            <DropdownMenuSeparator />
+
+                            {/* Thumbnail Tags */}
+                            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Thumbnail</DropdownMenuLabel>
+                            {tags.filter(t => t.category === 'thumbnail').map(tag => (
+                                <DropdownMenuCheckboxItem
+                                    key={tag.id}
+                                    checked={selectedTagIds.includes(tag.id)}
+                                    onCheckedChange={() => handleSelectTag(tag.id)}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
+                                        {tag.name}
+                                    </div>
+                                </DropdownMenuCheckboxItem>
+                            ))}
+                            {tags.filter(t => t.category === 'thumbnail').length === 0 && (
+                                <div className="px-2 py-1 text-xs text-muted-foreground italic">No tags</div>
+                            )}
+
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                onSelect={() => handleSelectTag(null)}
+                                disabled={selectedTagIds.length === 0}
+                                className="text-destructive focus:text-destructive"
+                            >
+                                Clear Filters
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>

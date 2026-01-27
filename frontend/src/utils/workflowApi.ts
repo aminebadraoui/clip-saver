@@ -130,16 +130,18 @@ export const workflowApi = {
   },
 
   // Execute workflow
+  // Execute workflow
   async execute(
     id: string,
-    inputData: Record<string, any>
+    inputData: Record<string, any>,
+    targetNodeIds?: string[]
   ): Promise<WorkflowExecution> {
     const response = await fetch(
       `${API_BASE_URL}/api/workflows/${id}/execute`,
       {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ input_data: inputData }),
+        body: JSON.stringify({ input_data: inputData, target_node_ids: targetNodeIds }),
       }
     );
     if (!response.ok) throw new Error('Failed to execute workflow');

@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api", tags=["executions"])
 
 class ExecutionCreate(BaseModel):
     input_data: Dict[str, Any]
+    target_node_ids: Optional[List[str]] = None
 
 
 class ExecutionResponse(BaseModel):
@@ -94,7 +95,8 @@ def execute_workflow(
         result = engine.execute(
             workflow_data=workflow.workflow_data,
             input_data=execution.input_data,
-            user_id=current_user.id
+            user_id=current_user.id,
+            target_node_ids=execution.target_node_ids
         )
         
         # Update execution record

@@ -12,7 +12,7 @@ interface Model {
     cost_per_run: number;
 }
 
-export function ReplicateNode({ data, selected }: NodeProps) {
+export function ReplicateNode({ id, data, selected }: NodeProps) {
     const [models, setModels] = useState<Model[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -69,6 +69,7 @@ export function ReplicateNode({ data, selected }: NodeProps) {
 
     return (
         <NodeWrapper
+            id={id}
             selected={selected}
             title="To Replicate"
             icon={Cpu}

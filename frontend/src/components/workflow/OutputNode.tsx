@@ -2,7 +2,7 @@ import type { NodeProps } from 'reactflow';
 import { NodeWrapper } from './NodeWrapper';
 import { Image as ImageIcon, Loader2 } from 'lucide-react';
 
-export function OutputNode({ data, selected }: NodeProps) {
+export function OutputNode({ id, data, selected }: NodeProps) {
     // data.output contains the result from the execution (e.g. image URL array or string)
     // data.loading indicates if the node is processing
 
@@ -11,10 +11,11 @@ export function OutputNode({ data, selected }: NodeProps) {
 
     return (
         <NodeWrapper
+            id={id}
             selected={selected}
             title="Output"
             icon={ImageIcon}
-            color="bg-rose-600"
+            color="bg-zinc-800"
             inputs={[{ id: 'input', label: 'Image/Video' }]}
         >
             <div className="flex flex-col items-center justify-center min-h-[140px] bg-muted/30 rounded-md border border-dashed border-muted-foreground/30 p-2">

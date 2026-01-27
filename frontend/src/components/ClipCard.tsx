@@ -3,11 +3,11 @@ import { useNavigate } from "react-router-dom";
 
 import type { Tag } from "@/types/tag";
 import { formatTime } from "@/utils/formatTime";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 // removed Play, Film if unused or check if they are used elsewhere. They were only used in the button.
 // But I should just add FlaskConical and keep the others for now to minimize diff or remove them if unused.
-import { Trash2, MoreVertical, Tag as TagIcon, Eye, Clock, Wand2, FlaskConical } from "lucide-react";
+import { Trash2, MoreVertical, Tag as TagIcon, Eye, Clock, Wand2 } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -68,7 +68,7 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate }:
     const originalTitle = originalVideo?.title || clip.originalTitle;
 
     const displayViewCount = originalVideo?.viewCount ?? clip.viewCount;
-    const displayViralRatio = originalVideo?.viralRatio ?? clip.viralRatio;
+
 
 
     return (
@@ -248,44 +248,7 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate }:
                 )}
 
                 {/* Scores Row */}
-                <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
-                    {/* Viral Ratio Pill */}
-                    {displayViralRatio != null && (
-                        <Tooltip>
-                            <TooltipTrigger>
-                                <div className={`
-                                    inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm border border-white/10
-                                    ${displayViralRatio >= 1.0 ? "bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-pink-500 border-pink-500/20" :
-                                        displayViralRatio >= 0.5 ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-purple-500 border-purple-500/20" :
-                                            displayViralRatio >= 0.1 ? "bg-gradient-to-r from-green-500/20 to-blue-500/20 text-blue-500 border-blue-500/20" :
-                                                "bg-gray-500/10 text-gray-500 border-gray-500/20"
-                                    }
-                                `}>
-                                    Viral: {Number(displayViralRatio).toFixed(2)}x
-                                </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Viral Score: Views / Subscribers</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    )}
 
-                    {/* Velocity Score Pill (Time Ratio) */}
-                    {(originalVideo?.timeSinceUploadRatio != null || clip.timeSinceUploadRatio != null) && (
-                        <Tooltip>
-                            <TooltipTrigger>
-                                <div className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm border border-orange-500/20 bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-500">
-                                    Vel: {Number(originalVideo?.timeSinceUploadRatio ?? clip.timeSinceUploadRatio).toFixed(1)}
-                                </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Velocity Score: Views / Days since upload</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    )}
-
-
-                </div>
 
                 {/* Original Video Info for Clips (Subtitle) */}
                 {clip.type === 'clip' && originalTitle && (
@@ -318,21 +281,6 @@ export function ClipCard({ clip, originalVideo, tags = [], onDelete, onUpdate }:
                 )}
             </CardContent>
 
-            <CardFooter className="p-4 pt-0">
-                <Button
-                    variant="default"
-                    size="sm"
-                    className="w-full bg-primary/90 hover:bg-primary shadow-sm hover:shadow transition-all"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        // Navigate to details page instead of popup
-                        navigate(`/clip/${clip.id}`);
-                    }}
-                >
-                    <FlaskConical className="w-3.5 h-3.5 mr-2" />
-                    Open in Lab
-                </Button>
-            </CardFooter>
         </Card >
     );
 }
