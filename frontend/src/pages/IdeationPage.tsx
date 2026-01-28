@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
-import { Plus, ChevronLeft, Save, Loader2, ArrowRight, Trash2 } from "lucide-react";
+import { Plus, ArrowRight, Trash2 } from "lucide-react";
 import { MainIdeaSection } from "@/components/ideation/MainIdeaSection";
 import { TitleBrainstorming } from "@/components/ideation/TitleBrainstorming";
 import { ThumbnailBrainstorming } from "@/components/ideation/ThumbnailBrainstorming";
@@ -10,7 +10,6 @@ import { useAuth } from "@/context/AuthContext";
 import { getHeaders } from "@/utils/storage";
 import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     Dialog,
@@ -21,6 +20,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 
+import { IdeationWizard } from "@/components/ideation/IdeationWizard";
 import { API_URL } from "@/config";
 
 
@@ -32,6 +32,8 @@ interface IdeationProject {
     commonAssumptions: string;
     breakingAssumptions: string;
     viewerFeeling: string;
+    targetAudience?: string; // Add new fields
+    visualVibe?: string;
     brainstormedTitles: string | { id: string; text: string; score?: number }[];
     brainstormedThumbnails: string | { id: string; type: 'text' | 'image'; content: string }[];
     scriptOutline: string;
@@ -46,7 +48,6 @@ export const IdeationPage = () => {
     const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
     const [currentProject, setCurrentProject] = useState<IdeationProject | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
     const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
 
 
@@ -54,7 +55,7 @@ export const IdeationPage = () => {
 
     const saveProject = async (silent: boolean = false, projectToSave: IdeationProject | null = currentProject) => {
         if (!projectToSave || !token) return;
-        setIsSaving(true);
+        // setIsSaving(true);
         try {
             const res = await fetch(`${API_URL}/api/ideation/${projectToSave.id}`, {
                 method: 'PUT',
@@ -66,6 +67,8 @@ export const IdeationPage = () => {
                     commonAssumptions: projectToSave.commonAssumptions,
                     breakingAssumptions: projectToSave.breakingAssumptions,
                     viewerFeeling: projectToSave.viewerFeeling,
+                    targetAudience: projectToSave.targetAudience, // Add new fields
+                    visualVibe: projectToSave.visualVibe,
                     brainstormedTitles: projectToSave.brainstormedTitles,
                     brainstormedThumbnails: projectToSave.brainstormedThumbnails,
                     scriptOutline: projectToSave.scriptOutline,
@@ -87,7 +90,7 @@ export const IdeationPage = () => {
             if (!silent) toast.error("Failed to save");
             console.error("Auto-save error:", e);
         } finally {
-            setIsSaving(false);
+            // setIsSaving(false);
         }
     };
 
@@ -319,108 +322,72 @@ export const IdeationPage = () => {
 
     if (!currentProject || isLoading) {
         return (
-            <div className="container mx-auto py-4 space-y-8">
-                <div className="flex items-center justify-between mb-6 py-2 border-b">
-                    <div className="flex items-center gap-4 flex-1 mr-4">
-                        <Skeleton className="w-10 h-10 rounded-md" /> {/* Back Button */}
-                        <Skeleton className="flex-1 h-10 max-w-xl" /> {/* Title Input */}
-                    </div>
-                    <Skeleton className="w-32 h-10" /> {/* Save Button */}
-                </div>
-
-                {/* Main Idea Skeleton */}
-                <div className="space-y-4">
-                    <Skeleton className="h-8 w-48" />
-                    <Skeleton className="h-[200px] w-full rounded-xl" />
-                </div>
-
-                {/* Split Sections Skeleton */}
-                <div className="grid gap-6 md:grid-cols-2">
-                    <div className="space-y-4">
-                        <Skeleton className="h-8 w-32" />
-                        <Skeleton className="h-[300px] w-full rounded-xl" />
-                    </div>
-                    <div className="space-y-4">
-                        <Skeleton className="h-8 w-32" />
-                        <Skeleton className="h-[300px] w-full rounded-xl" />
-                    </div>
-                </div>
-
-                {/* Outline Skeleton */}
-                <div className="space-y-4">
-                    <Skeleton className="h-8 w-32" />
-                    <Skeleton className="h-[150px] w-full rounded-xl" />
+            <div className="container mx-auto py-8 space-y-8">
+                <Skeleton className="h-12 w-64 mb-8" />
+                <div className="grid grid-cols-[300px_1fr] gap-8 h-[calc(100vh-12rem)]">
+                    <Skeleton className="h-full rounded-xl" />
+                    <Skeleton className="h-full rounded-xl" />
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="container mx-auto py-4">
-            <div className="flex items-center justify-between mb-6 py-2 border-b">
-                <div className="flex items-center gap-4 flex-1 mr-4">
-                    <Button variant="ghost" size="icon" onClick={() => setSelectedProjectId(null)}>
-                        <ChevronLeft className="w-5 h-5" />
-                    </Button>
-                    <div className="relative flex-1 max-w-2xl">
-                        <Input
-                            className="text-xl font-bold h-10 py-2 px-3 border border-transparent hover:border-input focus:border-ring bg-transparent transition-all w-full"
-                            value={currentProject.projectName}
-                            onChange={(e) => setCurrentProject(prev => prev ? ({ ...prev, projectName: e.target.value }) : null)}
-                        />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground/50">
-                            <span className="text-xs">Edit</span>
-                        </div>
-                    </div>
-                </div>
-                <Button onClick={handleSave} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                    Save Changes
-                </Button>
-            </div>
-
-            <div className="space-y-8 pb-20">
-                <section id="concept">
-                    <MainIdeaSection
-                        data={currentProject}
-                        onChange={(field, value) => setCurrentProject(prev => prev ? ({ ...prev, [field]: value }) : null)}
-                    />
-                </section>
-
-                <div className="grid gap-6 md:grid-cols-2">
-                    <section id="titles">
-                        <TitleBrainstorming
-                            titles={currentProject.brainstormedTitles as any[]}
-                            onUpdate={(titles) => setCurrentProject(prev => prev ? ({ ...prev, brainstormedTitles: titles }) : null)}
-                            conceptData={currentProject}
-                        />
-                    </section>
-                    <section id="thumbnails">
-                        <ThumbnailBrainstorming
-                            thumbnails={currentProject.brainstormedThumbnails as any[]}
-                            onUpdate={(thumbnails) => setCurrentProject(prev => prev ? ({ ...prev, brainstormedThumbnails: thumbnails }) : null)}
-                        />
-                    </section>
-                </div>
-
-                <section id="outline">
-                    <ScriptOutlineSection
-                        outline={currentProject.scriptOutline}
-                        onUpdate={(val) => setCurrentProject(prev => prev ? ({ ...prev, scriptOutline: val }) : null)}
-                        conceptData={currentProject}
-                    />
-                </section>
-
-                <section id="script">
-                    <ScriptWritingSection
-                        content={currentProject.scriptContent}
-                        onUpdate={(val) => setCurrentProject(prev => prev ? ({ ...prev, scriptContent: val }) : null)}
-                        conceptData={currentProject}
-                        outline={currentProject.scriptOutline}
-                        titles={currentProject.brainstormedTitles as any[]}
-                    />
-                </section>
-            </div>
-        </div>
+        <IdeationWizard
+            project={currentProject}
+            onUpdate={(updates) => setCurrentProject(prev => prev ? ({ ...prev, ...updates }) : null)}
+            onSave={() => saveProject(true)} // Silent save
+            onBack={() => {
+                saveProject(true);
+                setSelectedProjectId(null);
+            }}
+        >
+            {(step) => {
+                switch (step) {
+                    case 0:
+                        return (
+                            <MainIdeaSection
+                                data={currentProject}
+                                onChange={(field, value) => setCurrentProject(prev => prev ? ({ ...prev, [field]: value }) : null)}
+                            />
+                        );
+                    case 1:
+                        return (
+                            <TitleBrainstorming
+                                titles={currentProject.brainstormedTitles as any[]}
+                                onUpdate={(titles) => setCurrentProject(prev => prev ? ({ ...prev, brainstormedTitles: titles }) : null)}
+                                conceptData={currentProject}
+                            />
+                        );
+                    case 2:
+                        return (
+                            <ThumbnailBrainstorming
+                                thumbnails={currentProject.brainstormedThumbnails as any[]}
+                                onUpdate={(thumbnails) => setCurrentProject(prev => prev ? ({ ...prev, brainstormedThumbnails: thumbnails }) : null)}
+                            />
+                        );
+                    case 3:
+                        return (
+                            <ScriptOutlineSection
+                                outline={currentProject.scriptOutline}
+                                onUpdate={(val) => setCurrentProject(prev => prev ? ({ ...prev, scriptOutline: val }) : null)}
+                                conceptData={currentProject}
+                            />
+                        );
+                    case 4:
+                        return (
+                            <ScriptWritingSection
+                                content={currentProject.scriptContent}
+                                onUpdate={(val) => setCurrentProject(prev => prev ? ({ ...prev, scriptContent: val }) : null)}
+                                conceptData={currentProject}
+                                outline={currentProject.scriptOutline}
+                                titles={currentProject.brainstormedTitles as any[]}
+                            />
+                        );
+                    default:
+                        return <div>Unknown Step</div>;
+                }
+            }}
+        </IdeationWizard>
     );
 };

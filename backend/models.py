@@ -207,6 +207,8 @@ class VideoIdeation(SQLModel, table=True):
     commonAssumptions: Optional[str] = Field(default=None, sa_type=Text)
     breakingAssumptions: Optional[str] = Field(default=None, sa_type=Text)
     viewerFeeling: Optional[str] = Field(default=None, sa_type=Text)
+    targetAudience: Optional[str] = Field(default=None, sa_type=Text)
+    visualVibe: Optional[str] = Field(default=None, sa_type=Text)
 
     # JSON lists stored as text
     brainstormedTitles: Optional[str] = Field(default="[]", sa_type=Text) 

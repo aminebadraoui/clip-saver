@@ -21,7 +21,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { workflowApi } from '../utils/workflowApi';
-import { Save, Play, ArrowLeft, Loader2, Plus } from 'lucide-react';
+import { Save, Play, ArrowLeft, Loader2, Plus, Trash2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 import { WorkflowContext } from '../context/WorkflowContext';
@@ -36,6 +36,14 @@ import { ConcatNode } from '../components/workflow/ConcatNode';
 import { RemoveBackgroundNode } from '../components/workflow/RemoveBackgroundNode';
 import { InpaintNode } from '../components/workflow/InpaintNode';
 import { MaskEditorNode } from '../components/workflow/MaskEditorNode';
+import { LLMNode } from '../components/workflow/LLMNode';
+import { MediaInputNode } from '../components/workflow/MediaInputNode';
+import { MediaPickerModal } from '../components/workflow/MediaPickerModal';
+import { NodeDetailModal } from '../components/workflow/NodeDetailModal';
+import { ConfirmModal } from '../components/ConfirmModal';
+import type { WorkflowTemplate } from '../components/workflow/workflowTemplates';
+
+import { VideoIdeationNode } from '../components/workflow/VideoIdeationNode';
 
 // Node types registry
 const nodeTypes: NodeTypes = {
@@ -46,6 +54,9 @@ const nodeTypes: NodeTypes = {
     remove_bg: RemoveBackgroundNode,
     inpaint: InpaintNode,
     mask_editor: MaskEditorNode,
+    llm_model: LLMNode,
+    media_input: MediaInputNode,
+    ideation_source: VideoIdeationNode,
 };
 
 function ZoomIndicator() {
@@ -69,8 +80,25 @@ function WorkflowEditor() {
     const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
     const [selectedNode, setSelectedNode] = useState<Node | null>(null);
     const [showNodeLibrary, setShowNodeLibrary] = useState(false);
+    const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-    // Removed the useEffect that auto-opened settings on selection
+    // Media Picker State
+    const [showMediaPicker, setShowMediaPicker] = useState(false);
+    const [mediaPickerCallback, setMediaPickerCallback] = useState<((url: string) => void) | null>(null);
+    const [currentSpaceId, setCurrentSpaceId] = useState<string | null>(null);
+
+    // Detail Modal State
+    const [detailModalState, setDetailModalState] = useState<{
+        isOpen: boolean;
+        title: string;
+        content: string;
+        type: 'text' | 'image';
+    }>({
+        isOpen: false,
+        title: '',
+        content: '',
+        type: 'text'
+    });
 
     const openSettings = useCallback((nodeId: string) => {
         const node = nodes.find((n) => n.id === nodeId);
@@ -82,7 +110,6 @@ function WorkflowEditor() {
     const handleNodeChange = (nodeId: string, newData: any) => {
         setNodes((nds) => nds.map((node) => {
             if (node.id === nodeId) {
-                // Update both the node in the list AND the selected node if it matches
                 const updatedNode = { ...node, data: newData };
                 if (selectedNode?.id === nodeId) {
                     setSelectedNode(updatedNode);
@@ -114,6 +141,9 @@ function WorkflowEditor() {
         try {
             const workflow = await workflowApi.get(workflowId);
             setWorkflowName(workflow.name);
+            if (workflow.space_id) {
+                setCurrentSpaceId(workflow.space_id);
+            }
 
             const data = JSON.parse(workflow.workflow_data);
             if (data.nodes) setNodes(data.nodes);
@@ -157,9 +187,25 @@ function WorkflowEditor() {
             const type = event.dataTransfer.getData('application/reactflow');
             const dataStr = event.dataTransfer.getData('application/reactflow/data');
 
-            if (!type) return;
+            if (!type) {
+                console.warn("onDrop: No type found in dataTransfer");
+                return;
+            }
 
-            const data = dataStr ? JSON.parse(dataStr) : {};
+            let data = {};
+            try {
+                if (dataStr) {
+                    data = JSON.parse(dataStr);
+                }
+            } catch (e) {
+                console.error("onDrop: Failed to parse dataStr", dataStr, e);
+                toast.error("Failed to add node: invalid data");
+                return;
+            }
+
+            if (type === 'llm_model' && !(data as any)['definitionId']) {
+                console.warn("onDrop: llm_model dropped but missing definitionId", data);
+            }
 
             const position = reactFlowInstance.screenToFlowPosition({
                 x: event.clientX,
@@ -181,27 +227,50 @@ function WorkflowEditor() {
     const handleAddNode = useCallback((type: string, data: any) => {
         if (!reactFlowInstance) return;
 
-        // Try to get center of view
         const zoom = reactFlowInstance.getZoom();
         const { x: vX, y: vY } = reactFlowInstance.getViewport();
 
-        // Approximate center calculation based on window size
-        // Or better: pass random offset to avoid overlap if adding multiple
         const centerX = -vX / zoom + (window.innerWidth / 2) / zoom;
         const centerY = -vY / zoom + (window.innerHeight / 2) / zoom;
 
         const newNode: Node = {
             id: uuidv4(),
             type,
-            position: { x: centerX - 100, y: centerY - 50 }, // Generic centering
+            position: { x: centerX - 100, y: centerY - 50 },
             data: { ...data },
         };
 
         setNodes((nds) => nds.concat(newNode));
         toast.success(`Added ${type} node`);
-        // Optionally close library
-        // setShowNodeLibrary(false); 
     }, [reactFlowInstance]);
+
+    const handleLoadTemplate = useCallback((template: WorkflowTemplate) => {
+        const idMap = new Map<string, string>();
+
+        const newNodes = template.nodes.map(node => {
+            const newId = uuidv4();
+            idMap.set(node.id, newId);
+            return {
+                ...node,
+                id: newId,
+            };
+        });
+
+        const newEdges = template.edges.map(edge => ({
+            ...edge,
+            id: uuidv4(),
+            source: idMap.get(edge.source) || edge.source,
+            target: idMap.get(edge.target) || edge.target,
+        }));
+
+        setNodes((nds) => {
+            return nds.concat(newNodes);
+        });
+        setEdges((eds) => eds.concat(newEdges));
+
+        toast.success(`Loaded "${template.label}" template`);
+        setShowNodeLibrary(false);
+    }, []);
 
     const handleSave = async () => {
         try {
@@ -231,23 +300,59 @@ function WorkflowEditor() {
     };
 
     const handleExecute = async (runSelected = false) => {
-        if (!id || id === 'new') {
-            toast.error('Please save the workflow before executing');
+        let currentId = id;
+
+        try {
+            setSaving(true);
+            const workflowData = JSON.stringify({ nodes, edges });
+
+            if (!currentId || currentId === 'new') {
+                const newWorkflow = await workflowApi.create({
+                    name: workflowName,
+                    workflow_data: workflowData,
+                });
+                currentId = newWorkflow.id;
+                navigate(`/workflows/${newWorkflow.id}/edit`, { replace: true });
+                toast.success('Workflow saved automatically');
+            } else {
+                await workflowApi.update(currentId, {
+                    name: workflowName,
+                    workflow_data: workflowData,
+                });
+            }
+        } catch (error) {
+            console.error('Auto-save failed:', error);
+            toast.error('Failed to save workflow before execution');
+            setSaving(false);
             return;
+        } finally {
+            setSaving(false);
         }
+
+        if (!currentId || currentId === 'new') return;
 
         try {
             setExecuting(true);
+            const executionId = currentId;
 
-            // 1. Reset output nodes
             setNodes((nds) => nds.map(node => {
-                if (node.type === 'output') {
-                    return { ...node, data: { ...node.data, loading: true, output: null } };
+                if (targetNodeIds && !targetNodeIds.includes(node.id)) {
+                    return node;
                 }
-                return node;
+                if (!targetNodeIds && (node.type === 'input' || node.type === 'note')) {
+                    return node;
+                }
+                return {
+                    ...node,
+                    data: {
+                        ...node.data,
+                        loading: true,
+                        output: null,
+                        error: null
+                    }
+                };
             }));
 
-            // 2. Identify input nodes data
             const inputData: Record<string, any> = {};
             nodes.forEach(node => {
                 if (node.type === 'input') {
@@ -255,15 +360,13 @@ function WorkflowEditor() {
                 }
             });
 
-            // 3. Start execution
             let targetNodeIds: string[] | undefined = undefined;
-            if (runSelected) {
-                // Find selected nodes
+            if (Array.isArray(runSelected)) {
+                targetNodeIds = runSelected;
+                toast.info(`Running specified node...`);
+            } else if (runSelected === true) {
                 const selectedNodes = nodes.filter(n => n.selected);
                 if (selectedNodes.length === 0) {
-                    // If run selected but none selected, run all? Or warn?
-                    // User requested: "if none are selected we run all"
-                    // So we keep targetNodeIds undefined
                     toast.info("No nodes selected, running all...");
                 } else {
                     targetNodeIds = selectedNodes.map(n => n.id);
@@ -271,47 +374,39 @@ function WorkflowEditor() {
                 }
             }
 
-            const execution = await workflowApi.execute(id, inputData, targetNodeIds);
+            const execution = await workflowApi.execute(executionId, inputData, targetNodeIds);
             toast.info('Workflow execution started...');
 
-            // 4. Poll or Stream for updates
-            // Using SSE
             const eventSource = workflowApi.streamExecution(
                 execution.id,
                 (data) => {
                     if (data.status === 'running') {
-                        // Maybe update specific node progress if available
                     }
 
                     if (data.error_message) {
                         toast.error(`Execution failed: ${data.error_message}`);
-                        setNodes((nds) => nds.map(node => {
-                            if (node.type === 'output') {
-                                return { ...node, data: { ...node.data, loading: false } };
-                            }
-                            return node;
-                        }));
+                        setNodes((nds) => nds.map(node => ({
+                            ...node,
+                            data: { ...node.data, loading: false }
+                        })));
                         setExecuting(false);
                     }
 
                     if (data.outputs) {
-                        // Execution completed
                         toast.success('Execution completed!');
-
-                        // Update output nodes with results
                         setNodes((nds) => nds.map(node => {
-                            if (node.type === 'output') {
-                                // Find output for this node ID if mapped, or just generic 'output'
-                                // The backend engine maps outputs by node ID if specified
-                                const nodeOutput = data.outputs[node.id] || data.outputs['output'];
+                            if (data.outputs && data.outputs[node.id] !== undefined) {
                                 return {
                                     ...node,
                                     data: {
                                         ...node.data,
                                         loading: false,
-                                        output: nodeOutput
+                                        output: data.outputs[node.id]
                                     }
                                 };
+                            }
+                            if (node.data.loading) {
+                                return { ...node, data: { ...node.data, loading: false } };
                             }
                             return node;
                         }));
@@ -329,19 +424,50 @@ function WorkflowEditor() {
             console.error('Execution failed:', error);
             toast.error('Failed to start execution');
             setExecuting(false);
-            setNodes((nds) => nds.map(node => {
-                if (node.type === 'output') {
-                    return { ...node, data: { ...node.data, loading: false } };
-                }
-                return node;
-            }));
+            setNodes((nds) => nds.map(node => ({
+                ...node,
+                data: { ...node.data, loading: false }
+            })));
         }
     };
 
+    const runNode = useCallback((nodeId: string) => {
+        handleExecute([nodeId] as any);
+    }, [handleExecute]);
+
+    const openMediaPicker = useCallback((onSelect: (url: string) => void) => {
+        setMediaPickerCallback(() => onSelect);
+        setShowMediaPicker(true);
+    }, []);
+
+    const openDetailModal = useCallback((title: string, content: string, type: 'text' | 'image') => {
+        setDetailModalState({
+            isOpen: true,
+            title,
+            content,
+            type
+        });
+    }, []);
+
+    const deleteNode = useCallback((nodeId: string) => {
+        setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+        setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+    }, [setNodes, setEdges]);
+
+    const clearCanvas = useCallback(() => {
+        setShowClearConfirm(true);
+    }, []);
+
+    const handleConfirmClear = useCallback(() => {
+        setNodes([]);
+        setEdges([]);
+        setShowClearConfirm(false);
+        toast.success('Canvas cleared');
+    }, [setNodes, setEdges]);
+
     return (
-        <WorkflowContext.Provider value={{ openSettings }}>
+        <WorkflowContext.Provider value={{ openSettings, runNode, openMediaPicker, openDetailModal, deleteNode }}>
             <div className="h-full flex flex-col bg-[#0f0f0f] overflow-hidden">
-                {/* Header - Simplified layout */}
                 <div className="z-40 px-6 py-4 bg-[#0f0f0f] border-b border-white/5 flex items-center justify-between shadow-2xl">
                     <div className="flex items-center gap-4">
                         <button
@@ -377,6 +503,15 @@ function WorkflowEditor() {
                         </button>
 
                         <button
+                            onClick={clearCanvas}
+                            className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-all text-xs font-semibold uppercase tracking-wider mr-2"
+                            title="Delete All Nodes"
+                        >
+                            <Trash2 size={14} />
+                            Clear
+                        </button>
+
+                        <button
                             onClick={handleSave}
                             disabled={saving || executing}
                             className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 text-gray-300 rounded-lg hover:bg-white/10 hover:text-white disabled:opacity-50 text-xs font-semibold uppercase tracking-wider transition-all"
@@ -408,19 +543,47 @@ function WorkflowEditor() {
                     </div>
                 </div>
 
-                {/* Editor Area */}
                 <div className="flex-1 flex overflow-hidden relative">
-                    {/* NodeLibrary is fixed overlay now */}
                     <NodeLibrary
                         isOpen={showNodeLibrary}
                         onClose={() => setShowNodeLibrary(false)}
                         onNodeClick={handleAddNode}
+                        onTemplateClick={handleLoadTemplate}
                     />
 
                     <NodeSettingsPanel
                         node={selectedNode}
                         onClose={() => setSelectedNode(null)}
                         onChange={handleNodeChange}
+                    />
+
+                    <MediaPickerModal
+                        isOpen={showMediaPicker}
+                        onClose={() => setShowMediaPicker(false)}
+                        onSelect={(url) => {
+                            if (mediaPickerCallback) mediaPickerCallback(url);
+                        }}
+                        token={localStorage.getItem('clipcoba_token') || ''}
+                        spaceId={currentSpaceId}
+                    />
+
+                    <NodeDetailModal
+                        isOpen={detailModalState.isOpen}
+                        onClose={() => setDetailModalState(prev => ({ ...prev, isOpen: false }))}
+                        title={detailModalState.title}
+                        content={detailModalState.content}
+                        type={detailModalState.type}
+                    />
+
+                    <ConfirmModal
+                        isOpen={showClearConfirm}
+                        onClose={() => setShowClearConfirm(false)}
+                        onConfirm={handleConfirmClear}
+                        title="Clear Workflow"
+                        description="Are you sure you want to delete all nodes and edges? This action cannot be undone."
+                        confirmText="Clear Canvas"
+                        cancelText="Cancel"
+                        variant="danger"
                     />
 
                     <div className="flex-1 h-full relative bg-[#0f0f0f]" ref={reactFlowWrapper}>

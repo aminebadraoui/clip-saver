@@ -6,6 +6,7 @@ from sqlmodel import Session, select
 from models import Space, User
 from database import get_session
 from auth import get_current_user
+from dependencies import get_current_space
 
 router = APIRouter(prefix="/api/spaces", tags=["spaces"])
 
@@ -67,3 +68,52 @@ def delete_space(
     session.delete(space)
     session.commit()
     return {"ok": True}
+
+from models import Image, Clip
+
+@router.get("/current/assets")
+def get_space_assets(
+    current_space: Space = Depends(get_current_space),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """Get all media assets (images + clip thumbnails) for the current space"""
+    
+    # Get images
+    images = session.exec(
+        select(Image).where(Image.space_id == current_space.id)
+    ).all()
+    
+    # Get clips
+    clips = session.exec(
+        select(Clip).where(Clip.space_id == current_space.id)
+    ).all()
+    
+    assets = []
+    
+    for img in images:
+        assets.append({
+            "id": str(img.id),
+            "type": "image",
+            "url": img.image_url,
+            "thumbnail": img.thumbnail_url or img.image_url,
+            "title": img.title,
+            "created_at": img.createdAt
+        })
+        
+    for clip in clips:
+        # For clips, we offer the thumbnail as the "image" output
+        if clip.thumbnail:
+            assets.append({
+                "id": str(clip.id),
+                "type": "video",
+                "url": clip.thumbnail, # Input node expects an image URL usually
+                "thumbnail": clip.thumbnail,
+                "title": clip.title,
+                "created_at": clip.createdAt
+            })
+            
+    # Sort by newest first
+    assets.sort(key=lambda x: x["created_at"], reverse=True)
+    
+    return assets

@@ -143,3 +143,30 @@ export async function deleteImage(
         throw new Error(error.detail || "Failed to delete image");
     }
 }
+
+export interface SpaceAsset {
+    id: string;
+    type: 'image' | 'video';
+    url: string;
+    thumbnail: string;
+    title: string;
+    created_at: number;
+}
+
+export async function fetchSpaceAssets(
+    token: string,
+    spaceId: string
+): Promise<SpaceAsset[]> {
+    const headers: HeadersInit = {
+        Authorization: `Bearer ${token}`,
+        "X-Space-Id": spaceId
+    };
+
+    const response = await fetch(`${API_BASE}/spaces/current/assets`, { headers });
+
+    if (!response.ok) {
+        throw new Error("Failed to fetch space assets");
+    }
+
+    return response.json();
+}

@@ -867,3 +867,52 @@ async def summarize_video_async(transcript: Optional[str], webhook_url: str, vid
         webhook_events_filter=["completed"]
     )
 
+
+async def generate_thumbnail_concepts_async(concept_data: Dict[str, Any], titles: List[Dict[str, Any]], webhook_url: str) -> Any:
+    """
+    Starts an async prediction for thumbnail concept generation.
+    """
+    api_key = os.getenv("REPLICATE_API_TOKEN")
+    if not api_key:
+        raise ValueError("REPLICATE_API_TOKEN not found")
+
+    title_text = "\n".join([f"- {t.get('text', '')}" for t in titles if t.get('text')])
+
+    system_prompt = """You are a World-Class YouTube Thumbnail Strategist (like MrBeast's team).
+    Your goal is to brainstorm 3 distinct, high-CTR thumbnail *concepts* for a video.
+    
+    For each concept, provide:
+    1. **Visual Description**: What exactly is in the image? (Subject, Action, Background)
+    2. **Text Overlay**: Short, punchy text (max 3-5 words) that complements the title.
+    3. **Color Psychology**: Key colors to use and why (e.g., "Bright Red for urgency").
+    4. **Why it works**: The psychological trigger (Curiosity, Shock, Fear of Missing Out).
+    
+    Make the 3 concepts DIFFERENT from each other (e.g., one close-up emotion, one split-screen comparison, one action shot).
+    """
+
+    user_prompt = f"""
+    VIDEO STRATEGY:
+    - Main Idea: {concept_data.get('mainIdea', 'N/A')}
+    - Target Audience: {concept_data.get('targetAudience', 'General Audience')}
+    - Visual Vibe: {concept_data.get('visualVibe', 'High Energy')}
+    - Viewer Feeling: {concept_data.get('viewerFeeling', 'Curious')}
+    - Assumption to Break: {concept_data.get('breakingAssumptions', 'N/A')}
+
+    POTENTIAL TITLES:
+    {title_text}
+
+    Generate 3 viral thumbnail concepts.
+    """
+
+    client = replicate.Client(api_token=api_key)
+    return await client.predictions.async_create(
+        version="google/gemini-3-pro",
+        input={
+            "prompt": user_prompt,
+            "system_instruction": system_prompt,
+            "temperature": 0.8,
+            "thinking_level": "low",
+        },
+        webhook=webhook_url,
+        webhook_events_filter=["completed"]
+    )
