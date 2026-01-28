@@ -1,4 +1,4 @@
-import { Type, Image as ImageIcon, Video, Cpu, Scissors, Paintbrush, PenTool, GripVertical, Plus, X } from 'lucide-react';
+import { Type, Image as ImageIcon, Video, Scissors, Paintbrush, PenTool, GripVertical, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
