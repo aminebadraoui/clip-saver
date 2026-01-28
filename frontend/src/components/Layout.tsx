@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom";
-import { AppDataProvider, useAppData } from "@/context/AppDataContext";
+import { AppDataProvider } from "@/context/AppDataContext";
 import { Sidebar } from "@/components/Sidebar";
 
 
