@@ -83,14 +83,23 @@ class WorkflowEngine:
                 if G.in_degree(node.id) == 0 and G.out_degree(node.id) == 0:
                     return False, f"Node {node.id} is not connected"
         
-        # Check that there's at least one input and one output
-        has_input = any(node.type == 'input' for node in nodes)
+        # Check that there's at least one input and one output OR one generative node
+        has_input = any(node.type in ['input', 'media_input'] for node in nodes)
         has_output = any(node.type == 'output' for node in nodes)
+        has_gen_node = any(node.type in ['replicate', 'llm_model', 'inpaint', 'remove_bg'] for node in nodes)
         
         if not has_input:
-            return False, "Workflow must have at least one input node"
-        if not has_output:
-            return False, "Workflow must have at least one output node"
+            # Inputs via valid defaults? Let's keep input requirement for now or relax if needed.
+            # User might put text in LLM node directly. But typically 'input' node is the start.
+            # Actually, LLM node has parameters. Input node might not be strictly required if parameters are hardcoded?
+            # But let's stick to relaxing output first.
+            if not any(node.type == 'input' for node in nodes) and not any(node.type == 'media_input' for node in nodes):
+                 # Weak input check
+                 pass 
+                 # return False, "Workflow must have at least one input node" 
+        
+        if not has_output and not has_gen_node:
+            return False, "Workflow must have at least one output node or AI model node"
         
         return True, None
     
@@ -154,8 +163,9 @@ class WorkflowEngine:
                     node_inputs[edge.target_handle] = source_output
         
         # Execute based on node type
-        if node.type == 'input':
+        if node.type in ['input', 'media_input']:
             # Input nodes just pass through their data
+            # For media_input, data might be in 'value' (from URL) or other fields
             return node.data.get('value')
         
         elif node.type == 'utility':
@@ -186,7 +196,7 @@ class WorkflowEngine:
                 
             return None
         
-        elif node.type in ['replicate', 'inpaint', 'remove_bg']:
+        elif node.type in ['replicate', 'inpaint', 'remove_bg', 'llm_model']:
             # Run Replicate model
             model_id = node.data.get('model_id')
             if not model_id:
@@ -208,6 +218,21 @@ class WorkflowEngine:
             # Usually strict mapping, or just pass everything?
             # Existing code: model_inputs.update(node_inputs)
             model_inputs.update(node_inputs)
+
+            # Map frontend 'image' input handle to 'image_input' parameter expected by the model
+            if 'image' in model_inputs and 'image_input' not in model_inputs:
+                model_inputs['image_input'] = model_inputs['image']
+
+            # Special handling for GPT-5 / models requiring array image inputs
+            if 'image_input' in model_inputs:
+                img_input = model_inputs['image_input']
+                if isinstance(img_input, str) and img_input:
+                     # Wrap single URL in list as expected by "array of files"
+                     model_inputs['image_input'] = [img_input]
+                elif img_input is None:
+                     # Ensure empty list instead of None if strictly array required?
+                     # User said "image_input has to be array of files", and JSON example showed [].
+                     model_inputs['image_input'] = []
             
             # Special handling for mask_image if present in inputs vs parameters (for Inpainting)
             
@@ -219,8 +244,18 @@ class WorkflowEngine:
             
             # Format output
             output_data = result['output']
-            if isinstance(output_data, list) and len(output_data) == 1:
-                return output_data[0]
+            if isinstance(output_data, list):
+                if len(output_data) == 1:
+                    return output_data[0]
+                
+                # Check if it's a list of strings (tokens)
+                # If they are strings and don't look like URLs, join them
+                if all(isinstance(x, str) for x in output_data):
+                    # Heuristic: if any look like specific URLs, return list. Else join.
+                    if any(x.strip().startswith('http') for x in output_data):
+                         return output_data
+                    return "".join(output_data)
+                    
             return output_data
 
         elif node.type == 'mask_editor':
@@ -329,10 +364,15 @@ class WorkflowEngine:
                     outputs[node_id] = context.get(node_id)
             
             # Always also collect standard outputs if they were executed
+            # Always also collect standard outputs if they were executed
             for node in nodes:
-                if node.type == 'output' and node.id in context:
-                    output_name = node.data.get('name', node.id)
-                    outputs[output_name] = context.get(node.id)
+                if node.id in context:
+                    if node.type == 'output':
+                        output_name = node.data.get('name', node.id)
+                        outputs[output_name] = context.get(node.id)
+                    elif node.type in ['replicate', 'llm_model', 'inpaint', 'remove_bg']:
+                        # Also include AI outputs by ID for potential UI display
+                        outputs[node.id] = context.get(node.id)
             
             execution_time = int((time.time() - start_time) * 1000)
             

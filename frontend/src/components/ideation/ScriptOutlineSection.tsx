@@ -57,11 +57,23 @@ export const ScriptOutlineSection = ({ outline, onUpdate, conceptData }: ScriptO
         });
     };
 
-    const handleGenerate = async (clip: any) => {
+    const handleGenerate = async (source: any) => {
         setIsSidebarOpen(false);
+
+        // Case 1: Library Template (Structure)
+        if (source.type === 'structure') {
+            const structure = source.content;
+            // If outline exists, ask or append? For now append or replace logic could be confusing.
+            // Let's append with a separator if exists.
+            onUpdate(outline ? outline + "\n\n" + structure : structure);
+            toast.success("Structure template added!");
+            return;
+        }
+
+        // Case 2: Clip (Generate from Transcript)
         setIsGenerating(true);
         try {
-            const res = await fetch(`${API_URL}/api/ideation/clips/${clip.id}/outline`, {
+            const res = await fetch(`${API_URL}/api/ideation/clips/${source.id}/outline`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });

@@ -166,8 +166,8 @@ export const workflowApi = {
     onUpdate: (data: any) => void,
     onError?: (error: Error) => void
   ): EventSource {
-    // const token = localStorage.getItem('clipcoba_token');
-    const url = `${API_BASE_URL}/api/executions/${executionId}/stream`;
+    const token = localStorage.getItem('clipcoba_token');
+    const url = `${API_BASE_URL}/api/executions/${executionId}/stream?token=${token}`;
 
     const eventSource = new EventSource(url);
 

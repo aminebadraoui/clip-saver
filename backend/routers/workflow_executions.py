@@ -198,11 +198,15 @@ def get_execution(
     )
 
 
+from auth import get_current_user, get_current_user_from_token
+
+# ... (rest of imports)
+
 @router.get("/executions/{execution_id}/stream")
 async def stream_execution(
     execution_id: str,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_token)
 ):
     """Stream execution status updates via Server-Sent Events."""
     try:
@@ -228,29 +232,45 @@ async def stream_execution(
             detail="You don't have permission to access this execution"
         )
     
+    from database import engine
+    from functools import partial
+
     async def event_generator():
         """Generate SSE events for execution status."""
         while True:
-            # Refresh execution from database
-            session.refresh(execution)
-            
-            # Send status update
-            data = {
-                "status": execution.status,
-                "credits_used": execution.credits_used,
-                "execution_time_ms": execution.execution_time_ms,
-                "error_message": execution.error_message
-            }
-            
-            yield f"data: {json.dumps(data)}\n\n"
-            
-            # Stop streaming if execution is complete
-            if execution.status in ["completed", "failed", "cancelled"]:
-                if execution.output_data:
-                    output_data = json.loads(execution.output_data)
-                    yield f"data: {json.dumps({'outputs': output_data})}\n\n"
+            # Create a new session for this poll to ensure fresh data and valid connection
+            # We must use proper context management here
+            try:
+                with Session(engine) as db:
+                    # Re-fetch the execution
+                    current_execution = db.get(WorkflowExecution, execution_uuid)
+                    
+                    if not current_execution:
+                        # Should not happen, but handle it
+                        yield f"data: {json.dumps({'error': 'Execution not found'})}\n\n"
+                        break
+                    
+                    # Send status update
+                    data = {
+                        "status": current_execution.status,
+                        "credits_used": current_execution.credits_used,
+                        "execution_time_ms": current_execution.execution_time_ms,
+                        "error_message": current_execution.error_message
+                    }
+                    
+                    yield f"data: {json.dumps(data)}\n\n"
+                    
+                    # Stop streaming if execution is complete
+                    if current_execution.status in ["completed", "failed", "cancelled"]:
+                        if current_execution.output_data:
+                            output_data = json.loads(current_execution.output_data)
+                            yield f"data: {json.dumps({'outputs': output_data})}\n\n"
+                        break
+            except Exception as e:
+                print(f"Stream error: {e}")
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
                 break
-            
+                
             # Wait before next update
             await asyncio.sleep(0.5)
     

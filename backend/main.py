@@ -114,7 +114,7 @@ origins = [
     # Extension ID might be variable, but extensions usually need "*" or specific ID.
     # If extension sends auth, we need its specific ID. If not, we can keep a loose policy or separate middleware.
     # For now, adding common ones.
-    "*" 
+    # "*"  <- Removed invalid wildcard with credentials
 ]
 
 app.add_middleware(

@@ -19,7 +19,9 @@ from ai_agent import (
     generate_video_outline_async,
     generate_title_ideas_async,
     readapt_script_outline_async,
-    generate_viral_script_async
+    readapt_script_outline_async,
+    generate_viral_script_async,
+    generate_thumbnail_concepts_async
 )
 import os
 
@@ -35,6 +37,8 @@ class IdeationUpdate(BaseModel):
     commonAssumptions: Optional[str] = None
     breakingAssumptions: Optional[str] = None
     viewerFeeling: Optional[str] = None
+    targetAudience: Optional[str] = None
+    visualVibe: Optional[str] = None
     brainstormedTitles: Optional[List[Dict[str, Any]]] = None # Frontend sends list of objects
     brainstormedThumbnails: Optional[List[Dict[str, Any]]] = None
     scriptOutline: Optional[str] = None
@@ -302,6 +306,49 @@ async def generate_script_endpoint(
     
     try:
         prediction = await generate_viral_script_async(outline, titles, concept_data, webhook_url)
+        job.prediction_id = prediction.id
+        session.add(job)
+        session.commit()
+    except Exception as e:
+        job.status = "failed"
+        job.error_message = str(e)
+        session.add(job)
+        session.commit()
+        raise HTTPException(status_code=500, detail=f"Failed to start AI job: {e}")
+    
+    return {"jobId": str(job.id)}
+
+@router.post("/generate-thumbnails")
+async def generate_thumbnails_endpoint(
+    payload: Dict[str, Any],
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """
+    Generate thumbnail concepts based on strategy and titles.
+    """
+    concept_data = payload.get("conceptData", {})
+    titles = payload.get("titles", [])
+    
+    webhook_url = os.getenv("REPLICATE_WEBHOOK_URL")
+    if not webhook_url:
+         raise HTTPException(status_code=500, detail="REPLICATE_WEBHOOK_URL not configured")
+         
+    # Create Job
+    job = AsyncJob(
+        type="thumbnail_ideation",
+        status="pending",
+        input_payload=json.dumps({"concept": concept_data.get("mainIdea")}),
+        created_at=int(time.time() * 1000),
+        updated_at=int(time.time() * 1000),
+        user_id=user.id
+    )
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+    
+    try:
+        prediction = await generate_thumbnail_concepts_async(concept_data, titles, webhook_url)
         job.prediction_id = prediction.id
         session.add(job)
         session.commit()

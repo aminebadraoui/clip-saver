@@ -246,10 +246,47 @@ class ReplicateService:
 
     def run_prediction(self, model_id: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Run a prediction on Replicate."""
+        temp_files = []
+        open_handles = []
+        
         try:
             # Process inputs (handle Data URIs etc)
             processed_inputs = self._process_inputs(inputs)
             
+            # Special handling for 'image_input' (GPT-5/Vision models requiring binary files)
+            if 'image_input' in processed_inputs and isinstance(processed_inputs['image_input'], list):
+                import tempfile
+                import urllib.request
+                
+                file_inputs = []
+                for url in processed_inputs['image_input']:
+                    if isinstance(url, str) and (url.startswith('http') or url.startswith('data:')):
+                         try:
+                            # Create temp file
+                            fd, path = tempfile.mkstemp(suffix=".jpg") # Assume jpg or infer extension?
+                            os.close(fd) # Close low-level handle, we will reopen
+                            
+                            # Download
+                            if url.startswith('http'):
+                                urllib.request.urlretrieve(url, path)
+                            # Data URI handling could go here but let's assume http for now based on context
+                            
+                            # Open file object
+                            f = open(path, "rb")
+                            open_handles.append(f)
+                            temp_files.append(path)
+                            file_inputs.append(f)
+                         except Exception as e:
+                             print(f"Failed to download temp image: {e}")
+                             # Fallback to original if download fails? Or fail?
+                             # Let's keep original to avoid crashing everything if one fails, 
+                             # though mixing might be bad.
+                             file_inputs.append(url)
+                    else:
+                        file_inputs.append(url)
+                
+                processed_inputs['image_input'] = file_inputs
+
             # Run the model
             output = replicate.run(model_id, input=processed_inputs)
             
@@ -270,6 +307,20 @@ class ReplicateService:
                 "status": "failed",
                 "error": str(e)
             }
+        finally:
+            # Cleanup
+            for f in open_handles:
+                try:
+                    f.close()
+                except:
+                    pass
+            
+            for path in temp_files:
+                try:
+                    if os.path.exists(path):
+                        os.remove(path)
+                except:
+                    pass
     
     async def run_prediction_async(self, model_id: str, inputs: Dict[str, Any]) -> str:
         """Start an async prediction and return prediction ID."""
