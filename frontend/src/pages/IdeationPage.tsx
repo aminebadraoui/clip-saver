@@ -246,7 +246,7 @@ export const IdeationPage = () => {
 
 
 
-    const handleSave = () => saveProject(false);
+
 
     if (!selectedProjectId) {
         return (
