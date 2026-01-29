@@ -23,6 +23,7 @@ import { MoodboardsPage } from "@/pages/MoodboardsPage";
 import { MoodboardDetailPage } from "@/pages/MoodboardDetailPage";
 import { LibraryPage } from "@/pages/LibraryPage";
 import { SparksPage } from "@/pages/SparksPage";
+import { SparkEditorPage } from "@/pages/SparkEditorPage";
 
 
 // Guard for routes that require active subscription
@@ -71,6 +72,8 @@ function App() {
             <Route path="/moodboards" element={<Layout><MoodboardsPage /></Layout>} />
             <Route path="/moodboards/:moodboardId" element={<Layout><MoodboardDetailPage /></Layout>} />
             <Route path="/sparks" element={<Layout><SparksPage /></Layout>} />
+            <Route path="/sparks/new" element={<Layout><SparkEditorPage /></Layout>} />
+            <Route path="/sparks/:id" element={<Layout><SparkEditorPage /></Layout>} />
 
             {/* AI Workflow Routes */}
             <Route path="/workflows" element={<Layout><WorkflowsPage /></Layout>} />
