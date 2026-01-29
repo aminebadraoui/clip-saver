@@ -5,6 +5,7 @@ import { Pencil, Trash2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { PromoteSparkModal } from './PromoteSparkModal';
+import { useNavigate } from 'react-router-dom';
 
 interface SparkCardProps {
     spark: Spark;
@@ -13,11 +14,12 @@ interface SparkCardProps {
 }
 
 export function SparkCard({ spark, onDelete, onClick }: SparkCardProps) {
-    const { openEditor } = useSparkStore();
+    const navigate = useNavigate();
+    const { openEditor } = useSparkStore(); // We might still use openEditor for data preloading if we want, but nav is main
 
     const handleClick = (e: React.MouseEvent) => {
         if (onClick) onClick();
-        else openEditor(spark);
+        else navigate(`/sparks/${spark.id}`);
     };
 
     const [showPromote, setShowPromote] = React.useState(false);
@@ -55,7 +57,7 @@ export function SparkCard({ spark, onDelete, onClick }: SparkCardProps) {
                         className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-white/10"
                         onClick={(e) => {
                             e.stopPropagation();
-                            openEditor(spark);
+                            navigate(`/sparks/${spark.id}`);
                         }}
                     >
                         <Pencil className="w-3.5 h-3.5" />

@@ -5,21 +5,26 @@ import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { RichSparkEditor } from './RichSparkEditor';
 
-export function ZenSparkEditor() {
-    const { isOpen, currentSpark, closeEditor, saveSpark, isSaving } = useSparkStore();
+export function ZenSparkEditor({ isPage = false, onClose }: { isPage?: boolean; onClose?: () => void }) {
+    const { isOpen, currentSpark, closeEditor, saveSpark, isSaving, createNewSpark } = useSparkStore();
     const [content, setContent] = useState('');
     const [title, setTitle] = useState('');
     const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-    useEffect(() => {
-        if (isOpen) {
-            setContent(currentSpark?.content || '');
-            setTitle(currentSpark?.title || '');
+    // If used as a page, we might rely on props or initial load, but for now we sync with store
+    // actually, if isPage is true, we should probably ignore isOpen check?
+    // And "close" means navigate away.
 
-            // Focus textarea after animation
-            // setTimeout(() => textareaRef.current?.focus(), 100);
+    useEffect(() => {
+        // If it's a page, we don't care about isOpen, we care if we have a spark to edit (or new)
+        // Ensure content is synced when currentSpark changes
+        if (currentSpark) {
+            setContent(currentSpark.content || '');
+            setTitle(currentSpark.title || '');
+        } else if (isPage) {
+            // Maybe we are initializing?
         }
-    }, [isOpen, currentSpark]);
+    }, [currentSpark, isPage]);
 
     // Autosave Logic
     const handleContentChange = (newContent: string) => {
@@ -45,10 +50,22 @@ export function ZenSparkEditor() {
         saveSpark(content, title);
     };
 
-    if (!isOpen) return null;
+    const handleClose = () => {
+        if (onClose) {
+            onClose();
+        } else {
+            closeEditor();
+        }
+    };
+
+    // If global overlay mode (not isPage) and not open, return null
+    if (!isPage && !isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] bg-[#0A0A0A] text-gray-200 flex flex-col items-center animate-in fade-in duration-300">
+        <div className={cn(
+            "fixed inset-0 z-[100] bg-[#0A0A0A] text-gray-200 flex flex-col items-center animate-in fade-in duration-300",
+            isPage ? "relative h-full w-full inset-auto z-auto" : "" // Adjust styles if isPage
+        )}>
             {/* Minimalist Header (Shows on hover or active) */}
             <div className="w-full max-w-4xl p-6 flex justify-between items-center opacity-80 hover:opacity-100 transition-opacity">
                 <div className="flex items-center gap-4">
@@ -75,7 +92,7 @@ export function ZenSparkEditor() {
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={closeEditor}
+                        onClick={handleClose}
                         className="text-gray-500 hover:text-white hover:bg-white/10 rounded-full w-10 h-10"
                     >
                         <X className="w-5 h-5" />

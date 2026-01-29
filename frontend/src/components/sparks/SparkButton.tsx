@@ -4,12 +4,14 @@ import { useSparkStore } from '../../stores/useSparkStore';
 import { Button } from '../ui/button';
 import { cn } from '@/lib/utils'; // Assuming this alias exists, check imports
 
+import { useNavigate } from 'react-router-dom';
+
 export function SparkButton() {
-    const { createNewSpark } = useSparkStore();
+    const navigate = useNavigate();
 
     return (
         <Button
-            onClick={createNewSpark}
+            onClick={() => navigate('/sparks/new')}
             className={cn(
                 "fixed bottom-6 right-6 z-50",
                 "h-14 w-14 rounded-full shadow-2xl shadow-primary/20",
