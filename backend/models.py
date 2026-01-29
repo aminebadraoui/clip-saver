@@ -4,6 +4,20 @@ from datetime import datetime
 from sqlmodel import Field, Relationship, SQLModel
 from sqlalchemy import BigInteger, Text, UniqueConstraint
 # from enum import Enum # Removed as it's no longer used
+from sqlalchemy import BigInteger, Text, UniqueConstraint
+
+# Link Models for Moodboards and Ideation
+class MoodboardSparkLink(SQLModel, table=True):
+    moodboard_id: Optional[uuid.UUID] = Field(default=None, foreign_key="moodboard.id", primary_key=True)
+    spark_id: Optional[uuid.UUID] = Field(default=None, foreign_key="spark.id", primary_key=True)
+
+class MoodboardClipLink(SQLModel, table=True):
+    moodboard_id: Optional[uuid.UUID] = Field(default=None, foreign_key="moodboard.id", primary_key=True)
+    clip_id: Optional[uuid.UUID] = Field(default=None, foreign_key="clip.id", primary_key=True)
+
+class IdeationMoodboardLink(SQLModel, table=True):
+    ideation_id: Optional[uuid.UUID] = Field(default=None, foreign_key="videoideation.id", primary_key=True)
+    moodboard_id: Optional[uuid.UUID] = Field(default=None, foreign_key="moodboard.id", primary_key=True)
 
 class User(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -31,7 +45,9 @@ class User(SQLModel, table=True):
     refresh_tokens: List["RefreshToken"] = Relationship(back_populates="user")
     images: List["Image"] = Relationship(back_populates="user")
     moodboards: List["Moodboard"] = Relationship(back_populates="user")
+    sparks: List["Spark"] = Relationship(back_populates="user")
     async_jobs: List["AsyncJob"] = Relationship(back_populates="user")
+
 
 class RefreshToken(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -56,6 +72,8 @@ class Space(SQLModel, table=True):
     workflows: List["AIWorkflow"] = Relationship(back_populates="space")
     images: List["Image"] = Relationship(back_populates="space")
     moodboards: List["Moodboard"] = Relationship(back_populates="space")
+    sparks: List["Spark"] = Relationship(back_populates="space")
+
 
 
 
@@ -139,7 +157,10 @@ class Clip(SQLModel, table=True):
 
     # folder relationship removed
     tags: List[Tag] = Relationship(back_populates="clips", link_model=ClipTagLink)
+    tags: List[Tag] = Relationship(back_populates="clips", link_model=ClipTagLink)
     notes_list: List["Note"] = Relationship(back_populates="clip", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    moodboards: List["Moodboard"] = Relationship(back_populates="clips", link_model=MoodboardClipLink)
+
 
     title_templates: List["TitleTemplate"] = Relationship(back_populates="sources", link_model=TitleTemplateClipLink)
     thumbnail_templates: List["ThumbnailTemplate"] = Relationship(back_populates="sources", link_model=ThumbnailTemplateClipLink)
@@ -173,6 +194,10 @@ class Moodboard(SQLModel, table=True):
     space: Optional["Space"] = Relationship(back_populates="moodboards")
     
     images: List["Image"] = Relationship(back_populates="moodboard")
+    sparks: List["Spark"] = Relationship(back_populates="moodboards", link_model=MoodboardSparkLink)
+    clips: List["Clip"] = Relationship(back_populates="moodboards", link_model=MoodboardClipLink)
+    referenced_in_ideations: List["VideoIdeation"] = Relationship(back_populates="moodboard_references", link_model=IdeationMoodboardLink)
+
 
 class Image(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -224,7 +249,29 @@ class VideoIdeation(SQLModel, table=True):
     user: Optional[User] = Relationship(back_populates="ideations")
 
     space_id: Optional[uuid.UUID] = Field(default=None, foreign_key="space.id")
+    space_id: Optional[uuid.UUID] = Field(default=None, foreign_key="space.id")
     space: Optional["Space"] = Relationship(back_populates="ideations")
+
+    moodboard_references: List["Moodboard"] = Relationship(back_populates="referenced_in_ideations", link_model=IdeationMoodboardLink)
+
+class Spark(SQLModel, table=True):
+    """Freestyle writing / Quick capture ideas"""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    content: str = Field(sa_type=Text) # Markdown content
+    title: Optional[str] = None # Optional title
+    status: str = Field(default="inbox") # 'inbox', 'processed', 'archived'
+    
+    createdAt: int = Field(sa_type=BigInteger)
+    updatedAt: int = Field(sa_type=BigInteger)
+    
+    user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="user.id")
+    user: Optional[User] = Relationship(back_populates="sparks")
+    
+    space_id: Optional[uuid.UUID] = Field(default=None, foreign_key="space.id")
+    space: Optional["Space"] = Relationship(back_populates="sparks")
+    
+    moodboards: List["Moodboard"] = Relationship(back_populates="sparks", link_model=MoodboardSparkLink)
+
 
 class AIWorkflow(SQLModel, table=True):
     """Represents a saved AI workflow/pipeline"""

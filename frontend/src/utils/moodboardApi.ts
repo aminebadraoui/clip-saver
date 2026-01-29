@@ -100,3 +100,39 @@ export async function deleteMoodboard(
         throw new Error(error.detail || 'Failed to delete moodboard');
     }
 }
+
+export async function getMoodboardSparks(token: string, moodboardId: string): Promise<any[]> {
+    const response = await fetch(`${API_BASE}/moodboards/${moodboardId}/sparks`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Failed to fetch sparks');
+    return response.json();
+}
+
+export async function getMoodboardClips(token: string, moodboardId: string): Promise<any[]> {
+    const response = await fetch(`${API_BASE}/moodboards/${moodboardId}/clips`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Failed to fetch clips');
+    return response.json();
+}
+
+export async function addSparkToMoodboard(token: string, moodboardId: string, sparkId: string): Promise<void> {
+    const response = await fetch(`${API_BASE}/moodboards/${moodboardId}/sparks`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ item_id: sparkId })
+    });
+
+    if (!response.ok) {
+        try {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to add spark to moodboard');
+        } catch (e) {
+            throw new Error('Failed to add spark to moodboard');
+        }
+    }
+}

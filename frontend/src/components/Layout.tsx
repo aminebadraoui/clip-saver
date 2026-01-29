@@ -1,6 +1,8 @@
 import { useLocation } from "react-router-dom";
 import { AppDataProvider } from "@/context/AppDataContext";
 import { Sidebar } from "@/components/Sidebar";
+import { ZenSparkEditor } from "@/components/sparks/ZenSparkEditor";
+import { SparkButton } from "@/components/sparks/SparkButton";
 
 
 // Actually LogoutButton component was removed in previous step? No, I need to remove it now.
@@ -40,6 +42,8 @@ export function Layout({ children }: LayoutProps) {
             {/* We removed the header and unified the layout */}
             <AppDataProvider>
                 <LayoutContent>{children}</LayoutContent>
+                <ZenSparkEditor />
+                <SparkButton />
             </AppDataProvider>
         </div>
     );

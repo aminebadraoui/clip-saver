@@ -1,0 +1,18 @@
+/* RichSparkEditor.css */
+.tiptap p.is-editor-empty:first-child::before {
+    color: #4b5563;
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+}
+
+/* Hide prosemirror default focus outline */
+.ProseMirror-focused {
+    outline: none !important;
+}
+
+/* Style for the audio recorder node wrapper */
+.react-renderer {
+    width: 100%;
+}

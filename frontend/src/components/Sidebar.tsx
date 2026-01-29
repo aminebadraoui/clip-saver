@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Video, Wand2, Lightbulb, Image, Settings, LogOut } from "lucide-react";
+import { Video, Wand2, Lightbulb, Image, Settings, LogOut, Sparkles } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Separator } from "@/components/ui/separator";
@@ -53,6 +53,16 @@ export function Sidebar() {
                     </Button>
                 </Link>
 
+                <Link to="/sparks">
+                    <Button
+                        variant={location.pathname.startsWith('/sparks') ? "secondary" : "ghost"}
+                        className="w-full justify-start px-2"
+                    >
+                        <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
+                        <span className="truncate opacity-0 group-hover:opacity-100 w-0 group-hover:w-auto transition-all duration-300 overflow-hidden">Sparks</span>
+                    </Button>
+                </Link>
+
                 {/* Add standard "AI Workflows" link at bottom */}
                 <Separator className="my-2 bg-border/50" />
 
@@ -65,6 +75,8 @@ export function Sidebar() {
                         <span className="truncate opacity-0 group-hover:opacity-100 w-0 group-hover:w-auto transition-all duration-300 overflow-hidden">Video Ideation</span>
                     </Button>
                 </Link>
+
+
 
                 <Link to="/moodboards">
                     <Button

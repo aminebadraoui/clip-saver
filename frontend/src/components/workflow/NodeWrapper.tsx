@@ -1,7 +1,7 @@
 import { type ReactNode, useState, useRef, useEffect } from 'react';
 import { Handle, Position, useReactFlow } from 'reactflow';
 import { cn } from '../../lib/utils';
-import { Settings2, X, type LucideIcon } from 'lucide-react';
+import { Settings2, X, Play, Loader2, type LucideIcon } from 'lucide-react';
 import { useWorkflow } from '../../context/WorkflowContext';
 
 interface NodeWrapperProps {
@@ -14,6 +14,8 @@ interface NodeWrapperProps {
     inputs?: Array<{ id: string; label?: string }>;
     outputs?: Array<{ id: string; label?: string }>;
     className?: string;
+    onRun?: () => void;
+    isRunning?: boolean;
 }
 
 export function NodeWrapper({
@@ -26,6 +28,8 @@ export function NodeWrapper({
     inputs = [],
     outputs = [],
     className,
+    onRun,
+    isRunning = false,
 }: NodeWrapperProps) {
     const { openSettings, deleteNode } = useWorkflow();
     const { setNodes } = useReactFlow();
@@ -83,21 +87,21 @@ export function NodeWrapper({
     return (
         <div
             className={cn(
-                'w-96 h-96 flex flex-col rounded-xl border bg-black/80 backdrop-blur-md shadow-2xl transition-all duration-300 group',
+                'w-96 h-96 flex flex-col rounded-2xl border bg-[#0a0a0a] shadow-2xl transition-all duration-300 group',
                 selected
-                    ? 'border-primary/50 ring-2 ring-primary/20 shadow-[0_0_30px_-5px_hsl(var(--primary)/0.3)]'
-                    : 'border-white/10 hover:border-white/20',
+                    ? 'border-primary/50 shadow-[0_0_40px_-10px_hsl(var(--primary)/0.4)]'
+                    : 'border-white/5 hover:border-white/10 hover:shadow-[0_0_20px_-5px_rgba(255,255,255,0.05)]',
                 className
             )}
         >
             {/* Header */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 bg-white/5 rounded-t-xl"
+            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/5 bg-white/[0.02] rounded-t-2xl relative"
                 onDoubleClick={(e) => {
                     e.stopPropagation();
                     setIsEditing(true);
                 }}
             >
-                <div className={cn("p-1.5 rounded-md text-white shadow-inner", color)}>
+                <div className={cn("p-1.5 rounded-lg text-white/90 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)]", color)}>
                     {Icon && <Icon size={14} strokeWidth={2.5} />}
                 </div>
 
@@ -109,60 +113,76 @@ export function NodeWrapper({
                         onChange={(e) => setEditValue(e.target.value)}
                         onBlur={handleSave}
                         onKeyDown={handleKeyDown}
-                        className="flex-1 bg-black/50 border border-white/20 rounded text-sm px-2 py-0.5 text-white focus:outline-none focus:border-primary/50 font-semibold tracking-tight"
+                        className="flex-1 bg-black/50 border border-white/10 rounded text-sm px-2 py-0.5 text-white focus:outline-none focus:border-primary/50 font-medium tracking-tight"
                         onClick={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
                     />
                 ) : (
-                    <span className="font-semibold text-sm tracking-tight text-white/90 select-none cursor-text truncate flex-1" title="Double click to rename">
+                    <span className="font-medium text-sm tracking-tight text-white/90 select-none cursor-text truncate flex-1" title="Double click to rename">
                         {title}
                     </span>
                 )}
 
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ml-auto flex items-center gap-1">
+                    {onRun && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onRun();
+                            }}
+                            disabled={isRunning}
+                            className={cn(
+                                "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all mr-2",
+                                isRunning
+                                    ? "bg-primary/20 text-primary border border-primary/20 cursor-wait"
+                                    : "bg-white/5 text-gray-300 hover:bg-primary hover:text-white hover:shadow-[0_0_15px_hsl(var(--primary)/0.5)] border border-white/10 hover:border-primary/50"
+                            )}
+                            title="Run Model"
+                        >
+                            {isRunning ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} fill="currentColor" />}
+                            <span>{isRunning ? 'Running' : 'Run'}</span>
+                        </button>
+                    )}
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
                             deleteNode(id);
                         }}
-                        className="p-1.5 rounded-md text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                        className="p-1.5 rounded-md text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
                         title="Delete Node"
                     >
                         <X size={14} />
                     </button>
                     <button
                         onClick={(e) => {
-                            e.stopPropagation(); // Prevent node selection if we just want settings? Or allow both.
+                            e.stopPropagation();
                             openSettings(id);
                         }}
-                        className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100"
+                        className="p-1.5 rounded-md text-white/20 hover:text-white hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100"
                         title="Open Settings"
                     >
                         <Settings2 size={14} />
                     </button>
-                    {selected && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_hsl(var(--primary))]" />
-                    )}
                 </div>
             </div>
 
             {/* Content */}
-            <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar p-4 space-y-4 min-h-0">
+            <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar p-5 space-y-4 min-h-0 relative">
                 {/* Input Handles */}
                 {inputs.length > 0 && (
-                    <div className="space-y-4 relative -ml-4">
+                    <div className="space-y-5 relative -ml-5 mt-1">
                         {inputs.map((input) => (
-                            <div key={input.id} className="relative flex items-center h-5">
+                            <div key={input.id} className="relative flex items-center h-5 group/handle">
                                 <Handle
                                     type="target"
                                     position={Position.Left}
                                     id={input.id}
                                     className={cn(
-                                        '!w-3 !h-3 !-left-[7px] !border-[3px] !border-black transition-all duration-200',
-                                        '!bg-muted-foreground hover:!bg-primary hover:scale-125'
+                                        '!w-3.5 !h-3.5 !-left-[7px] !border-[3px] !border-[#0a0a0a] transition-all duration-300',
+                                        '!bg-zinc-600 group-hover/handle:!bg-primary group-hover/handle:scale-110'
                                     )}
                                 />
-                                <span className="text-[10px] font-medium text-muted-foreground ml-4 uppercase tracking-wider">
+                                <span className="text-[10px] font-medium text-zinc-500 ml-3 uppercase tracking-wider group-hover/handle:text-zinc-300 transition-colors">
                                     {input.label || input.id}
                                 </span>
                             </div>
@@ -171,16 +191,16 @@ export function NodeWrapper({
                 )}
 
                 {/* Main Body */}
-                <div className="flex-1 flex flex-col text-sm text-gray-300 font-medium min-h-0">
+                <div className="flex-1 flex flex-col text-sm text-zinc-400 font-normal min-h-0">
                     {children}
                 </div>
 
                 {/* Output Handles */}
                 {outputs.length > 0 && (
-                    <div className="space-y-4 relative flex flex-col items-end mt-4 -mr-4">
+                    <div className="space-y-5 relative flex flex-col items-end mt-4 -mr-5 mb-1">
                         {outputs.map((output) => (
-                            <div key={output.id} className="relative flex items-center justify-end h-5 w-full">
-                                <span className="text-[10px] font-medium text-muted-foreground mr-4 uppercase tracking-wider text-right">
+                            <div key={output.id} className="relative flex items-center justify-end h-5 w-full group/handle">
+                                <span className="text-[10px] font-medium text-zinc-500 mr-3 uppercase tracking-wider text-right group-hover/handle:text-zinc-300 transition-colors">
                                     {output.label || output.id}
                                 </span>
                                 <Handle
@@ -188,8 +208,8 @@ export function NodeWrapper({
                                     position={Position.Right}
                                     id={output.id}
                                     className={cn(
-                                        '!w-3 !h-3 !-right-[7px] !border-[3px] !border-black transition-all duration-200',
-                                        '!bg-primary hover:scale-125 shadow-[0_0_10px_hsl(var(--primary)/0.5)]'
+                                        '!w-3.5 !h-3.5 !-right-[7px] !border-[3px] !border-[#0a0a0a] transition-all duration-300',
+                                        '!bg-zinc-600 group-hover/handle:!bg-primary group-hover/handle:scale-110 hover:!shadow-[0_0_10px_hsl(var(--primary)/0.5)]'
                                     )}
                                 />
                             </div>
