@@ -40,6 +40,8 @@ from routers import moodboards
 from routers import lab
 from routers import webhooks
 from routers import jobs
+from routers import sparks
+from routers import transcribe
 from dependencies import get_current_space
 from models import Space
 
@@ -138,6 +140,8 @@ app.include_router(moodboards.router)
 app.include_router(lab.router)
 app.include_router(webhooks.router)
 app.include_router(jobs.router)
+app.include_router(sparks.router)
+app.include_router(transcribe.router)
 
 # Ensure temp directory exists
 # forcing reload for env vars 2

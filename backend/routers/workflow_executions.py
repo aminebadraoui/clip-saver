@@ -38,7 +38,7 @@ class ExecutionResponse(BaseModel):
 
 
 @router.post("/workflows/{workflow_id}/execute", response_model=ExecutionResponse, status_code=status.HTTP_201_CREATED)
-def execute_workflow(
+async def execute_workflow(
     workflow_id: str,
     execution: ExecutionCreate,
     session: Session = Depends(get_session),
@@ -92,7 +92,7 @@ def execute_workflow(
         
         # Run workflow engine
         engine = WorkflowEngine(session)
-        result = engine.execute(
+        result = await engine.execute(
             workflow_data=workflow.workflow_data,
             input_data=execution.input_data,
             user_id=current_user.id,

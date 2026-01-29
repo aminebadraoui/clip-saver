@@ -602,13 +602,19 @@ function WorkflowEditor() {
                             maxZoom={2}
                             zoomOnScroll={false}
                             panOnScroll={true}
-                            attributionPosition="bottom-right"
+                            proOptions={{ hideAttribution: true }}
+                            defaultEdgeOptions={{
+                                type: 'default',
+                                animated: true,
+                                style: { stroke: '#71717a', strokeWidth: 2 }, // zinc-500 (lighter than before for visibility)
+                            }}
+                            connectionLineStyle={{ stroke: '#ef4444', strokeWidth: 2 }} // red-500
                             className="bg-[#0f0f0f]"
                         >
-                            <Controls position="bottom-left" className="!bg-[#1a1a1a]/80 !backdrop-blur !border-white/10 !fill-gray-400 [&>button]:!border-white/10 [&>button:hover]:!bg-white/10 !ml-12 !mb-12" />
+                            <Controls position="bottom-left" className="!bg-[#1a1a1a]/80 !backdrop-blur !border-white/5 !fill-zinc-400 [&>button]:!border-white/5 [&>button:hover]:!bg-white/5 !ml-8 !mb-8 !rounded-xl !shadow-xl" />
                             <MiniMap
                                 position="bottom-right"
-                                className="!bg-[#1a1a1a]/80 !backdrop-blur !border !border-white/10 !rounded-lg !mb-12 !mr-12"
+                                className="!bg-[#1a1a1a]/80 !backdrop-blur !border !border-white/5 !rounded-xl !mb-8 !mr-8 !shadow-xl"
                                 maskColor="#0f0f0f"
                                 nodeColor={(n) => {
                                     if (n.type === 'input') return '#52525b'; // zinc-600
@@ -616,14 +622,14 @@ function WorkflowEditor() {
                                     return '#b91c1c'; // red-700
                                 }}
                             />
-                            <Panel position="bottom-left" className="!mb-12 !ml-24">
+                            <Panel position="bottom-left" className="!mb-8 !ml-20">
                                 <ZoomIndicator />
                             </Panel>
                             <Background
                                 variant={BackgroundVariant.Dots}
                                 gap={24}
                                 size={1}
-                                color="#333"
+                                color="rgba(255, 255, 255, 0.05)"
                                 className="bg-[#0f0f0f]"
                             />
                         </ReactFlow>

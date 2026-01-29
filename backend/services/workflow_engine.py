@@ -1,6 +1,7 @@
 """Workflow execution engine."""
 import json
 import time
+import asyncio
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 import networkx as nx
@@ -83,28 +84,17 @@ class WorkflowEngine:
                 if G.in_degree(node.id) == 0 and G.out_degree(node.id) == 0:
                     return False, f"Node {node.id} is not connected"
         
-        # Check that there's at least one input and one output OR one generative node
-        has_input = any(node.type in ['input', 'media_input'] for node in nodes)
+        # Check that there's at least one output or generative node
         has_output = any(node.type == 'output' for node in nodes)
         has_gen_node = any(node.type in ['replicate', 'llm_model', 'inpaint', 'remove_bg'] for node in nodes)
-        
-        if not has_input:
-            # Inputs via valid defaults? Let's keep input requirement for now or relax if needed.
-            # User might put text in LLM node directly. But typically 'input' node is the start.
-            # Actually, LLM node has parameters. Input node might not be strictly required if parameters are hardcoded?
-            # But let's stick to relaxing output first.
-            if not any(node.type == 'input' for node in nodes) and not any(node.type == 'media_input' for node in nodes):
-                 # Weak input check
-                 pass 
-                 # return False, "Workflow must have at least one input node" 
         
         if not has_output and not has_gen_node:
             return False, "Workflow must have at least one output node or AI model node"
         
         return True, None
     
-    def get_execution_order(self, nodes: List[WorkflowNode], edges: List[WorkflowEdge], target_node_ids: Optional[List[str]] = None) -> List[str]:
-        """Get topologically sorted execution order, optionally filtered by target nodes."""
+    def get_execution_generations(self, nodes: List[WorkflowNode], edges: List[WorkflowEdge], target_node_ids: Optional[List[str]] = None) -> List[List[str]]:
+        """Get topologically sorted generations of nodes for parallel execution."""
         G = nx.DiGraph()
         
         for node in nodes:
@@ -113,23 +103,29 @@ class WorkflowEngine:
         for edge in edges:
             G.add_edge(edge.source, edge.target)
         
-        # Topological sort
+        # Topological generations
         try:
-            full_order = list(nx.topological_sort(G))
+            generations = list(nx.topological_generations(G))
         except nx.NetworkXError:
             raise ValueError("Cannot determine execution order - workflow may contain cycles")
             
         if not target_node_ids:
-            return full_order
+            return generations
             
-        # Filter for targets and their dependencies
+        # Filter layers for target nodes and their dependencies
         nodes_to_keep = set(target_node_ids)
         for node_id in target_node_ids:
             if node_id in G:
                 nodes_to_keep.update(nx.ancestors(G, node_id))
         
-        return [n for n in full_order if n in nodes_to_keep]
-    
+        filtered_generations = []
+        for gen in generations:
+            filtered_gen = [n for n in gen if n in nodes_to_keep]
+            if filtered_gen:
+                filtered_generations.append(filtered_gen)
+                
+        return filtered_generations
+
     def calculate_total_cost(self, nodes: List[WorkflowNode], nodes_to_run: Optional[List[str]] = None) -> int:
         """Estimate total credit cost for workflow."""
         total_cost = 0
@@ -147,53 +143,40 @@ class WorkflowEngine:
         
         return total_cost
     
-    def execute_node(
+    async def execute_node(
         self,
         node: WorkflowNode,
         context: Dict[str, Any],
         edges: List[WorkflowEdge]
     ) -> Any:
-        """Execute a single node."""
+        """Execute a single node asynchronously."""
         # Get inputs from context based on edges
         node_inputs = {}
         for edge in edges:
             if edge.target == node.id:
+                # IMPORTANT: Since context is shared and updated concurrently by other generations,
+                # we must ensure we only access keys that are already present (from previous generations).
+                # Current generation nodes don't depend on each other, so this is safe.
                 source_output = context.get(edge.source)
                 if source_output is not None:
                     node_inputs[edge.target_handle] = source_output
         
         # Execute based on node type
         if node.type in ['input', 'media_input']:
-            # Input nodes just pass through their data
-            # For media_input, data might be in 'value' (from URL) or other fields
             return node.data.get('value')
         
         elif node.type == 'utility':
-            # Utility operations
             op_type = node.data.get('op_type')
             
             if op_type == 'concat':
-                # Concatenate strings
-                # Get all inputs that look like 'input_1', 'input_2', etc or just values
                 separator = node.data.get('separator', ' ')
-                
-                # We collect values from dynamic inputs usually labeled 'input1', 'input2'...
-                # Or we can just join all inputs in order of keys? safely, let's use a list of values from data config
-                # But inputs come from edges.
-                # Convention: for concat, we might have specific named inputs or just generic 'input'
-                
-                # Let's assume the node data defines order or keys
                 parts = []
-                # Check for explicit 'parts' configuration in data, which might map input keys to order
-                # Fallback: sort keys
                 input_keys = sorted([k for k in node_inputs.keys()])
                 for k in input_keys:
                     val = node_inputs[k]
                     if val is not None:
                         parts.append(str(val))
-                
                 return separator.join(parts)
-                
             return None
         
         elif node.type in ['replicate', 'inpaint', 'remove_bg', 'llm_model']:
@@ -205,91 +188,70 @@ class WorkflowEngine:
             # Build inputs for the model
             model_inputs = {}
             for key, value in node.data.get('parameters', {}).items():
-                # Check if value is a reference to another node's output
                 if isinstance(value, str) and value.startswith('$'):
-                    # Reference to another node
                     ref_node_id = value[1:]
                     model_inputs[key] = context.get(ref_node_id)
                 else:
                     model_inputs[key] = value
             
-            # Also add direct inputs from edges
-            # Map edge inputs to model inputs
-            # Usually strict mapping, or just pass everything?
-            # Existing code: model_inputs.update(node_inputs)
             model_inputs.update(node_inputs)
 
-            # Map frontend 'image' input handle to 'image_input' parameter expected by the model
             if 'image' in model_inputs and 'image_input' not in model_inputs:
                 model_inputs['image_input'] = model_inputs['image']
 
-            # Special handling for GPT-5 / models requiring array image inputs
             if 'image_input' in model_inputs:
                 img_input = model_inputs['image_input']
                 if isinstance(img_input, str) and img_input:
-                     # Wrap single URL in list as expected by "array of files"
                      model_inputs['image_input'] = [img_input]
                 elif img_input is None:
-                     # Ensure empty list instead of None if strictly array required?
-                     # User said "image_input has to be array of files", and JSON example showed [].
                      model_inputs['image_input'] = []
             
-            # Special handling for mask_image if present in inputs vs parameters (for Inpainting)
-            
-            # Run the prediction
-            result = self.replicate_service.run_prediction(model_id, model_inputs)
+            # Run blocking prediction in thread pool to avoid blocking the loop
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None, 
+                lambda: self.replicate_service.run_prediction(model_id, model_inputs)
+            )
             
             if result['status'] == 'failed':
                 raise ValueError(f"Replicate prediction failed: {result.get('error')}")
             
-            # Format output
             output_data = result['output']
             if isinstance(output_data, list):
                 if len(output_data) == 1:
                     return output_data[0]
-                
-                # Check if it's a list of strings (tokens)
-                # If they are strings and don't look like URLs, join them
                 if all(isinstance(x, str) for x in output_data):
-                    # Heuristic: if any look like specific URLs, return list. Else join.
                     if any(x.strip().startswith('http') for x in output_data):
                          return output_data
                     return "".join(output_data)
-                    
             return output_data
 
         elif node.type == 'mask_editor':
             return node.data.get('mask_output')
         
         elif node.type == 'transform':
-            # Transform operations (resize, crop, etc.)
             transform_type = node.data.get('transform_type')
             input_data = node_inputs.get('input')
-            
             if transform_type == 'select_first':
-                # Select first item from array
                 if isinstance(input_data, list) and len(input_data) > 0:
                     return input_data[0]
                 return input_data
-            
-            # Add more transform types as needed
             return input_data
         
         elif node.type == 'output':
-            # Output nodes collect results
             return node_inputs.get('input')
         
         else:
             raise ValueError(f"Unknown node type: {node.type}")
     
-    def execute(
+    async def execute(
         self,
         workflow_data: str,
         input_data: Dict[str, Any],
         user_id: uuid.UUID,
         target_node_ids: Optional[List[str]] = None
     ) -> Dict[str, Any]:
-        """Execute the workflow, optionally only specific nodes."""
+        """Execute the workflow asynchronously, optionally only specific nodes."""
         start_time = time.time()
         
         # Parse workflow
@@ -303,17 +265,18 @@ class WorkflowEngine:
                 "error": error
             }
         
-        # Get execution order (filtered by target if specified)
+        # Get execution generations (layers of safe-to-parallelize nodes)
         try:
-            execution_order_ids = self.get_execution_order(nodes, edges, target_node_ids)
+            generations = self.get_execution_generations(nodes, edges, target_node_ids)
         except ValueError as e:
             return {
                 "status": "failed",
                 "error": str(e)
             }
             
-        # Check credits
-        estimated_cost = self.calculate_total_cost(nodes, execution_order_ids)
+        # Check credits (flatten generations to get all nodes to run)
+        all_nodes_to_run = [n_id for gen in generations for n_id in gen]
+        estimated_cost = self.calculate_total_cost(nodes, all_nodes_to_run)
         if not self.credit_service.has_sufficient_credits(self.session, user_id, estimated_cost):
             balance = self.credit_service.get_balance(self.session, user_id)
             return {
@@ -324,13 +287,8 @@ class WorkflowEngine:
         # Create execution context
         context = {}
         
-        # Set input values
-        # Logic update: we might need inputs for nodes that are NOT in execution_order_ids if they are dependencies?
-        # No, execution_order_ids includes dependencies.
-        
+        # Initialize input values
         for node in nodes:
-            # We initialize context for ALL input nodes present in standard inputs, 
-            # even if not strictly in execution path, just in case.
             if node.type == 'input':
                 input_name = node.data.get('name', node.id)
                 if input_name in input_data:
@@ -338,40 +296,48 @@ class WorkflowEngine:
                 else:
                     context[node.id] = node.data.get('default_value')
         
-        # Execute nodes in order
+        # Execute generations
         credits_used = 0
         try:
-            for node_id in execution_order_ids:
-                node = next(n for n in nodes if n.id == node_id)
+            for generation in generations:
+                # Get node objects for this generation
+                gen_nodes = [n for n in nodes if n.id in generation]
                 
-                # Execute node
-                result = self.execute_node(node, context, edges)
-                context[node_id] = result
+                # Execute all nodes in this generation concurrently
+                # We create tasks for each node execution
+                tasks = [
+                    self.execute_node(node, context, edges)
+                    for node in gen_nodes
+                ]
                 
-                # Track credits for Replicate nodes
-                if node.type == 'replicate':
-                    model_id = node.data.get('model_id')
-                    cost = self.replicate_service.estimate_cost(self.session, model_id)
-                    credits_used += cost
+                if not tasks:
+                    continue
+
+                # Wait for all nodes in this layer to complete
+                results = await asyncio.gather(*tasks)
+                
+                # Update context with results
+                for node, result in zip(gen_nodes, results):
+                    context[node.id] = result
+                    
+                    # Track credits
+                    if node.type == 'replicate':
+                        model_id = node.data.get('model_id')
+                        cost = self.replicate_service.estimate_cost(self.session, model_id)
+                        credits_used += cost
             
             # Collect outputs
             outputs = {}
-            # If target_node_ids is set, we might want to return outputs for those specific nodes
-            # regardless of whether they are "output" type nodes.
-            
             if target_node_ids:
                 for node_id in target_node_ids:
                     outputs[node_id] = context.get(node_id)
             
-            # Always also collect standard outputs if they were executed
-            # Always also collect standard outputs if they were executed
             for node in nodes:
                 if node.id in context:
                     if node.type == 'output':
                         output_name = node.data.get('name', node.id)
                         outputs[output_name] = context.get(node.id)
                     elif node.type in ['replicate', 'llm_model', 'inpaint', 'remove_bg']:
-                        # Also include AI outputs by ID for potential UI display
                         outputs[node.id] = context.get(node.id)
             
             execution_time = int((time.time() - start_time) * 1000)

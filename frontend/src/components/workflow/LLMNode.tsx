@@ -46,25 +46,10 @@ export function LLMNode({ id, data, selected }: NodeProps) {
             color={data.color || "bg-blue-600"}
             inputs={definition?.inputs?.map(i => ({ id: i.name, label: i.label || i.name }))}
             outputs={definition?.outputs?.map(o => ({ id: o.name, label: o.label || o.name }))}
+            onRun={() => runNode(id)}
+            isRunning={data.loading}
         >
             <div className="relative group/node h-full flex flex-col">
-                {/* Run Button - Floating Action */}
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        runNode(id);
-                    }}
-                    disabled={data.loading}
-                    className={cn(
-                        "absolute bottom-4 right-4 z-50",
-                        "p-2 rounded-full bg-green-500 text-black shadow-[0_0_15px_rgba(34,197,94,0.4)]",
-                        "hover:bg-green-400 hover:scale-110 active:scale-95 transition-all duration-200"
-                    )}
-                    title="Run Step"
-                >
-                    {data.loading ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} fill="currentColor" />}
-                </button>
-
                 {/* Content */}
                 {data.loading ? (
                     <div className="flex flex-col items-center justify-center flex-1 text-primary gap-2 h-full">

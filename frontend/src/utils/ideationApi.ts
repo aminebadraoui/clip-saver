@@ -58,3 +58,28 @@ export async function fetchIdeations(
 
     return response.json();
 }
+
+export async function createIdeation(
+    token: string,
+    projectName: string,
+    initialData?: { mainIdea?: string }
+): Promise<VideoIdeation> {
+    const response = await fetch(`${API_BASE}/ideation/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+            projectName,
+            ...initialData
+        })
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to create ideation project');
+    }
+
+    return response.json();
+}

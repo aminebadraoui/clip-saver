@@ -9,6 +9,7 @@ import {
 import type { Clip } from "@/types/clip";
 import { ClipCard } from "@/components/ClipCard";
 
+
 import { CinemaModeModal } from "@/components/CinemaModeModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -210,6 +211,8 @@ export function ClipsPage() {
 
     return (
         <>
+
+
             <div className="flex items-center justify-between mb-8">
                 <h1 className="text-3xl font-bold tracking-tight">
                     {selectedTagIds.length > 0
