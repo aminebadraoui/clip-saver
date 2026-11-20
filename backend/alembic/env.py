@@ -26,6 +26,15 @@ from models import *
 
 target_metadata = SQLModel.metadata
 
+
+def get_database_url() -> str:
+    """Migrations use the direct (non-pooled) Neon endpoint when available;
+    PgBouncer pooling can break DDL/session-level features."""
+    url = os.getenv("DATABASE_URL_DIRECT") or os.getenv("DATABASE_URL")
+    if not url:
+        raise RuntimeError("DATABASE_URL (or DATABASE_URL_DIRECT) must be set in the environment")
+    return url
+
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
@@ -44,7 +53,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = get_database_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -64,7 +73,7 @@ def run_migrations_online() -> None:
 
     """
     configuration = config.get_section(config.config_ini_section, {})
-    configuration["sqlalchemy.url"] = os.getenv("DATABASE_URL")
+    configuration["sqlalchemy.url"] = get_database_url()
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
