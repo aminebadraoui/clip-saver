@@ -6,6 +6,7 @@ ffmpeg-python
 google-api-python-client
 python-dotenv
 sqlmodel
+SQLAlchemy<2.1
 alembic
 psycopg2-binary
 passlib[bcrypt]
